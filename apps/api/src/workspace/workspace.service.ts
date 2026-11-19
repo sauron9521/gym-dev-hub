@@ -7,7 +7,13 @@ import {
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import type { AgentSession, AgentSessionSummary, WorkspaceOverview } from '@gym-dev-hub/contracts';
+import type {
+  AgentSession,
+  AgentSessionSummary,
+  WorkspaceOverview,
+  CodexSessionBinding,
+} from '@gym-dev-hub/contracts';
+import { CodexBridgeService } from '../codex/codex-bridge.service.js';
 import { GitHubService } from '../github/github.service.js';
 import {
   createMessageSchema,
@@ -30,6 +36,7 @@ function summary(session: PersistedWorkspace['sessions'][number]): AgentSessionS
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     messageCount: session.messages.length,
+    codexThreadId: session.codexThreadId ?? null,
   };
 }
 
@@ -47,7 +54,10 @@ export class WorkspaceService {
   // Multiple independent API processes sharing the file are not supported.
   private serial: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly github: GitHubService) {}
+  constructor(
+    private readonly github: GitHubService,
+    private readonly codex: CodexBridgeService,
+  ) {}
 
   private async load(): Promise<PersistedWorkspace> {
     let text: string;
@@ -131,6 +141,7 @@ export class WorkspaceService {
         task: parsed.data.task,
         repository,
         status: 'planned',
+        codexThreadId: null,
         messages: [],
         createdAt: now,
         updatedAt: now,
@@ -167,6 +178,22 @@ export class WorkspaceService {
       });
       session.updatedAt = now;
       return fullSession(session);
+    }, true);
+  }
+
+  linkCodex(id: string): Promise<CodexSessionBinding> {
+    return this.transact(async (data) => {
+      const session = this.findSession(data, id);
+      const previousId = session.codexThreadId ?? null;
+      const binding = await this.codex.linkThread(session.id, previousId);
+      session.codexThreadId = binding.id;
+      session.updatedAt = new Date().toISOString();
+      return {
+        sessionId: session.id,
+        threadId: binding.id,
+        reused: binding.reused,
+        connection: this.codex.status(),
+      };
     }, true);
   }
 

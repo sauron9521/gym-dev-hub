@@ -9,7 +9,8 @@ This repository owns the orchestration tooling. Target repositories (including `
 - Read-only GitHub REST integration: implemented for allowlisted repositories via NestJS, with an optional server-side read-only token
 - GitHub App installation and write permissions: planned as separate permission-gated work
 - Agent Workspace foundation: local versioned JSON store (one NestJS process), repository-bound tasks, notes and UI tabs
-- Codex agent execution and isolated Git worktrees: planned as separate, permission-gated slices
+- Codex app-server connection and read-only per-session thread bindings: implemented; no turns, commands, Git writes or approval grants (PR #5)
+- Actual AI turns, secure approval UI and isolated Git worktrees: planned as separate, permission-gated slices
 - Persistence and worker queues: planned, separate from target repositories
 
 ## Invariants

@@ -1,21 +1,24 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GitHubService } from '../src/github/github.service.js';
 import { WorkspaceService } from '../src/workspace/workspace.service.js';
+import { CodexBridgeService } from '../src/codex/codex-bridge.service.js';
 
 describe('WorkspaceService', () => {
   let directory: string;
   let file: string;
   let service: WorkspaceService;
+  let codex: CodexBridgeService;
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'gym-dev-hub-test-'));
     file = join(directory, 'workspace.json');
     process.env.DEV_HUB_WORKSPACE_FILE = file;
     process.env.GITHUB_REPOSITORIES = 'sauron9521/gym-dev-hub,sauron9521/gym-platform';
-    service = new WorkspaceService(new GitHubService());
+    codex = new CodexBridgeService();
+    service = new WorkspaceService(new GitHubService(), codex);
   });
 
   afterEach(async () => {
@@ -54,7 +57,7 @@ describe('WorkspaceService', () => {
       content: 'CI should check latest SHA',
     });
 
-    const restored = new WorkspaceService(new GitHubService());
+    const restored = new WorkspaceService(new GitHubService(), new CodexBridgeService());
     const readBack = await restored.get(created.id);
     expect(readBack).toMatchObject({
       title: 'API PR #456',
@@ -72,7 +75,9 @@ describe('WorkspaceService', () => {
         service.addMessage(created.id, { content: `Acceptance criteria #${index}` }),
       ),
     );
-    const readBack = await new WorkspaceService(new GitHubService()).get(created.id);
+    const readBack = await new WorkspaceService(new GitHubService(), new CodexBridgeService()).get(
+      created.id,
+    );
     expect(readBack.messages).toHaveLength(12);
     expect(new Set(readBack.messages.map((note) => note.content)).size).toBe(12);
   });
@@ -99,6 +104,27 @@ describe('WorkspaceService', () => {
     await expect(service.get('00000000-0000-4000-8000-000000000000')).rejects.toThrow(
       'Сесію не знайдено',
     );
+  });
+
+  it('persists a Codex thread binding and resumes it rather than duplicating it', async () => {
+    const fake = vi.spyOn(codex, 'linkThread').mockImplementation(async (_, previousId) => ({
+      id: '019b4dc2-test-thread',
+      reused: previousId !== null,
+    }));
+    const session = await service.create(createInput);
+    const created = await service.linkCodex(session.id);
+    expect(created).toMatchObject({
+      sessionId: session.id,
+      threadId: '019b4dc2-test-thread',
+      reused: false,
+    });
+    const resumed = await service.linkCodex(session.id);
+    expect(resumed.reused).toBe(true);
+    expect(fake).toHaveBeenNthCalledWith(1, session.id, null);
+    expect(fake).toHaveBeenNthCalledWith(2, session.id, '019b4dc2-test-thread');
+    const persisted = await new WorkspaceService(new GitHubService(), codex).get(session.id);
+    expect(persisted.codexThreadId).toBe('019b4dc2-test-thread');
+    expect((await service.list()).sessions[0].codexThreadId).toBe('019b4dc2-test-thread');
   });
 
   it('does not overwrite a corrupted workspace', async () => {

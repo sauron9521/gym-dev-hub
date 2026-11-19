@@ -5,8 +5,9 @@
 3. **PR checks drill-down**: current head-SHA check runs, legacy commit statuses, classic required checks, conservative review readiness, short-lived cache (PR #3).
 4. **GitHub data reliability**: GitHub Rulesets, review approvals, full required-check evaluation, pagination, rate-limit improvements and optional read-only GitHub App installation, in small follow-up PRs.
 5. **Agent workspace foundation**: local persistent sessions, parallel tabs, task states and notes (PR #4).
-6. **Agent execution**: Codex app-server integration, session approvals and per-task Git worktrees in separate safe PRs.
-7. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-8. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+6. **Codex adapter foundation**: optional local app-server handshake, persisted read-only thread bindings and connection health (PR #5).
+7. **Agent execution**: streamed AI turns, approval UI and per-task Git worktrees in separate safe PRs.
+8. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+9. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
