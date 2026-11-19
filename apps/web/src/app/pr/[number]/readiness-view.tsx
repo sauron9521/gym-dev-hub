@@ -60,7 +60,12 @@ export function ReadinessView({ repository, number, data, error }: Props) {
             <small>Development workspace</small>
           </span>
         </Link>
-        <span className="topbar-badge">Read-only PR checks</span>
+        <div className="topbar-right">
+          <Link href="/workspace" className="ws-nav-link">
+            Agent Workspace
+          </Link>
+          <span className="topbar-badge">Read-only PR checks</span>
+        </div>
       </header>
       <main className="readiness-container">
         <div className="readiness-toolbar">

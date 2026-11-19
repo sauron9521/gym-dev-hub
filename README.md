@@ -22,6 +22,10 @@ The dashboard reads `sauron9521/gym-dev-hub` and `sauron9521/gym-platform` from 
 
 See [GitHub Dashboard and PR Checks setup](docs/github-dashboard.md) for the per-PR `/pr/[number]` verification page, capabilities, and limitations.
 
+### Agent Workspace (local foundation)
+
+Open <http://127.0.0.1:3100/workspace> to create separate implementation-task sessions, open multiple tabs, update task statuses, and save local notes. This is **not yet a live AI chat**: Codex, command execution and PR creation follow in separate PRs. Session files remain local and are gitignored. See [Agent Workspace setup](docs/agent-workspace.md).
+
 ## Verification
 
 ```bash

@@ -847,3 +847,556 @@ strong {
     margin: 0;
   }
 }
+
+/* Agent Workspace foundation — local sessions, not yet connected to Codex. */
+.ws-app {
+  min-height: 100vh;
+}
+.ws-layout {
+  display: grid;
+  grid-template-columns: 294px minmax(0, 1fr);
+  min-height: calc(100vh - 76px);
+}
+.ws-sidebar {
+  background: #101725;
+  border-right: 1px solid #273246;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 76px);
+}
+.ws-sidebar-top {
+  padding: 28px 20px 15px;
+}
+.ws-dashboard-link {
+  display: block;
+  font-size: 12px;
+  color: #89a5d6;
+  margin-bottom: 34px;
+}
+.ws-dashboard-link:hover {
+  color: #d1dfff;
+}
+.ws-sidebar-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 20px;
+  gap: 10px;
+}
+.ws-sidebar-heading strong {
+  font:
+    800 18px Manrope,
+    sans-serif;
+}
+.ws-sidebar-heading span {
+  padding: 4px 9px;
+  border-radius: 20px;
+  color: #a4b5d3;
+  background: #273248;
+  font-size: 11px;
+}
+.ws-primary {
+  background: linear-gradient(125deg, #527be8, #3963c9);
+  border: 1px solid #6485ea;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 12px 17px;
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: center;
+}
+.ws-primary:hover:not(:disabled) {
+  background: #628bf0;
+}
+.ws-primary:disabled,
+.refresh:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.ws-sidebar-top > .ws-primary {
+  width: 100%;
+}
+.ws-session-nav {
+  overflow-y: auto;
+  padding: 10px 13px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.ws-session-link {
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #bdc9dc;
+  border-radius: 10px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+.ws-session-link:hover {
+  background: #1a2539;
+}
+.ws-session-link.is-active {
+  background: #1e3050;
+  border-color: #3b5077;
+}
+.ws-session-link strong {
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.ws-session-link small {
+  font-size: 10px;
+  color: #91a1ba;
+  overflow-wrap: anywhere;
+}
+.ws-status {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: #adbed7;
+  background: #2d394c;
+}
+.ws-status-in-progress {
+  color: #a4c7ff;
+  background: #263f65;
+}
+.ws-status-review {
+  color: #f4d9a1;
+  background: #40361f;
+}
+.ws-status-completed {
+  color: #a5e7c3;
+  background: #1b4138;
+}
+.ws-empty-nav {
+  font-size: 12px;
+  color: #73849f;
+  line-height: 1.6;
+  padding: 10px;
+}
+.ws-sidebar-footer {
+  border-top: 1px solid #273246;
+  padding: 18px 24px 23px;
+  display: grid;
+  gap: 8px;
+  font-size: 10px;
+  color: #7789a5;
+  line-height: 1.55;
+}
+.ws-main {
+  min-width: 0;
+  padding: 42px clamp(20px, 4vw, 64px);
+}
+.ws-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.ws-header h1 {
+  font:
+    800 clamp(29px, 4vw, 40px)/1.2 Manrope,
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.04em;
+  margin-bottom: 10px;
+}
+.ws-header p {
+  color: #94a4bd;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.ws-header .refresh {
+  cursor: pointer;
+  background: #19263c;
+}
+.ws-scope-notice {
+  margin: 19px 0 25px;
+  border: 1px solid #3c4a66;
+  border-left: 3px solid #7597e6;
+  border-radius: 9px;
+  color: #a7b7ce;
+  font-size: 12px;
+  line-height: 1.65;
+  background: #162234;
+  padding: 13px 17px;
+}
+.ws-scope-notice strong {
+  color: #deeaff;
+}
+.ws-create-form {
+  max-width: 720px;
+  border: 1px solid #314365;
+  border-radius: 13px;
+  background: #151f31;
+  padding: 23px;
+  margin-bottom: 20px;
+  display: grid;
+  gap: 16px;
+}
+.ws-form-title {
+  font-size: 17px;
+  font-weight: 800;
+}
+.ws-create-form label,
+.ws-compose label,
+.ws-status-select {
+  display: grid;
+  gap: 8px;
+  color: #a2b3d0;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ws-create-form input,
+.ws-create-form textarea,
+.ws-create-form select,
+.ws-compose textarea,
+.ws-status-select select {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid #364760;
+  border-radius: 8px;
+  color: #ebf1ff;
+  background: #0f1828;
+  font:
+    12px/1.6 'DM Sans',
+    system-ui,
+    sans-serif;
+}
+.ws-create-form textarea,
+.ws-compose textarea {
+  resize: vertical;
+}
+.ws-create-form input:focus-visible,
+.ws-create-form textarea:focus-visible,
+.ws-create-form select:focus-visible,
+.ws-compose textarea:focus-visible,
+.ws-status-select select:focus-visible {
+  outline: 2px solid #7499ec;
+  outline-offset: 1px;
+}
+.ws-form-actions {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+}
+.ws-form-actions button:not(.ws-primary) {
+  border: 1px solid #3b4960;
+  padding: 11px 15px;
+  color: #9faec9;
+  background: #1b2638;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.ws-tabs {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid #2b3850;
+  padding: 0 0 0 5px;
+}
+.ws-tab {
+  max-width: 280px;
+  display: flex;
+  align-items: center;
+  background: #151d2b;
+  border: 1px solid #2d394e;
+  border-radius: 9px 9px 0 0;
+  color: #94a7c7;
+}
+.ws-tab.is-active {
+  color: #e8f0ff;
+  background: #1c2c46;
+  border-color: #4a638d;
+  border-bottom-color: #1c2c46;
+}
+.ws-tab button {
+  border: 0;
+  cursor: pointer;
+  font:
+    700 11px 'DM Sans',
+    sans-serif;
+  color: inherit;
+  background: transparent;
+}
+.ws-tab button:first-child {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 13px 10px 13px 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-tab-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  background: #7395dc;
+  border-radius: 50%;
+}
+.ws-tab-close {
+  padding: 9px 12px;
+  font-size: 18px !important;
+}
+.ws-tab-close:hover {
+  color: #ffb1b1;
+}
+.ws-welcome {
+  text-align: center;
+  border: 1px dashed #3c4b64;
+  background: #111b2b;
+  border-radius: 13px;
+  padding: 80px 26px;
+  color: #95a7c2;
+}
+.ws-welcome-icon {
+  font-size: 38px;
+  color: #87aaff;
+  margin-bottom: 20px;
+}
+.ws-welcome h2 {
+  color: #e7efff;
+  font:
+    800 22px Manrope,
+    sans-serif;
+}
+.ws-welcome p {
+  max-width: 550px;
+  margin: 0 auto 25px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.ws-detail {
+  border: 1px solid #303c51;
+  border-top: 0;
+  border-radius: 0 0 13px 13px;
+  background: #111a28;
+}
+.ws-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 28px 27px;
+}
+.ws-detail-header h2 {
+  margin: 0 0 10px;
+  font:
+    800 clamp(19px, 2.4vw, 26px) Manrope,
+    sans-serif;
+}
+.ws-date {
+  color: #7d91ad;
+  font-size: 11px;
+}
+.ws-status-select {
+  min-width: 170px;
+}
+.ws-task {
+  padding: 24px 27px;
+  background: #152236;
+  border-top: 1px solid #283b57;
+  border-bottom: 1px solid #283b57;
+}
+.ws-task p {
+  color: #d0def2;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.75;
+}
+.ws-task-meta {
+  font-size: 10px;
+  color: #88a1c7;
+}
+.ws-thread-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 22px 27px;
+  border-bottom: 1px solid #283346;
+}
+.ws-thread-head h3 {
+  margin: 0;
+  font:
+    800 15px Manrope,
+    sans-serif;
+}
+.ws-thread-head span {
+  font-size: 11px;
+  color: #8194b2;
+}
+.ws-thread-messages {
+  padding: 24px 27px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 180px;
+  max-height: 460px;
+  overflow-y: auto;
+}
+.ws-thread-empty {
+  margin: auto;
+  color: #788ca8;
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
+}
+.ws-message {
+  align-self: flex-end;
+  background: #243956;
+  border: 1px solid #375179;
+  border-radius: 12px 12px 3px 12px;
+  padding: 15px 18px;
+  max-width: 88%;
+  min-width: 120px;
+}
+.ws-message-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  align-items: center;
+  color: #a3bdf1;
+  font-size: 10px;
+}
+.ws-message-meta time {
+  color: #96a9c5;
+}
+.ws-message p {
+  margin: 10px 0 0;
+  color: #e1eaf9;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ws-compose {
+  border-top: 1px solid #2e3b50;
+  padding: 20px 27px 27px;
+}
+.ws-compose textarea {
+  margin: 8px 0 12px;
+}
+.ws-compose-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.ws-compose-actions span {
+  font-size: 10px;
+  color: #7286a3;
+}
+.ws-dismiss {
+  background: none;
+  color: #ecd9bf;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 11px;
+  margin-left: auto;
+}
+@media (max-width: 980px) {
+  .ws-layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .ws-main {
+    padding: 30px 20px;
+  }
+}
+@media (max-width: 720px) {
+  .ws-layout {
+    grid-template-columns: 1fr;
+  }
+  .ws-sidebar {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid #273246;
+  }
+  .ws-sidebar-top {
+    padding: 20px;
+  }
+  .ws-dashboard-link {
+    margin-bottom: 15px;
+  }
+  .ws-session-nav {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    max-height: 180px;
+  }
+  .ws-session-link {
+    min-width: 185px;
+  }
+  .ws-sidebar-footer {
+    display: none;
+  }
+  .ws-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .ws-detail-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 22px 18px;
+  }
+  .ws-task,
+  .ws-thread-head,
+  .ws-thread-messages,
+  .ws-compose {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .ws-tab {
+    max-width: 90vw;
+  }
+  .ws-message {
+    max-width: 100%;
+  }
+}
+
+/* Workspace navigation entry */
+.ws-nav-link {
+  color: #a8c5ff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 9px 11px;
+  background: #203250;
+  border: 1px solid #3b517a;
+  border-radius: 8px;
+}
+.ws-nav-link:hover {
+  background: #2a426b;
+  color: #ecf2ff;
+}
+.ws-sidebar-entry {
+  margin: 21px 8px 0;
+  padding: 13px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #c5d7ff;
+  background: #1b2d4d;
+  border: 1px solid #37527b;
+  border-radius: 9px;
+}
+.ws-sidebar-entry:hover {
+  background: #283f64;
+}
+@media (max-width: 570px) {
+  .ws-nav-link {
+    display: none;
+  }
+}

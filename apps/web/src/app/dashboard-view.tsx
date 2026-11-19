@@ -92,7 +92,10 @@ export function DashboardView({ dashboard, error, selectedRepository }: Props) {
         <div className="topbar-right">
           <span className="mode-dot" />
           <span>GitHub · лише читання</span>
-          <span className="topbar-badge">MVP / PR #2</span>
+          <Link href="/workspace" className="ws-nav-link">
+            Agent Workspace
+          </Link>
+          <span className="topbar-badge">MVP / PR #4</span>
         </div>
       </header>
 
@@ -113,6 +116,9 @@ export function DashboardView({ dashboard, error, selectedRepository }: Props) {
               </Link>
             ))}
           </nav>
+          <Link href="/workspace" className="ws-sidebar-entry">
+            ✦ Agent Workspace
+          </Link>
           <div className="sidebar-section-label secondary-label">НАВІГАЦІЯ</div>
           <nav className="section-list" aria-label="Розділи">
             <a href="#pulls">Pull requests</a>

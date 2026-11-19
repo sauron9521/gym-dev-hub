@@ -84,6 +84,10 @@ export class GitHubService {
     return [...new Set(valid)];
   }
 
+  listAllowedRepositories(): string[] {
+    return this.repositories();
+  }
+
   assertAllowedRepository(repositoryInput?: string): string {
     const repositories = this.repositories();
     const repository = repositoryInput || repositories[0];
