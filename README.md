@@ -20,7 +20,7 @@ pnpm dev
 
 The dashboard reads `sauron9521/gym-dev-hub` and `sauron9521/gym-platform` from the GitHub public API by default. For additional repository access and rate limits, copy `apps/api/.env.example` to `apps/api/.env` and configure an optional read-only GitHub token. Never commit tokens.
 
-See [GitHub Dashboard setup](docs/github-dashboard.md) for capabilities and limitations.
+See [GitHub Dashboard and PR Checks setup](docs/github-dashboard.md) for the per-PR `/pr/[number]` verification page, capabilities, and limitations.
 
 ## Verification
 

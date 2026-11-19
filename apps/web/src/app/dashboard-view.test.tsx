@@ -64,6 +64,8 @@ describe('GitHub Dashboard', () => {
     const markup = renderToStaticMarkup(<DashboardView dashboard={dashboard} />);
     expect(markup).toContain('Контроль розробки');
     expect(markup).toContain('Dashboard UI');
+    expect(markup).toContain('Перевірити');
+    expect(markup).toContain('/pr/7?repository=sauron9521%2Fgym-dev-hub');
     expect(markup).toContain('Add worker');
     expect(markup).toContain('CI пройшов');
     expect(markup).toContain('Milestones');
