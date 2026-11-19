@@ -28,6 +28,18 @@ export const persistedWorkspaceSchema = z.strictObject({
       createdAt: z.iso.datetime(),
       updatedAt: z.iso.datetime(),
       codexThreadId: z.string().min(4).max(128).nullable().optional(),
+      chatMessages: z
+        .array(
+          z.strictObject({
+            id: z.uuid(),
+            role: z.enum(['user', 'assistant']),
+            content: z.string().max(20000),
+            createdAt: z.iso.datetime(),
+            state: z.enum(['completed', 'failed', 'interrupted']),
+          }),
+        )
+        .max(100)
+        .optional(),
       messages: z.array(
         z.strictObject({
           id: z.uuid(),

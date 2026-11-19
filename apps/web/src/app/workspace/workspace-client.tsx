@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { CodexChatPanel } from './codex-chat-panel';
 import { useEffect, useState, type FormEvent } from 'react';
 import type {
   AgentSession,
@@ -263,7 +264,7 @@ export function WorkspaceClient({ initial, initialError }: Props) {
         <div className="topbar-right">
           <span className="mode-dot" />
           <span>Локальні робочі сесії</span>
-          <span className="topbar-badge">Codex Adapter / PR #5</span>
+          <span className="topbar-badge">Agent Chat / PR #6</span>
         </div>
       </header>
 
@@ -523,6 +524,12 @@ export function WorkspaceClient({ initial, initialError }: Props) {
                   Один PR · одна задача · ручний merge після review
                 </div>
               </section>
+
+              <CodexChatPanel
+                sessionId={active.id}
+                enabled={codexStatus.state === 'ready' && Boolean(active.codexThreadId)}
+                completed={active.status === 'completed'}
+              />
 
               <section className="ws-thread">
                 <div className="ws-thread-head">

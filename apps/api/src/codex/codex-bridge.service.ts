@@ -13,11 +13,45 @@ class CodexRpcError extends Error {
   }
 }
 
+interface RunningTurn {
+  threadId: string;
+  turnId: string | null;
+  text: string;
+  itemIds: Set<string>;
+  done: (result: { text: string; status: 'completed' | 'failed' | 'interrupted' }) => void;
+  onText: (text: string) => void;
+  timeout: NodeJS.Timeout;
+  aborted: boolean;
+}
+
 type Pending = {
   resolve: (value: unknown) => void;
   reject: (reason: Error) => void;
   timeout: NodeJS.Timeout;
 };
+
+function codexEnvironment(): NodeJS.ProcessEnv {
+  // Never inherit Dev Hub's GitHub credentials, database URLs, or other
+  // application secrets into an AI-controlled subprocess.
+  const allowed = [
+    'PATH',
+    'Path',
+    'HOME',
+    'USERPROFILE',
+    'APPDATA',
+    'LOCALAPPDATA',
+    'TEMP',
+    'TMP',
+    'SystemRoot',
+    'WINDIR',
+    'CODEX_HOME',
+    'LANG',
+    'LC_ALL',
+  ];
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of allowed) if (process.env[key]) env[key] = process.env[key];
+  return env;
+}
 
 function executablePath(): string {
   const configured = process.env.CODEX_EXECUTABLE?.trim();
@@ -61,6 +95,7 @@ export class CodexBridgeService implements OnModuleDestroy {
   private buffer = '';
   private pending = new Map<number, Pending>();
   private readonly activeThreads = new Set<string>();
+  private readonly turns = new Map<string, RunningTurn>();
   private connecting: Promise<CodexConnectionStatus> | null = null;
   private readonly timeoutMs = 12_000;
   private readonly maxBufferSize = 512 * 1024;
@@ -92,7 +127,7 @@ export class CodexBridgeService implements OnModuleDestroy {
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
         shell: false,
-        env: process.env,
+        env: codexEnvironment(),
       });
       this.child = child;
       this.buffer = '';
@@ -171,6 +206,9 @@ export class CodexBridgeService implements OnModuleDestroy {
     }
 
     const id = message.id;
+    if (typeof message.method === 'string' && id === undefined) {
+      this.onNotification(message.method, message.params);
+    }
     if (typeof id === 'number' && this.pending.has(id)) {
       const task = this.pending.get(id)!;
       clearTimeout(task.timeout);
@@ -194,6 +232,146 @@ export class CodexBridgeService implements OnModuleDestroy {
     }
   }
 
+  private onNotification(method: string, raw: unknown): void {
+    const params = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    const threadId = typeof params.threadId === 'string' ? params.threadId : null;
+    if (!threadId) return;
+    const turn = this.turns.get(threadId);
+    if (!turn) return;
+    const turnId =
+      typeof params.turnId === 'string'
+        ? params.turnId
+        : params.turn && typeof params.turn === 'object'
+          ? (params.turn as Record<string, unknown>).id
+          : null;
+    if (typeof turnId === 'string') {
+      if (turn.turnId && turn.turnId !== turnId) return;
+      turn.turnId = turnId;
+    }
+
+    if (method === 'item/agentMessage/delta' && !turn.aborted) {
+      if (typeof params.delta === 'string') {
+        const itemId = String(params.itemId ?? '');
+        turn.itemIds.add(itemId);
+        turn.text = (turn.text + params.delta).slice(0, 20_000);
+        turn.onText(turn.text);
+      }
+    } else if (method === 'item/completed' && !turn.aborted) {
+      const item =
+        params.item && typeof params.item === 'object'
+          ? (params.item as Record<string, unknown>)
+          : {};
+      if (item.type === 'agentMessage' && typeof item.text === 'string') {
+        const itemId = String(item.id ?? '');
+        if (!turn.itemIds.has(itemId)) {
+          turn.text = (turn.text + item.text).slice(0, 20_000);
+          turn.onText(turn.text);
+        }
+      }
+    } else if (method === 'item/started') {
+      const item =
+        params.item && typeof params.item === 'object'
+          ? (params.item as Record<string, unknown>)
+          : {};
+      // Extra stop-gap: a read-only sandbox alone allows some read-only shell tools.
+      // Interrupt unexpectedly started tools instead of accepting their output.
+      if (
+        [
+          'commandExecution',
+          'fileChange',
+          'mcpToolCall',
+          'dynamicToolCall',
+          'webSearch',
+          'collabAgentToolCall',
+        ].includes(String(item.type))
+      ) {
+        turn.aborted = true;
+        if (turn.turnId) {
+          void this.request('turn/interrupt', { threadId, turnId: turn.turnId }).catch(
+            () => undefined,
+          );
+        }
+      }
+    } else if (method === 'turn/completed') {
+      const details =
+        params.turn && typeof params.turn === 'object'
+          ? (params.turn as Record<string, unknown>)
+          : {};
+      const status =
+        details.status === 'completed' && !turn.aborted
+          ? 'completed'
+          : details.status === 'interrupted' || turn.aborted
+            ? 'interrupted'
+            : 'failed';
+      clearTimeout(turn.timeout);
+      this.turns.delete(threadId);
+      turn.done({ text: turn.text, status });
+    }
+  }
+
+  async startReadOnlyTurn(
+    threadId: string,
+    text: string,
+    onText: (response: string) => void,
+  ): Promise<{ text: string; status: 'completed' | 'failed' | 'interrupted' }> {
+    if (!this.activeThreads.has(threadId) || this.state.state !== 'ready') {
+      throw new ServiceUnavailableException('Спочатку підключи Codex thread.');
+    }
+    if (this.turns.has(threadId)) {
+      throw new ServiceUnavailableException('У цьому Codex thread вже виконується запит.');
+    }
+    let finished!: (result: {
+      text: string;
+      status: 'completed' | 'failed' | 'interrupted';
+    }) => void;
+    const completion = new Promise<{
+      text: string;
+      status: 'completed' | 'failed' | 'interrupted';
+    }>((resolve) => {
+      finished = resolve;
+    });
+    const timeout = setTimeout(() => {
+      const turn = this.turns.get(threadId);
+      if (!turn) return;
+      turn.aborted = true;
+      if (turn.turnId) {
+        void this.request('turn/interrupt', { threadId, turnId: turn.turnId }).catch(
+          () => undefined,
+        );
+      }
+      this.turns.delete(threadId);
+      finished({ text: turn.text, status: 'interrupted' });
+    }, 120_000);
+    const turn: RunningTurn = {
+      threadId,
+      turnId: null,
+      text: '',
+      itemIds: new Set(),
+      done: finished,
+      onText,
+      timeout,
+      aborted: false,
+    };
+    this.turns.set(threadId, turn);
+
+    try {
+      const result = (await this.request('turn/start', {
+        threadId,
+        input: [{ type: 'text', text, text_elements: [] }],
+        approvalPolicy: 'never',
+        sandboxPolicy: { type: 'readOnly', networkAccess: false },
+      })) as { turn?: { id?: unknown } };
+      if (typeof result?.turn?.id === 'string' && !turn.turnId) {
+        turn.turnId = result.turn.id;
+      }
+    } catch {
+      clearTimeout(timeout);
+      this.turns.delete(threadId);
+      finished({ text: turn.text, status: 'failed' });
+    }
+    return completion;
+  }
+
   private disconnectWithError(message: string): void {
     const child = this.child;
     this.child = null;
@@ -204,6 +382,11 @@ export class CodexBridgeService implements OnModuleDestroy {
     }
     this.pending.clear();
     this.activeThreads.clear();
+    for (const turn of this.turns.values()) {
+      clearTimeout(turn.timeout);
+      turn.done({ text: turn.text, status: 'failed' });
+    }
+    this.turns.clear();
     if (child && child.exitCode === null) child.kill();
   }
 
@@ -222,7 +405,26 @@ export class CodexBridgeService implements OnModuleDestroy {
       return { id: previousId, reused: true };
     }
 
-    const settings = { cwd: directory, sandbox: 'read-only', approvalPolicy: 'never' };
+    const settings = {
+      cwd: directory,
+      sandbox: 'read-only',
+      approvalPolicy: 'never',
+      // Text-only chat: disable optional tool surfaces. The sandbox remains
+      // read-only even if Codex ignores a feature flag.
+      config: {
+        web_search: 'disabled',
+        agents: { enabled: false },
+        features: {
+          shell_tool: false,
+          unified_exec: false,
+          browser_use: false,
+          browser_use_external: false,
+          plugins: false,
+        },
+      },
+      baseInstructions:
+        'You are an AI chat assistant. Answer questions in text only. Never execute commands, inspect files, use tools, browse, delegate, or modify anything. If asked to access local resources, state that this mode cannot.',
+    };
     const start = async (): Promise<{ id: string; reused: boolean }> => {
       const output = (await this.request('thread/start', settings)) as {
         thread?: { id?: unknown };
@@ -279,6 +481,11 @@ export class CodexBridgeService implements OnModuleDestroy {
     }
     this.pending.clear();
     this.activeThreads.clear();
+    for (const turn of this.turns.values()) {
+      clearTimeout(turn.timeout);
+      turn.done({ text: turn.text, status: 'failed' });
+    }
+    this.turns.clear();
     if (child && child.exitCode === null) child.kill();
   }
 }

@@ -25,6 +25,17 @@ function allowedPath(segments: string[], method: string): string | null {
   if (segments.length === 2 && (method === 'GET' || method === 'PATCH')) {
     return `/workspace/sessions/${id}`;
   }
+  if (segments.length === 3 && segments[2] === 'chat' && ['POST', 'GET'].includes(method)) {
+    return `/workspace/sessions/${id}/chat`;
+  }
+  if (
+    segments.length === 4 &&
+    segments[2] === 'chat' &&
+    segments[3] === 'events' &&
+    method === 'GET'
+  ) {
+    return `/workspace/sessions/${id}/chat/events`;
+  }
   if (segments.length === 3 && segments[2] === 'codex' && method === 'POST') {
     return `/workspace/sessions/${id}/codex`;
   }
@@ -65,6 +76,7 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
   }
 
   try {
+    const isEventStream = path.endsWith('/chat/events');
     const endpoint = new URL(path, process.env.DEV_HUB_API_URL ?? 'http://127.0.0.1:3101');
     const upstream = await fetch(endpoint, {
       method,
@@ -74,9 +86,21 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
       },
       body,
       cache: 'no-store',
-      signal: AbortSignal.timeout(path.includes('codex') ? 20_000 : 10_000),
+      signal: isEventStream
+        ? request.signal
+        : AbortSignal.timeout(path.includes('codex') || path.endsWith('/chat') ? 20_000 : 10_000),
       redirect: 'error',
     });
+    if (isEventStream && upstream.ok) {
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          Connection: 'keep-alive',
+        },
+      });
+    }
     return new Response(await upstream.text(), {
       status: upstream.status,
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },

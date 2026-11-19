@@ -1,6 +1,6 @@
 # Agent Workspace Foundation (PR #4)
 
-This is the **local session and task foundation**, not yet an interactive AI chat. PR #5 adds an opt-in [Codex app-server connection](codex-adapter.md) with read-only thread IDs but deliberately does not send prompts. A Workspace session contains one repository, one implementation task, a lifecycle status, and notes. Open several sessions in parallel browser tabs, and switch between them without losing their notes.
+This is the **local session and task foundation**. PR #5 added an opt-in [Codex app-server connection](codex-adapter.md) with read-only thread IDs. PR #6 now adds a separate [Codex AI Chat](agent-chat.md) with streamed text responses and saved history. A Workspace session contains one repository, one implementation task, a lifecycle status, and notes. Open several sessions in parallel browser tabs, and switch between them without losing their notes.
 
 ## Start
 
@@ -13,7 +13,7 @@ Open `http://127.0.0.1:3100/workspace`, or follow **Agent Workspace** from the D
 
 Create a session with a title, one of the configured GitHub repositories, and task/acceptance criteria. Use **Заплановано → У роботі → Очікує review → Завершено** as the task lifecycle. Use the note composer to save milestones, decisions and PR references. Multiple sessions can be open as separate UI tabs; closing a tab does **not** delete its data.
 
-The workspace currently **does not send prompts to GPT/Codex, execute commands, create branches/PRs, or merge code**. Connecting a Codex thread saves only an ID; it does not run an agent turn. Notes are saved under the `user` role to avoid pretending an AI replied.
+Workspace notes remain local user notes, separate from the AI chat. A user may now explicitly send a prompt to a linked Codex thread; this does not grant code write, shell execution, branch creation, PR or merge permissions. See the [security limitations](agent-chat.md).
 
 ## Persistence
 
