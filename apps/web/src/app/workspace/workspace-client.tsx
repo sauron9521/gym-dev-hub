@@ -7,6 +7,8 @@ import type {
   AgentSessionStatus,
   AgentSessionSummary,
   WorkspaceOverview,
+  CodexConnectionStatus,
+  CodexSessionBinding,
 } from '@gym-dev-hub/contracts';
 
 interface Props {
@@ -70,6 +72,12 @@ export function WorkspaceClient({ initial, initialError }: Props) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialError);
+  const [codexNotice, setCodexNotice] = useState<string | null>(null);
+  const [codexStatus, setCodexStatus] = useState<CodexConnectionStatus>({
+    state: 'disconnected',
+    message: 'Codex ще не підключений.',
+    connectedAt: null,
+  });
 
   const active = activeId ? details[activeId] : null;
   const activeSummary = sessions.find((session) => session.id === activeId);
@@ -92,6 +100,20 @@ export function WorkspaceClient({ initial, initialError }: Props) {
       cancelled = true;
     };
   }, [activeId, details]);
+
+  useEffect(() => {
+    let cancelled = false;
+    requestJson<CodexConnectionStatus>('codex/status')
+      .then((result) => {
+        if (!cancelled) setCodexStatus(result);
+      })
+      .catch(() => {
+        /* Status is optional until NestJS starts. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function applySession(session: AgentSession) {
     setDetails((previous) => ({ ...previous, [session.id]: session }));
@@ -151,6 +173,49 @@ export function WorkspaceClient({ initial, initialError }: Props) {
     }
   }
 
+  async function connectCodex() {
+    if (busy) return;
+    setBusy(true);
+    setCodexStatus({ state: 'connecting', message: 'З’єднання…', connectedAt: null });
+    try {
+      const connected = await requestJson<CodexConnectionStatus>('codex/connect', 'POST', {});
+      setCodexStatus(connected);
+      setError(null);
+    } catch (reason) {
+      setCodexStatus({ state: 'error', message: 'Підключення не вдалося.', connectedAt: null });
+      setError(reason instanceof Error ? reason.message : 'Codex недоступний.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function bindCodexThread() {
+    if (!active || busy) return;
+    setBusy(true);
+    try {
+      const link = await requestJson<CodexSessionBinding>(
+        `sessions/${active.id}/codex`,
+        'POST',
+        {},
+      );
+      const updated = await requestJson<AgentSession>(`sessions/${active.id}`);
+      applySession(updated);
+      setCodexStatus(link.connection);
+      setCodexNotice(
+        link.reused
+          ? 'Існуючий thread підключено без запуску AI.'
+          : active.codexThreadId
+            ? 'Попередній порожній thread не мав історії Codex. Створено новий read-only thread.'
+            : 'Створено новий read-only thread. Жодне AI-завдання не запущено.',
+      );
+      setError(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Codex thread недоступний.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function changeStatus(next: AgentSessionStatus) {
     if (!active || busy) return;
     setBusy(true);
@@ -198,7 +263,7 @@ export function WorkspaceClient({ initial, initialError }: Props) {
         <div className="topbar-right">
           <span className="mode-dot" />
           <span>Локальні робочі сесії</span>
-          <span className="topbar-badge">Foundation / PR #4</span>
+          <span className="topbar-badge">Codex Adapter / PR #5</span>
         </div>
       </header>
 
@@ -267,9 +332,33 @@ export function WorkspaceClient({ initial, initialError }: Props) {
             </button>
           </div>
 
-          <div className="ws-scope-notice">
-            <strong>Поки без Codex.</strong> Повідомлення зараз — це твої локальні нотатки, а не
-            запити до AI. Виконання коду та автоматичні PR додамо окремо.
+          <div className="ws-scope-notice ws-codex-panel">
+            <div>
+              <strong>
+                Codex:{' '}
+                {codexStatus.state === 'ready'
+                  ? 'підключено'
+                  : codexStatus.state === 'connecting'
+                    ? 'підключення…'
+                    : codexStatus.state === 'error'
+                      ? 'помилка'
+                      : 'вимкнено'}
+                .
+              </strong>
+              <span>{codexStatus.message}</span>
+              <small>
+                Thread прив’язується до задачі без запуску AI-turn. Команди, Git і записи у файли
+                залишаються вимкненими.
+              </small>
+            </div>
+            <button
+              className="ws-primary"
+              type="button"
+              disabled={busy || codexStatus.state === 'ready'}
+              onClick={() => void connectCodex()}
+            >
+              {codexStatus.state === 'ready' ? 'Підключено' : 'Підключити Codex'}
+            </button>
           </div>
 
           {error && (
@@ -391,6 +480,23 @@ export function WorkspaceClient({ initial, initialError }: Props) {
                   <div className="overline">SESSION · {active.repository}</div>
                   <h2>{active.title}</h2>
                   <span className="ws-date">Змінено {shortDate(active.updatedAt)}</span>
+                  <div className="ws-codex-thread">
+                    <div className="overline">CODEX THREAD · READ-ONLY</div>
+                    {active.codexThreadId ? (
+                      <code title={active.codexThreadId}>{active.codexThreadId}</code>
+                    ) : (
+                      <span>Thread ще не створено.</span>
+                    )}
+                    <button
+                      type="button"
+                      className="inspect-link"
+                      disabled={busy || codexStatus.state !== 'ready'}
+                      onClick={() => void bindCodexThread()}
+                    >
+                      {active.codexThreadId ? 'Підключити thread' : 'Прив’язати Codex thread'}
+                    </button>
+                    {codexNotice && <small role="status">{codexNotice}</small>}
+                  </div>
                 </div>
                 <label className="ws-status-select">
                   Статус задачі

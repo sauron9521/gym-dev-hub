@@ -16,6 +16,7 @@ export interface AgentSessionSummary {
   createdAt: string;
   updatedAt: string;
   messageCount: number;
+  codexThreadId: string | null;
 }
 
 export interface AgentSession extends AgentSessionSummary {

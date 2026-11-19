@@ -27,6 +27,7 @@ export const persistedWorkspaceSchema = z.strictObject({
       status: z.enum(['planned', 'in-progress', 'review', 'completed']),
       createdAt: z.iso.datetime(),
       updatedAt: z.iso.datetime(),
+      codexThreadId: z.string().min(4).max(128).nullable().optional(),
       messages: z.array(
         z.strictObject({
           id: z.uuid(),

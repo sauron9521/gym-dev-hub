@@ -5,6 +5,10 @@ export const dynamic = 'force-dynamic';
 type Context = { params: Promise<{ segments: string[] }> };
 
 function allowedPath(segments: string[], method: string): string | null {
+  if (segments.length === 2 && segments[0] === 'codex') {
+    if (segments[1] === 'status' && method === 'GET') return '/workspace/codex/status';
+    if (segments[1] === 'connect' && method === 'POST') return '/workspace/codex/connect';
+  }
   if (segments[0] !== 'sessions') return null;
   if (segments.length === 1 && (method === 'GET' || method === 'POST')) {
     return '/workspace/sessions';
@@ -20,6 +24,9 @@ function allowedPath(segments: string[], method: string): string | null {
 
   if (segments.length === 2 && (method === 'GET' || method === 'PATCH')) {
     return `/workspace/sessions/${id}`;
+  }
+  if (segments.length === 3 && segments[2] === 'codex' && method === 'POST') {
+    return `/workspace/sessions/${id}/codex`;
   }
   if (segments.length === 3 && segments[2] === 'messages' && method === 'POST') {
     return `/workspace/sessions/${id}/messages`;
@@ -67,7 +74,7 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
       },
       body,
       cache: 'no-store',
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(path.includes('codex') ? 20_000 : 10_000),
       redirect: 'error',
     });
     return new Response(await upstream.text(), {

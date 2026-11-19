@@ -26,6 +26,10 @@ See [GitHub Dashboard and PR Checks setup](docs/github-dashboard.md) for the per
 
 Open <http://127.0.0.1:3100/workspace> to create separate implementation-task sessions, open multiple tabs, update task statuses, and save local notes. This is **not yet a live AI chat**: Codex, command execution and PR creation follow in separate PRs. Session files remain local and are gitignored. See [Agent Workspace setup](docs/agent-workspace.md).
 
+### Codex Adapter (opt-in)
+
+The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. This does not send prompts or run commands. See [Codex Adapter setup and security](docs/codex-adapter.md).
+
 ## Verification
 
 ```bash

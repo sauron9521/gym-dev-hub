@@ -26,6 +26,13 @@ export class WorkspaceController {
     return this.workspace.update(id, input);
   }
 
+  @Post(':id/codex')
+  attachCodex(
+    @Param('id') id: string,
+  ): Promise<import('@gym-dev-hub/contracts').CodexSessionBinding> {
+    return this.workspace.linkCodex(id);
+  }
+
   @Post(':id/messages')
   addMessage(@Param('id') id: string, @Body() input: unknown): Promise<AgentSession> {
     return this.workspace.addMessage(id, input);

@@ -13,6 +13,7 @@ const overview: WorkspaceOverview = {
       task: 'One PR for a native mobile UX refinement',
       status: 'in-progress',
       messageCount: 2,
+      codexThreadId: null,
       createdAt: '2026-11-19T20:00:00.000Z',
       updatedAt: '2026-11-19T20:15:00.000Z',
     },
@@ -26,7 +27,8 @@ describe('Workspace foundation UI', () => {
     expect(html).toContain('Окремі задачі');
     expect(html).toContain('role="tablist"');
     expect(html).toContain('Закрити вкладку');
-    expect(html).toContain('Поки без Codex');
+    expect(html).toContain('Підключити Codex');
+    expect(html).toContain('без запуску AI-turn');
     expect(html).toContain('2 нотаток');
   });
 

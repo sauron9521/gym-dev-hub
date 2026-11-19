@@ -29,3 +29,5 @@ export type {
   AgentSession,
   WorkspaceOverview,
 } from './workspace.js';
+
+export type { CodexConnectionState, CodexConnectionStatus, CodexSessionBinding } from './codex.js';
