@@ -21,3 +21,11 @@ export type {
   RequiredCheck,
   PullReadiness,
 } from './readiness.js';
+
+export type {
+  AgentSessionStatus,
+  WorkspaceMessage,
+  AgentSessionSummary,
+  AgentSession,
+  WorkspaceOverview,
+} from './workspace.js';

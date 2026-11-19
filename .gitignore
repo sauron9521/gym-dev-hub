@@ -10,4 +10,6 @@ coverage/
 !.env.*.example
 .DS_Store
 .idea/
+# Keep local development session histories out of public GitHub.
+.local/
 .vscode/

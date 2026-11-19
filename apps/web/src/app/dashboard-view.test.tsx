@@ -70,6 +70,7 @@ describe('GitHub Dashboard', () => {
     expect(markup).toContain('CI пройшов');
     expect(markup).toContain('Milestones');
     expect(markup).toContain('gym-platform');
+    expect(markup).toContain('/workspace');
   });
 
   it('shows API unavailability rather than invented data', () => {
