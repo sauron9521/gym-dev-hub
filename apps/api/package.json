@@ -14,6 +14,7 @@
   "dependencies": {
     "@gym-dev-hub/contracts": "workspace:*",
     "@nestjs/common": "^12.5.1",
+    "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^12.5.1",
     "@nestjs/platform-express": "^12.5.1",
     "reflect-metadata": "^0.2.2",

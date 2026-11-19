@@ -6,7 +6,8 @@ This repository owns the orchestration tooling. Target repositories (including `
 - `apps/api`: NestJS 12 orchestration API (localhost:3101, loopback-only by default)
 - `packages/contracts`: shared types and DTO contracts
 - `packages/tsconfig`: shared compiler settings
-- GitHub App integration: planned, with least-privilege installation permissions
+- Read-only GitHub REST integration: implemented for allowlisted repositories via NestJS, with an optional server-side read-only token
+- GitHub App installation and write permissions: planned as separate permission-gated work
 - AI sessions: planned, persistent isolated agent threads and Git worktrees
 - Persistence and worker queues: planned, separate from target repositories
 
