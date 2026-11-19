@@ -1,0 +1,20 @@
+# Architecture (initial design)
+
+This repository owns the orchestration tooling. Target repositories (including `gym-platform`) remain unaware of it.
+
+- `apps/web`: Next.js 16 workspace interface (localhost:3100)
+- `apps/api`: NestJS 12 orchestration API (localhost:3101, loopback-only by default)
+- `packages/contracts`: shared types and DTO contracts
+- `packages/tsconfig`: shared compiler settings
+- GitHub App integration: planned, with least-privilege installation permissions
+- AI sessions: planned, persistent isolated agent threads and Git worktrees
+- Persistence and worker queues: planned, separate from target repositories
+
+## Invariants
+
+1. No direct writes to `main`, no automatic merge.
+2. Every coding task has a unique branch / worktree and PR.
+3. CI status is valid only for the current PR head commit SHA.
+4. Parallel work must coordinate shared files, lockfiles and migrations.
+5. Never expose host terminals, Docker sockets or write APIs to untrusted networks.
+6. Public code and CI must contain no credentials.
