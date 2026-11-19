@@ -12,3 +12,12 @@ export type {
   GitHubWorkflowRun,
   GitHubDashboard,
 } from './github.js';
+
+export type {
+  ReadinessVerdict,
+  RequiredPolicy,
+  CheckSource,
+  PullCheck,
+  RequiredCheck,
+  PullReadiness,
+} from './readiness.js';

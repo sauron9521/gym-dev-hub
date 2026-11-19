@@ -228,26 +228,30 @@ export function DashboardView({ dashboard, error, selectedRepository }: Props) {
                   </h3>
                   {dashboard.pulls.length ? (
                     dashboard.pulls.map((pr) => (
-                      <a
-                        key={pr.number}
-                        className="item"
-                        href={pr.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                      <div key={pr.number} className="item pr-item">
                         <span className="item-symbol">⑂</span>
-                        <span className="item-body">
+                        <a
+                          href={pr.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="item-body"
+                        >
                           <strong>
-                            #{pr.number} · {pr.title}
+                            #{pr.number} · {pr.title} ↗
                           </strong>
                           <small>
                             {pr.headBranch} · {pr.author} · {date(pr.updatedAt)}
                           </small>
-                        </span>
+                        </a>
                         {pr.draft && <span className="state state-neutral">Draft</span>}
                         <span className={`state state-${pr.ci}`}>{ciLabel(pr.ci)}</span>
-                        <span className="outbound">↗</span>
-                      </a>
+                        <Link
+                          className="inspect-link"
+                          href={`/pr/${pr.number}?repository=${encodeURIComponent(dashboard.repository)}`}
+                        >
+                          Перевірити
+                        </Link>
+                      </div>
                     ))
                   ) : (
                     <EmptySection unavailable={unavailable('pulls')} label="Pull requests" />

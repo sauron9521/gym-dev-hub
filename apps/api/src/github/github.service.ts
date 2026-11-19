@@ -84,7 +84,16 @@ export class GitHubService {
     return [...new Set(valid)];
   }
 
-  private async request<T>(path: string): Promise<T> {
+  assertAllowedRepository(repositoryInput?: string): string {
+    const repositories = this.repositories();
+    const repository = repositoryInput || repositories[0];
+    if (!repository || !repositories.includes(repository)) {
+      throw new BadRequestException('Репозиторій не дозволений конфігурацією Dev Hub');
+    }
+    return repository;
+  }
+
+  async request<T>(path: string): Promise<T> {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
@@ -106,12 +115,7 @@ export class GitHubService {
 
   async getDashboard(repositoryInput?: string): Promise<GitHubDashboard> {
     const repositories = this.repositories();
-    const repository = repositoryInput || repositories[0];
-
-    // An explicit allowlist prevents arbitrary GitHub API requests through this endpoint.
-    if (!repository || !repositories.includes(repository)) {
-      throw new BadRequestException('Репозиторій не дозволений конфігурацією Dev Hub');
-    }
+    const repository = this.assertAllowedRepository(repositoryInput);
     const [owner, name] = repository.split('/');
     const root = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 
