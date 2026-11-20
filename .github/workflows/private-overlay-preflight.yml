@@ -1,0 +1,197 @@
+name: Private Writable Overlay Preflight (CI-only)
+
+on:
+  pull_request:
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/private-overlay-preflight.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/private-overlay-preflight.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-overlay-preflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Immutable source + independent tmpfs scratch / no target execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout immutable public Gym Platform source, no credentials
+        uses: actions/checkout@v4
+        with:
+          repository: sauron9521/gym-platform
+          ref: 7104f723c4ee7b81e7b9b64e9c9483aea344ef7a
+          path: .audit/gym-platform
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Export reviewed 1258-file source snapshot and fixed manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo='.audit/gym-platform'
+          test "$(git -C "$repo" rev-parse HEAD)" = '7104f723c4ee7b81e7b9b64e9c9483aea344ef7a'
+          test "$(git -C "$repo" rev-parse HEAD^{tree})" = '2c140e1e740b3dd8cc7582db726f46b54b73b334'
+
+          source="$(mktemp -d)"
+          manifest="$(mktemp -d)"
+          chmod 755 "$source" "$manifest"
+          echo "GYM_SOURCE_SNAPSHOT=$source" >> "$GITHUB_ENV"
+          echo "GYM_SOURCE_MANIFEST=$manifest" >> "$GITHUB_ENV"
+          git -C "$repo" ls-tree -r --long -z HEAD > "$manifest/tracked-files.bin"
+          echo 'dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b' \
+            "$manifest/tracked-files.bin" | sha256sum --check --status
+          (cd "$repo" && git archive --format=tar HEAD) | tar -xf - -C "$source"
+          test -z "$(find "$source" -type l -print -quit)"
+          test "$(find "$source" -type f | wc -l)" -eq 1258
+          test ! -e "$source/.git"
+          echo 'Full reviewed Git archive prepared without untracked files or .git.'
+
+      - name: Build fixed CI-only Node runner image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull=false --tag gym-dev-hub-node-runner:v1 \
+            --file packages/runner/Dockerfile packages/runner
+
+      - name: Verify read-only sources and TWO separate noexec writable tmpfs volumes
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="gym-devhub-overlay-${{ github.run_id }}"
+          cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          docker create --name "$name" --pull=never \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --user=65534:65534 \
+            --ipc=none --pids-limit=128 --memory=536870912 --cpus=1 \
+            --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=64m,mode=1777' \
+            --tmpfs='/results:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+            --mount "type=bind,source=$GYM_SOURCE_SNAPSHOT,target=/source,readonly" \
+            --mount "type=bind,source=$GYM_SOURCE_MANIFEST,target=/manifest,readonly" \
+            --stop-timeout=3 --entrypoint /usr/bin/node \
+            gym-dev-hub-node-runner:v1 /opt/gym-dev-hub/overlay-preflight.mjs >/dev/null
+
+          docker inspect "$name" --format '{{json .HostConfig}}' | jq -e '
+            .NetworkMode == "none" and .ReadonlyRootfs == true
+            and .Privileged == false and (.CapDrop | any(.[]; ascii_downcase == "all"))
+            and .Memory == 536870912 and .NanoCpus == 1000000000
+            and .PidsLimit == 128 and .IpcMode == "none"
+            and (.Mounts | length) == 2
+            and ([.Mounts[] | select(.Type == "bind" and .ReadOnly == true) | .Target] | sort) == ["/manifest","/source"]
+            and ([.SecurityOpt[]] | index("no-new-privileges") != null)
+            and (.Tmpfs["/workspace"] | contains("noexec") and contains("nodev") and contains("nosuid"))
+            and (.Tmpfs["/results"] | contains("noexec") and contains("nodev") and contains("nosuid"))
+            and (.Tmpfs["/tmp"] | contains("noexec"))
+          '
+          docker inspect "$name" --format '{{json .Mounts}}' | jq -e '
+            length == 2 and
+            ([.[] | select(.Type == "bind" and .RW == false) | .Destination] | sort) == ["/manifest","/source"]
+          '
+          test "$(docker inspect "$name" --format '{{.Config.User}}')" = '65534:65534'
+          report="$(docker start --attach "$name")"
+          test "$(docker inspect "$name" --format '{{.State.ExitCode}}')" = '0'
+          printf '%s\n' "$report" | jq -e '
+            .protocol == 1 and .event == "private-writable-overlay-preflight-passed"
+            and .sourceCommit == "7104f723c4ee7b81e7b9b64e9c9483aea344ef7a"
+            and .sourceTree == "2c140e1e740b3dd8cc7582db726f46b54b73b334"
+            and .sourceManifestSha256 == "dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b"
+            and .trackedSourceFiles == 1258
+            and .readOnlyBindMounts == ["/manifest","/source"]
+            and .privateTmpfsMounts == ["/results","/workspace"]
+            and .verifiedPrivateScratch == ["dependencies","cache","generated","reports"]
+            and .sourceCodeExecuted == false and .projectScriptsExecuted == false
+            and .packagesInstalled == false and .runtimeNetworkEnabled == false
+            and .taskExecutionEnabled == false and .taskGrantConsumed == false
+            and .futureRecipe == "API_TYPECHECK"
+          '
+          docker rm "$name"
+          test -z "$(docker ps -aq --filter "name=^$name$")"
+          echo 'First private overlay instance verified and removed.'
+
+          # A new Docker instance receives empty private mounts, never the
+          # first instance's dependencies/cache/generated files or report.
+          docker run --rm --pull=never \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --user=65534:65534 \
+            --ipc=none --pids-limit=128 --memory=536870912 --cpus=1 \
+            --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=64m,mode=1777' \
+            --tmpfs='/results:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+            --mount "type=bind,source=$GYM_SOURCE_SNAPSHOT,target=/source,readonly" \
+            --mount "type=bind,source=$GYM_SOURCE_MANIFEST,target=/manifest,readonly" \
+            --stop-timeout=3 --entrypoint /usr/bin/node \
+            gym-dev-hub-node-runner:v1 /opt/gym-dev-hub/overlay-preflight.mjs | jq -e '
+            .event == "private-writable-overlay-preflight-passed"
+            and .taskExecutionEnabled == false
+          '
+          echo 'Second private overlay instance starts empty; no state survives.'
+
+      - name: Reject missing or executable tmpfs, source mutation and forged manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          modified="$(mktemp -d)"
+          bad_manifest="$(mktemp -d)"
+          cleanup() {
+            rm -rf "$modified" "$bad_manifest" "$GYM_SOURCE_SNAPSHOT" "$GYM_SOURCE_MANIFEST"
+          }
+          trap cleanup EXIT
+          chmod 755 "$modified" "$bad_manifest"
+          cp -a "$GYM_SOURCE_SNAPSHOT/." "$modified/"
+          printf '\n// unauthorized modification\n' >> "$modified/packages/domain/src/index.ts"
+          cp "$GYM_SOURCE_MANIFEST/tracked-files.bin" "$bad_manifest/tracked-files.bin"
+          printf 'forged' >> "$bad_manifest/tracked-files.bin"
+
+          for scenario in no-workspace no-results executable-workspace executable-results source-changed bad-manifest; do
+            input="$GYM_SOURCE_SNAPSHOT"
+            index="$GYM_SOURCE_MANIFEST"
+            tmpfs_args=(
+              --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=64m,mode=1777'
+              --tmpfs='/results:rw,nosuid,nodev,noexec,size=16m,mode=1777'
+            )
+            case "$scenario" in
+              no-workspace) tmpfs_args=(--tmpfs='/results:rw,nosuid,nodev,noexec,size=16m,mode=1777') ;;
+              no-results) tmpfs_args=(--tmpfs='/workspace:rw,nosuid,nodev,noexec,size=64m,mode=1777') ;;
+              executable-workspace)
+                tmpfs_args[0]="--tmpfs=/workspace:rw,nosuid,nodev,exec,size=64m,mode=1777"
+                ;;
+              executable-results)
+                tmpfs_args[1]="--tmpfs=/results:rw,nosuid,nodev,exec,size=16m,mode=1777"
+                ;;
+              source-changed) input="$modified" ;;
+              bad-manifest) index="$bad_manifest" ;;
+            esac
+            if docker run --rm --pull=never \
+              --network=none --read-only --cap-drop=ALL \
+              --security-opt=no-new-privileges --user=65534:65534 \
+              --ipc=none --pids-limit=128 --memory=536870912 --cpus=1 \
+              "${tmpfs_args[@]}" \
+              --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+              --mount "type=bind,source=$input,target=/source,readonly" \
+              --mount "type=bind,source=$index,target=/manifest,readonly" \
+              --stop-timeout=3 --entrypoint /usr/bin/node \
+              gym-dev-hub-node-runner:v1 /opt/gym-dev-hub/overlay-preflight.mjs \
+              >/dev/null 2>&1; then
+              echo "Unsafe preflight passed: $scenario"
+              exit 1
+            fi
+          done
+          test -z "$(docker ps -aq --filter 'ancestor=gym-dev-hub-node-runner:v1')"
+          test "$(sha256sum "$GYM_SOURCE_MANIFEST/tracked-files.bin" | cut -d' ' -f1)" = \
+            'dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b'
+          echo 'All six unsafe mount/source scenarios denied, sources left unchanged.'
