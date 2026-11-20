@@ -47,7 +47,7 @@ export function readImporterEntry(importer, group, name, specifier) {
     if (/^    \S/.test(lines[i]) || /^  \S/.test(lines[i])) break;
     groupLines.push(lines[i]);
   }
-  const entry = '      ' + name + ':';
+  const entry = '      ' + (name.startsWith('@') ? "'" + name + "'" : name) + ':';
   const index = groupLines.indexOf(entry);
   requireSafe(index >= 0 && groupLines.indexOf(entry, index + 1) < 0, 'missing/duplicate API dependency ' + name);
   const s = /^        specifier: (.*)$/.exec(groupLines[index + 1] ?? '');
