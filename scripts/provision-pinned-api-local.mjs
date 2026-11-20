@@ -596,9 +596,9 @@ async function prepare() {
   const stage = stageRun.stage;
   // It is newly created, empty and private to this invocation. The container
   // runs as UID 65534 and must be able to stage bytes on Linux bind mounts.
-  await chmod(stage, 0o777);
   let published = false;
   try {
+    await chmod(stage, 0o777);
     const provisionerId = await build(
       FIXED.provisioner,
       join(ROOT, 'packages', 'local-provisioner', 'Dockerfile'),
