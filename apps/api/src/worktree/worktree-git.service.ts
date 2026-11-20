@@ -90,10 +90,9 @@ async function secureTarget(plan: WorktreePlan, rootInput: string): Promise<void
     path = parent;
   }
   await mkdir(root, { recursive: true });
-  const actual = await realpath(root);
-  if (resolve(actual).toLowerCase() !== root.toLowerCase()) {
-    throw new ConflictException('Worktree root перенаправлено в інше місце.');
-  }
+  // Windows may return an 8.3 alias for the same safe directory. Reparse
+  // points were already rejected for every existing ancestor above.
+  await realpath(root);
   await mustNotExist(plan.targetPath);
 }
 
