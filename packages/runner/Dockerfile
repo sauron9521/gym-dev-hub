@@ -30,5 +30,7 @@ COPY --chown=65534:65534 offline-real-pair.mjs /opt/gym-dev-hub/offline-real-pai
 COPY --chown=65534:65534 offline-typescript-smoke.mjs /opt/gym-dev-hub/offline-typescript-smoke.mjs
 # CI-only first real SHA-pinned Gym Platform source typecheck, not an API tool.
 COPY --chown=65534:65534 pinned-source-typecheck.mjs /opt/gym-dev-hub/pinned-source-typecheck.mjs
+# CI-only full immutable Git source snapshot auditor; no project scripts or API surface.
+COPY --chown=65534:65534 full-source-audit.mjs /opt/gym-dev-hub/full-source-audit.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]
