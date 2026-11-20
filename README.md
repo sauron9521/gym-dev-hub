@@ -42,6 +42,10 @@ The Workspace can preview immutable, repository-scoped [worktree plans](docs/wor
 
 An acknowledged [worktree plan](docs/worktree-plans.md) can now be turned into a real, **metadata-only** Git worktree after two separate approvals: a configured local operator secret and a short-lived single-use token. The feature is disabled unless explicitly configured. No project files are checked out and agent execution remains disabled. See [safe worktree creation and setup](docs/safe-worktree-creation.md).
 
+### Worktree Recovery Inspector (PR #11)
+
+The Workspace can run a [read-only Git worktree inspection](docs/worktree-inspection.md) on created or interrupted plans. It validates worktree registration, the pinned commit and Git tree safety before any future checkout. **This does not hydrate files, delete anything, or authorize agents.**
+
 ### Codex Adapter (opt-in)
 
 The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. PR #6 adds a separate text-only [Codex Agent Chat](docs/agent-chat.md) using these threads, while keeping worktree and PR mutation disabled. See [Codex Adapter setup and security](docs/codex-adapter.md).
