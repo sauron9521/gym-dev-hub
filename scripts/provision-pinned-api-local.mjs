@@ -114,7 +114,9 @@ function command(executable, args, timeout = 30000, capture = MAX_CAPTURE) {
 }
 
 async function docker(...args) {
-  return command('docker', args, 30000);
+  // Docker Desktop may briefly exceed 30s during image/VM activation after
+  // provisioning; keep a hard bound without mistaking warm-up for failure.
+  return command('docker', args, 90000);
 }
 
 async function checkLocalDocker() {
@@ -331,7 +333,7 @@ async function stageInDocker(stage, imageId) {
         'type=bind,source=' + stage + ',target=/bundle',
         imageId,
       ],
-      30000,
+      90000,
     );
     const host = JSON.parse(await docker('inspect', '--format', '{{json .HostConfig}}', name));
     verifyProvisionerIsolation(host);
@@ -389,7 +391,7 @@ async function smoke(bundle, imageId) {
         imageId,
         '/opt/gym-dev-hub/api-typecheck-local.mjs',
       ],
-      30000,
+      90000,
     );
     const host = JSON.parse(await docker('inspect', '--format', '{{json .HostConfig}}', name));
     checkIsolation(host);
