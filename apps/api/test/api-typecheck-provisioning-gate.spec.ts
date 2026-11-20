@@ -21,6 +21,8 @@ const IMPORTER = [
 ].join('\n');
 const SRI = 'sha512-' + Buffer.alloc(64, 13).toString('base64');
 const PACKAGES = [
+  "lockfileVersion: '9.0'",
+  '',
   'packages:',
   '',
   "  '@prisma/client@7.10.1':",
@@ -28,6 +30,10 @@ const PACKAGES = [
   '',
   '  typescript@6.0.3:',
   '    resolution: {integrity: ' + SRI + '}',
+  '',
+  'snapshots:',
+  '',
+  '  typescript@6.0.3: {}',
 ].join('\n');
 
 function config() {
