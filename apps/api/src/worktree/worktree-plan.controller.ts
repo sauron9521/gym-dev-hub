@@ -16,10 +16,13 @@ import { WorktreeCodeReadService } from './worktree-code-read.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './task-execution-grant.service.js';
+import { TaskTypecheckService } from './task-typecheck.service.js';
 import type {
   TaskRunnerPreview,
   TaskExecutionGrant,
   TaskExecutionGrantRevocation,
+  TaskTypecheckRunResult,
+  TaskTypecheckCancelResult,
 } from '@gym-dev-hub/contracts';
 import type { WorktreeToolGrant, WorktreeToolResult } from '@gym-dev-hub/contracts';
 import type { WorktreeCodeReadGrant, WorktreeCodeReadResult } from '@gym-dev-hub/contracts';
@@ -37,6 +40,7 @@ export class WorktreePlanController {
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
     private readonly taskGrants: TaskExecutionGrantService,
+    private readonly taskTypecheck: TaskTypecheckService,
   ) {}
 
   @Get()
@@ -168,7 +172,7 @@ export class WorktreePlanController {
     return this.taskGrants.authorize(sessionId, planId, body);
   }
 
-  /** Revokes a single outstanding grant. No execution endpoint exists. */
+  /** Revokes a single outstanding grant before any execution attempt. */
   @Post(':planId/task-grant-revoke')
   taskGrantRevoke(
     @Param('sessionId') sessionId: string,
@@ -176,6 +180,26 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<TaskExecutionGrantRevocation> {
     return this.taskGrants.revoke(sessionId, planId, body);
+  }
+
+  /** One explicit, operator-approved pinned API_TYPECHECK; disabled by default. */
+  @Post(':planId/task-execute')
+  taskExecute(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<TaskTypecheckRunResult> {
+    return this.taskTypecheck.execute(sessionId, planId, body);
+  }
+
+  /** Cancellation requires the independently configured operator secret. */
+  @Post(':planId/task-cancel')
+  taskCancel(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): TaskTypecheckCancelResult {
+    return this.taskTypecheck.cancel(sessionId, planId, body);
   }
 
   @Post(':planId/hydration-authorize')

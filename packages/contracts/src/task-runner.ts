@@ -23,7 +23,7 @@ export interface TaskRunnerPreview {
     dockerSocket: false;
     environmentSecrets: false;
     maxDurationSeconds: 600;
-    maxMemoryMiB: 2048;
+    maxMemoryMiB: 5120;
     maxCpus: 2;
     maxPids: 128;
     maxOutputBytes: 65536;
@@ -67,4 +67,27 @@ export interface TaskExecutionGrantReceipt {
   recipeId: 'API_TYPECHECK';
   status: 'consumed-no-execution';
   executionEnabled: false;
+}
+
+/** A successful, single-use operator-authorized pinned compiler run. */
+export interface TaskTypecheckRunResult {
+  runId: string;
+  grantId: string;
+  recipeId: 'API_TYPECHECK';
+  sourceCommit: '7104f723c4ee7b81e7b9b64e9c9483aea344ef7a';
+  status: 'succeeded';
+  exitCode: 0;
+  durationMs: number;
+  stdoutBytes: number;
+  stderrBytes: number;
+  containerRemoved: true;
+  readOnlySource: true;
+  networkEnabled: false;
+  arbitraryCommandsEnabled: false;
+}
+
+/** A cancellation request, not a claim that cleanup has completed. */
+export interface TaskTypecheckCancelResult {
+  runId: string;
+  status: 'cancel-requested';
 }

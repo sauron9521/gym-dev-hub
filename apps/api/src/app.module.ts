@@ -25,6 +25,7 @@ import { WorktreeCodeReadService } from './worktree/worktree-code-read.service.j
 import { WorktreeToolService } from './worktree/worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './worktree/task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './worktree/task-execution-grant.service.js';
+import { TaskTypecheckService } from './worktree/task-typecheck.service.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -56,6 +57,7 @@ import { TaskExecutionGrantService } from './worktree/task-execution-grant.servi
     WorktreeToolService,
     TaskRunnerPolicyService,
     TaskExecutionGrantService,
+    TaskTypecheckService,
   ],
 })
 export class AppModule {}

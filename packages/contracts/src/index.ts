@@ -4,6 +4,8 @@ export type {
   TaskExecutionGrant,
   TaskExecutionGrantRevocation,
   TaskExecutionGrantReceipt,
+  TaskTypecheckRunResult,
+  TaskTypecheckCancelResult,
 } from './task-runner.js';
 
 export interface HealthResponse {

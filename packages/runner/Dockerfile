@@ -46,5 +46,7 @@ COPY --chown=65534:65534 native-runtime-smoke.mjs /opt/gym-dev-hub/native-runtim
 COPY --chown=65534:65534 native-runtime-fixture.mjs /opt/gym-dev-hub/native-runtime-fixture.mjs
 # CI-only fixed Prisma generation + approved TypeScript analysis; no HTTP/runner execution route.
 COPY --chown=65534:65534 api-typecheck-ci.mjs /opt/gym-dev-hub/api-typecheck-ci.mjs
+# Gated local wrapper uses the same CI recipe but never receives operator credentials.
+COPY --chown=65534:65534 api-typecheck-local.mjs /opt/gym-dev-hub/api-typecheck-local.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]

@@ -481,6 +481,45 @@ jobs:
           test -z "$(docker ps -aq --filter "name=^$name$")"
           echo 'Pinned Gym API TypeScript 6.0.3 check passed in disposable networkless Docker.'
 
+      - name: Validate fixed local wrapper rejects forged compiler receipts
+        run: node --test packages/runner/api-typecheck-local.test.mjs
+
+      - name: Prove local wrapper uses same immutable compiler recipe in CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          reply="$(docker run --rm --pull=never \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --user=65534:65534 \
+            --ipc=none --pids-limit=128 --memory=5g --cpus=2 \
+            --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=3072m,mode=1777' \
+            --tmpfs='/results:rw,nosuid,nodev,noexec,size=32m,mode=1777' \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777' \
+            --mount "type=bind,source=$GYM_SOURCE_SNAPSHOT,target=/source,readonly" \
+            --mount "type=bind,source=$GYM_SOURCE_MANIFEST,target=/manifest,readonly" \
+            --mount "type=bind,source=$GYM_API_PNPM_STORE,target=/store,readonly" \
+            --mount "type=bind,source=$GYM_PRISMA_ENGINE,target=/engine,readonly" \
+            --stop-timeout=3 --entrypoint /usr/bin/node \
+            gym-dev-hub-node-runner:v1 \
+            /opt/gym-dev-hub/api-typecheck-local.mjs)"
+          printf '%s\n' "$reply" | jq -e '
+            .protocol == 1
+            and .event == "pinned-api-typecheck-local-executed"
+            and .recipe == "API_TYPECHECK"
+            and .sourceCommit == "7104f723c4ee7b81e7b9b64e9c9483aea344ef7a"
+            and .sourceTree == "2c140e1e740b3dd8cc7582db726f46b54b73b334"
+            and .sourceManifestSha256 == "dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b"
+            and .typescriptVersion == "6.0.3"
+            and .apiTypecheckExecuted == true and .typecheckExitCode == 0
+            and .operatorGrantConsumedInsideContainer == false
+            and .hostGrantVerificationInsideContainer == false
+            and .delegatedAuthorization == "host-service-only"
+            and .networkEnabled == false and .sourceReadOnly == true
+            and .dependencyLifecycleScriptsExecuted == false
+            and .arbitraryCommandsEnabled == false
+          '
+          echo 'Fixed local wrapper proved in CI; no operator consent is asserted by this CI smoke.'
+
       - name: Reject tampered Prisma schema and incomplete pnpm cache
         shell: bash
         run: |

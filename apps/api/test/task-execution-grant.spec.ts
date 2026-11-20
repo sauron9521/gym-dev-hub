@@ -33,7 +33,7 @@ function goodPreview(): TaskRunnerPreview {
       dockerSocket: false,
       environmentSecrets: false,
       maxDurationSeconds: 600,
-      maxMemoryMiB: 2048,
+      maxMemoryMiB: 5120,
       maxCpus: 2,
       maxPids: 128,
       maxOutputBytes: 65536,
@@ -90,6 +90,7 @@ describe('one-time fixed API_TYPECHECK authorization (without a runner)', () => 
   afterEach(async () => {
     vi.restoreAllMocks();
     delete process.env.DEV_HUB_ENABLE_TASK_GRANTS;
+    delete process.env.DEV_HUB_ENABLE_TASK_EXECUTION;
     delete process.env.DEV_HUB_TASK_GRANT_OPERATOR_SECRET;
     delete process.env.DEV_HUB_TASK_GRANT_AUDIT_FILE;
     await rm(dir, { force: true, recursive: true });
@@ -333,6 +334,68 @@ describe('one-time fixed API_TYPECHECK authorization (without a runner)', () => 
     await symlink(forbidden, path);
     await expect(issue()).rejects.toThrow('журнал');
     expect(await readFile(forbidden, 'utf8')).toBe('do not modify\n');
+  });
+
+  it('never authorizes actual execution while its separate feature flag is disabled', async () => {
+    const grant = await issue();
+    await expect(
+      service.consumeForExecution(SESSION, PLAN, consumption(grant.grantToken)),
+    ).rejects.toThrow('вимкнено');
+    expect(policy.preview).toHaveBeenCalledTimes(1); // Issuance only.
+  });
+
+  it('burns exactly one execution token and records its authorized purpose', async () => {
+    process.env.DEV_HUB_ENABLE_TASK_EXECUTION = 'true';
+    const grant = await issue();
+    const request = consumption(grant.grantToken);
+    const results = await Promise.allSettled([
+      service.consumeForExecution(SESSION, PLAN, request),
+      service.consumeForExecution(SESSION, PLAN, request),
+    ]);
+    const success = results.filter((r) => r.status === 'fulfilled');
+    expect(success).toHaveLength(1);
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    expect(success[0]).toMatchObject({
+      value: { grantId: grant.grantId, recipeId: 'API_TYPECHECK' },
+    });
+    expect((await records()).map((item) => item.event).slice(0, 2)).toEqual([
+      'issued',
+      'execution-authorized',
+    ]);
+    await expect(service.consumeForExecution(SESSION, PLAN, request)).rejects.toThrow('недійсний');
+  });
+
+  it('burns the capability without authorizing execution after policy drift', async () => {
+    process.env.DEV_HUB_ENABLE_TASK_EXECUTION = 'true';
+    const grant = await issue();
+    policy.preview.mockResolvedValueOnce({
+      ...goodPreview(),
+      proposedBoundary: { ...goodPreview().proposedBoundary, maxMemoryMiB: 2048 },
+    });
+    await expect(
+      service.consumeForExecution(SESSION, PLAN, consumption(grant.grantToken)),
+    ).rejects.toThrow('анульовано');
+    await expect(
+      service.consumeForExecution(SESSION, PLAN, consumption(grant.grantToken)),
+    ).rejects.toThrow('недійсний');
+  });
+
+  it('rejects an expired execution token and never renews it', async () => {
+    process.env.DEV_HUB_ENABLE_TASK_EXECUTION = 'true';
+    const grant = await issue();
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now + 46_000);
+    await expect(
+      service.consumeForExecution(SESSION, PLAN, consumption(grant.grantToken)),
+    ).rejects.toThrow('недійсний');
+  });
+
+  it('checks the independent operator secret for a cancellation request', () => {
+    process.env.DEV_HUB_ENABLE_TASK_EXECUTION = 'true';
+    expect(() => service.authenticateForCancellation(SECRET)).not.toThrow();
+    expect(() => service.authenticateForCancellation('x'.repeat(44))).toThrow('Невірний');
+    process.env.DEV_HUB_ENABLE_TASK_EXECUTION = 'false';
+    expect(() => service.authenticateForCancellation(SECRET)).toThrow('вимкнено');
   });
 
   it('invalidates grants across service restarts because no bearer tokens are persisted', async () => {
