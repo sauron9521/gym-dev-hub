@@ -7,8 +7,9 @@
 5. **Agent workspace foundation**: local persistent sessions, parallel tabs, task states and notes (PR #4).
 6. **Codex adapter foundation**: optional local app-server handshake, persisted read-only thread bindings and connection health (PR #5).
 7. **Agent Chat (read-only)**: streamed Codex text turns over SSE, local chat history and failure handling (PR #6).
-8. **Isolated execution**: OS-level agent sandbox, approvals and per-task Git worktrees in separate safe PRs.
-9. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-10. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+8. **Execution boundary preflight**: local Linux Docker status, pinned test image, read-only/no-network/no-mounts probe, fail-closed capabilities (PR #7).
+9. **Isolated execution**: dedicated workers, explicit approvals and per-task Git worktrees in separate safe PRs.
+10. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+11. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

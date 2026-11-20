@@ -11,7 +11,8 @@ This repository owns the orchestration tooling. Target repositories (including `
 - Agent Workspace foundation: local versioned JSON store (one NestJS process), repository-bound tasks, notes and UI tabs
 - Codex app-server connection and read-only per-session thread bindings: implemented; no turns, commands, Git writes or approval grants (PR #5)
 - Read-only text chat via Codex app-server, streaming SSE and local chat history: implemented in PR #6
-- Hard OS-level tool isolation, approval UI and isolated Git worktrees: planned as separate, permission-gated slices
+- Docker execution isolation preflight: fixed diagnostic container with pinned image, no network or host mounts, non-root, read-only root and strict limits (PR #7)
+- Dedicated Codex worker isolation, approval UI and Git worktrees: planned as separate, permission-gated slices
 - Persistence and worker queues: planned, separate from target repositories
 
 ## Invariants
