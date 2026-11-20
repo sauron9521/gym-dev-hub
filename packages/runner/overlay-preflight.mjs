@@ -178,6 +178,8 @@ async function main() {
 }
 
 main().catch(() => {
-  process.stderr.write('Private overlay preflight rejected: unsafe mount, source or output state\n');
+  process.stderr.write(
+    'Private overlay preflight rejected: unsafe mount, source or output state\n',
+  );
   process.exitCode = 1;
 });

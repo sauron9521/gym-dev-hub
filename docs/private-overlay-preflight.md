@@ -8,13 +8,13 @@ The CI job checks out only the reviewed public Gym Platform commit `7104f723c4ee
 
 Inside the disposable Docker container:
 
-| Path | Mount | Purpose |
-| --- | --- | --- |
-| `/source` | Read-only bind | Exact tracked Gym Platform Git snapshot, not `.git` or untracked files |
-| `/manifest` | Read-only bind | Independently hash-pinned Git tree manifest |
-| `/workspace` | Independent `rw,nodev,nosuid,noexec` tmpfs, **64 MiB** | Private `dependencies/`, `cache/`, `generated/` proof files |
-| `/results` | Separate `rw,nodev,nosuid,noexec` tmpfs, **16 MiB** | Private `reports/preflight.jsonl` |
-| `/tmp` | `rw,nodev,nosuid,noexec` tmpfs, **16 MiB** | Isolated Node runtime temporary space |
+| Path         | Mount                                                  | Purpose                                                                |
+| ------------ | ------------------------------------------------------ | ---------------------------------------------------------------------- |
+| `/source`    | Read-only bind                                         | Exact tracked Gym Platform Git snapshot, not `.git` or untracked files |
+| `/manifest`  | Read-only bind                                         | Independently hash-pinned Git tree manifest                            |
+| `/workspace` | Independent `rw,nodev,nosuid,noexec` tmpfs, **64 MiB** | Private `dependencies/`, `cache/`, `generated/` proof files            |
+| `/results`   | Separate `rw,nodev,nosuid,noexec` tmpfs, **16 MiB**    | Private `reports/preflight.jsonl`                                      |
+| `/tmp`       | `rw,nodev,nosuid,noexec` tmpfs, **16 MiB**             | Isolated Node runtime temporary space                                  |
 
 This is **not an overlayfs union mount**: target source and scratch are deliberately separate; no relative folder overlay or dependency resolution is enabled yet. The full tracked source is never copied into the writable area. Real native packages, Prisma generation and any command requiring a writable project layout remain future work.
 
