@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import {
-  classifyProvisionContainer,
-} from './pinned-provision-recovery.mjs';
+import { classifyProvisionContainer } from './pinned-provision-recovery.mjs';
 import {
   PROVISIONING_LABEL,
   PROVISIONING_SCOPE,
@@ -27,16 +25,14 @@ const labels = (phase) => ({
 
 const base = (phase) => ({
   Id: ID,
-  Name: phase === 'stage'
-    ? '/gym-devhub-pinned-stage-' + UUID
-    : '/gym-devhub-provision-check-' + UUID,
+  Name:
+    phase === 'stage' ? '/gym-devhub-pinned-stage-' + UUID : '/gym-devhub-provision-check-' + UUID,
   Created: OLD,
   Config: {
     Labels: labels(phase),
     User: '65534:65534',
-    Entrypoint: phase === 'stage'
-      ? ['/bin/sh', '/opt/gym-dev-hub/stage-pinned-api.sh']
-      : ['/usr/bin/node'],
+    Entrypoint:
+      phase === 'stage' ? ['/bin/sh', '/opt/gym-dev-hub/stage-pinned-api.sh'] : ['/usr/bin/node'],
     Cmd: phase === 'stage' ? null : ['/opt/gym-dev-hub/api-typecheck-local.mjs'],
   },
   State: { Status: 'exited', Running: false, Paused: false, Restarting: false },
@@ -52,10 +48,14 @@ const base = (phase) => ({
     Memory: 5368709120,
     NanoCpus: 2000000000,
   },
-  Mounts: phase === 'stage'
-    ? [{ Type: 'bind', Destination: '/bundle', RW: true }]
-    : ['/source', '/manifest', '/store', '/engine']
-      .map((destination) => ({ Type: 'bind', Destination: destination, RW: false })),
+  Mounts:
+    phase === 'stage'
+      ? [{ Type: 'bind', Destination: '/bundle', RW: true }]
+      : ['/source', '/manifest', '/store', '/engine'].map((destination) => ({
+          Type: 'bind',
+          Destination: destination,
+          RW: false,
+        })),
 });
 
 const clone = (value) => structuredClone(value);
@@ -130,8 +130,10 @@ describe('explicit recovery of reviewed local pinned containers', () => {
       denied(restart, 'unexpected-isolation');
       const changed = base(phase);
       changed.Config.Entrypoint = ['/bin/sh', '-c'];
-      denied(changed, phase === 'stage'
-        ? 'unexpected-stage-identity' : 'unexpected-offline-identity');
+      denied(
+        changed,
+        phase === 'stage' ? 'unexpected-stage-identity' : 'unexpected-offline-identity',
+      );
     }
   });
 
