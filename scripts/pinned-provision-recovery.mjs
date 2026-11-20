@@ -36,7 +36,8 @@ export function classifyProvisionContainer(item, now = Date.now()) {
   if (
     labels[PROVISIONING_LABEL] !== PROVISIONING_SCOPE ||
     labels[PROVISIONING_CHECKOUT_LABEL] !== PROVISIONING_CHECKOUT
-  ) return ineligible('foreign-checkout-or-scope');
+  )
+    return ineligible('foreign-checkout-or-scope');
   const phase = labels[PROVISIONING_PHASE_LABEL];
   if (!Object.hasOwn(PHASE_NAMES, phase) || !PHASE_NAMES[phase].test(item.Name ?? '')) {
     return ineligible('unknown-phase-or-name');
@@ -51,11 +52,13 @@ export function classifyProvisionContainer(item, now = Date.now()) {
     item.State?.Running !== false ||
     item.State?.Paused === true ||
     item.State?.Restarting === true
-  ) return ineligible('running-or-unexpected-state');
+  )
+    return ineligible('running-or-unexpected-state');
   const cfg = item.Config ?? {};
   const host = item.HostConfig ?? {};
   const mounts = item.Mounts ?? [];
-  const caps = Array.isArray(host.CapDrop) &&
+  const caps =
+    Array.isArray(host.CapDrop) &&
     host.CapDrop.length === 1 &&
     String(host.CapDrop[0]).toUpperCase() === 'ALL';
   if (
@@ -67,7 +70,8 @@ export function classifyProvisionContainer(item, now = Date.now()) {
     !Array.isArray(host.SecurityOpt) ||
     !host.SecurityOpt.some((value) => String(value).startsWith('no-new-privileges')) ||
     (host.RestartPolicy?.Name && host.RestartPolicy.Name !== 'no')
-  ) return ineligible('unexpected-isolation');
+  )
+    return ineligible('unexpected-isolation');
   if (phase === 'stage') {
     if (
       host.NetworkMode !== 'bridge' ||
@@ -80,7 +84,8 @@ export function classifyProvisionContainer(item, now = Date.now()) {
       mounts[0].Type !== 'bind' ||
       mounts[0].Destination !== '/bundle' ||
       mounts[0].RW !== true
-    ) return ineligible('unexpected-stage-identity');
+    )
+      return ineligible('unexpected-stage-identity');
   } else if (
     host.NetworkMode !== 'none' ||
     host.PidsLimit !== 128 ||
@@ -91,28 +96,49 @@ export function classifyProvisionContainer(item, now = Date.now()) {
     JSON.stringify(cfg.Cmd) !== '["/opt/gym-dev-hub/api-typecheck-local.mjs"]' ||
     mounts.length !== 4 ||
     mounts.some((entry) => entry.Type !== 'bind' || entry.RW !== false) ||
-    mounts.map((entry) => entry.Destination).sort().join(',') !== '/engine,/manifest,/source,/store'
-  ) return ineligible('unexpected-offline-identity');
+    mounts
+      .map((entry) => entry.Destination)
+      .sort()
+      .join(',') !== '/engine,/manifest,/source,/store'
+  )
+    return ineligible('unexpected-offline-identity');
   return { removable: true, reason: 'stopped-and-stale', phase };
 }
 
 function cleanEnv() {
-  const allow = ['PATH', 'Path', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'HOME',
-    'USERPROFILE', 'APPDATA', 'LOCALAPPDATA'];
-  return Object.fromEntries(allow.filter((key) => process.env[key])
-    .map((key) => [key, process.env[key]]));
+  const allow = [
+    'PATH',
+    'Path',
+    'SystemRoot',
+    'WINDIR',
+    'TEMP',
+    'TMP',
+    'HOME',
+    'USERPROFILE',
+    'APPDATA',
+    'LOCALAPPDATA',
+  ];
+  return Object.fromEntries(
+    allow.filter((key) => process.env[key]).map((key) => [key, process.env[key]]),
+  );
 }
 
 function docker(args) {
   return new Promise((resolveRun, reject) => {
     const child = spawn('docker', args, {
-      cwd: ROOT, shell: false, windowsHide: true, env: cleanEnv(),
+      cwd: ROOT,
+      shell: false,
+      windowsHide: true,
+      env: cleanEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
     let byteCount = 0;
     let timedOut = false;
-    const stop = () => { timedOut = true; child.kill(); };
+    const stop = () => {
+      timedOut = true;
+      child.kill();
+    };
     const timeout = setTimeout(stop, 90000);
     child.stdout.on('data', (chunk) => {
       byteCount += chunk.length;
@@ -132,19 +158,26 @@ function docker(args) {
       else resolveRun(stdout.trim());
     };
     child.on('error', () => done(new Error('Local Docker executable unavailable')));
-    child.on('close', (code) => done(
-      timedOut || code !== 0
-        ? new Error('Docker recovery inspection or safe remove failed')
-        : undefined,
-    ));
+    child.on('close', (code) =>
+      done(
+        timedOut || code !== 0
+          ? new Error('Docker recovery inspection or safe remove failed')
+          : undefined,
+      ),
+    );
   });
 }
 
 async function ownedContainers(now) {
   const rawIds = await docker([
-    'ps', '--all', '--quiet', '--no-trunc',
-    '--filter', 'label=' + PROVISIONING_LABEL + '=' + PROVISIONING_SCOPE,
-    '--filter', 'label=' + PROVISIONING_CHECKOUT_LABEL + '=' + PROVISIONING_CHECKOUT,
+    'ps',
+    '--all',
+    '--quiet',
+    '--no-trunc',
+    '--filter',
+    'label=' + PROVISIONING_LABEL + '=' + PROVISIONING_SCOPE,
+    '--filter',
+    'label=' + PROVISIONING_CHECKOUT_LABEL + '=' + PROVISIONING_CHECKOUT,
   ]);
   const ids = rawIds ? rawIds.split(/\r?\n/) : [];
   if (ids.length > 128 || ids.some((id) => !SHA256.test(id))) {
@@ -177,8 +210,11 @@ async function stagedDirectories(now) {
     .filter((entry) => /^stage-[A-Za-z0-9_-]{6}$/.test(entry.name))
     .map((entry) => ({
       name: entry.name,
-      type: entry.isSymbolicLink() ? 'symlink-not-touched' :
-        entry.isDirectory() ? 'unpublished-staging-not-touched' : 'unrecognized-not-touched',
+      type: entry.isSymbolicLink()
+        ? 'symlink-not-touched'
+        : entry.isDirectory()
+          ? 'unpublished-staging-not-touched'
+          : 'unrecognized-not-touched',
     }));
 }
 
@@ -221,8 +257,12 @@ async function cleanup() {
     // the classifier denies it and docker rm (without --force) also refuses.
     const again = JSON.parse(await docker(['inspect', '--format', '{{json .}}', id]));
     const latest = classifyProvisionContainer(again, Date.now());
-    if (again.Id !== id || again.Name !== snapshot.Name ||
-        again.Created !== snapshot.Created || !latest.removable) {
+    if (
+      again.Id !== id ||
+      again.Name !== snapshot.Name ||
+      again.Created !== snapshot.Created ||
+      !latest.removable
+    ) {
       skipped.push({ id: id.slice(0, 12), reason: 'changed-since-preview' });
       continue;
     }
@@ -231,7 +271,8 @@ async function cleanup() {
   }
   return {
     event: 'pinned-provisioning-stale-container-cleanup',
-    removed, skipped,
+    removed,
+    skipped,
     stagedDirectoriesRemoved: false,
     protectedPublishedBundles: true,
     unrelatedContainersTouched: false,
@@ -240,18 +281,19 @@ async function cleanup() {
 
 async function main() {
   const mode = process.argv[2];
-  if (
-    process.argv.length !== 3 ||
-    !['--status', '--prune-stale'].includes(mode)
-  ) throw new Error('Use --status (read-only) or --prune-stale (explicit, stopped >24h only)');
+  if (process.argv.length !== 3 || !['--status', '--prune-stale'].includes(mode))
+    throw new Error('Use --status (read-only) or --prune-stale (explicit, stopped >24h only)');
   const result = mode === '--status' ? await inventory() : await cleanup();
   process.stdout.write(JSON.stringify(result) + '\n');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
-    process.stderr.write('Pinned recovery refused: ' +
-      (error instanceof Error ? error.message.slice(0, 260) : 'unknown') + '\n');
+    process.stderr.write(
+      'Pinned recovery refused: ' +
+        (error instanceof Error ? error.message.slice(0, 260) : 'unknown') +
+        '\n',
+    );
     process.exitCode = 1;
   });
 }
