@@ -184,18 +184,14 @@ async function main() {
   ) {
     throw new Error('Unreviewed Prisma generation configuration');
   }
-  await mustNotExist(join(SOURCE, 'apps', 'api', 'src', 'infra', 'database', 'generated', 'prisma'));
+  await mustNotExist(
+    join(SOURCE, 'apps', 'api', 'src', 'infra', 'database', 'generated', 'prisma'),
+  );
   await mustNotExist(GENERATED);
 
   const cli = run(
     '/usr/bin/node',
-    [
-      await pinnedPrismaCli(),
-      'generate',
-      '--config',
-      'prisma7.config.ts',
-      '--no-hints',
-    ],
+    [await pinnedPrismaCli(), 'generate', '--config', 'prisma7.config.ts', '--no-hints'],
     API,
     150000,
   );
@@ -216,7 +212,9 @@ async function main() {
       throw new Error('Missing expected Prisma 7 generated file: ' + required);
     }
   }
-  await mustNotExist(join(SOURCE, 'apps', 'api', 'src', 'infra', 'database', 'generated', 'prisma'));
+  await mustNotExist(
+    join(SOURCE, 'apps', 'api', 'src', 'infra', 'database', 'generated', 'prisma'),
+  );
   if (digest(await readFile(join(PROJECT, 'pnpm-lock.yaml'))) !== sourceLock) {
     throw new Error('Pinned project lock changed during Prisma generation');
   }
