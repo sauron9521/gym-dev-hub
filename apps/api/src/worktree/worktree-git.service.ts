@@ -107,7 +107,7 @@ export class WorktreeGitService {
 
   async headSha(plan: Pick<WorktreePlan, 'repository' | 'sourcePath'>): Promise<string> {
     const source = await verifyLocalRepository(plan.repository, this.reposRoot);
-    if (source.toLowerCase() !== resolve(plan.sourcePath).toLowerCase()) {
+    if ((await realpath(source)).toLowerCase() !== (await realpath(plan.sourcePath)).toLowerCase()) {
       throw new ConflictException('Локальний репозиторій відрізняється від плану.');
     }
     const sha = await gitExec(source, ['rev-parse', '--verify', 'HEAD^{commit}']);

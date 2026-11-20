@@ -193,7 +193,7 @@ export class WorktreeInspectionService {
 
     try {
       const source = await verifyLocalRepository(plan.repository, this.reposRoot);
-      if (resolve(source).toLowerCase() !== resolve(plan.sourcePath).toLowerCase()) {
+      if ((await realpath(source)).toLowerCase() !== (await realpath(plan.sourcePath)).toLowerCase()) {
         throw new Error('Source path drift');
       }
       if (
