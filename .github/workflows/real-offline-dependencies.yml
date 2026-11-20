@@ -81,7 +81,8 @@ jobs:
           pnpm --dir packages/runner/fixtures/real-pair fetch \
             --frozen-lockfile --ignore-scripts --store-dir "$store"
           if find "$store" -type l -print -quit | grep -q .; then
-            echo 'Symlinks are forbidden in dependency store'
+            echo 'Unexpected pnpm store symlinks (relative paths only):'
+            find "$store" -type l -printf '%P -> %l\n' | head -n 30
             exit 1
           fi
           count="$(find "$store" -type f | wc -l)"
