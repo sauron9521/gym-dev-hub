@@ -41,7 +41,7 @@ describe('task runner review-only panel', () => {
       expect(html).toContain(id);
     }
     expect(html).toContain('Переглянути команду й обмеження');
-    expect(html).toContain('Виконання вимкнено');
+    expect(html).toContain('Це не запускає тести');
     expect(html).not.toContain('Запустити тест');
     expect(html).not.toContain('Злити PR');
   });
