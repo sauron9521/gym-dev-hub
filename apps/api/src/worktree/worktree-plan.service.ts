@@ -24,6 +24,9 @@ const auditSchema = z.strictObject({
     'creation-started',
     'worktree-created',
     'creation-failed',
+    'hydration-started',
+    'hydration-completed',
+    'hydration-failed',
   ]),
   timestamp: z.iso.datetime(),
 });
@@ -41,6 +44,9 @@ const planSchema = z.strictObject({
   history: z.array(auditSchema),
   executionEnabled: z.literal(false),
   worktreeCreated: z.boolean(),
+  hydrationState: z.enum(['running', 'completed', 'failed']).optional(),
+  hydrationFiles: z.number().int().nonnegative().max(5000).optional(),
+  hydrationBytes: z.number().int().nonnegative().max(100 * 1024 * 1024).optional(),
   baseHeadSha: z
     .string()
     .regex(/^[0-9a-f]{40,64}$/)
