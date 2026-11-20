@@ -1,4 +1,4 @@
-# PR #12 — Explicitly Authorized Raw Git Blob Hydration
+# PR #13 — Explicitly Authorized Raw Git Blob Hydration
 
 **Scope:** populate the separately created metadata-only worktree from PR #10 using the inspected, pinned Git commit from PR #11. This is a local single-process capability, not a generic Git checkout, shell runner, Codex tool or workspace delete API.
 
