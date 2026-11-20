@@ -1,0 +1,30 @@
+name: Temporary Native Docs Formatting Diff
+
+on:
+  pull_request:
+    paths:
+      - 'docs/native-binary-static-audit.md'
+      - 'packages/runner/README.md'
+      - '.github/workflows/tmp-native-format.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  formatter-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pnpm install --frozen-lockfile
+      - name: Print exact documentation formatting (temporary)
+        shell: bash
+        run: |
+          pnpm exec prettier --write docs/native-binary-static-audit.md packages/runner/README.md
+          git diff -- docs/native-binary-static-audit.md packages/runner/README.md
