@@ -1,0 +1,50 @@
+name: Temporary PR13 formatter - remove before merge
+on:
+  push:
+    branches: [feat/gated-worktree-hydration]
+    paths:
+      - .github/workflows/_temporary-pr13-formatter.yml
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/gated-worktree-hydration
+          persist-credentials: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format changed PR files
+        run: |
+          pnpm exec prettier --write \
+            apps/api/src/worktree/worktree-hydration.service.ts \
+            apps/api/src/worktree/worktree-plan.service.ts \
+            apps/api/src/worktree/worktree-plan.controller.ts \
+            apps/api/src/app.module.ts \
+            apps/api/test/worktree-hydration.spec.ts \
+            apps/api/.env.example \
+            apps/web/src/app/api/workspace/'[...segments]'/route.ts \
+            apps/web/src/app/workspace/worktree-hydration-panel.tsx \
+            apps/web/src/app/workspace/worktree-hydration-panel.test.tsx \
+            apps/web/src/app/workspace/worktree-plan-panel.tsx \
+            packages/contracts/src/worktree.ts \
+            packages/contracts/src/index.ts \
+            docs/worktree-hydration.md \
+            docs/worktree-inspection.md \
+            docs/roadmap.md README.md
+      - name: Commit formatting to isolated feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- apps/api apps/web packages/contracts docs README.md
+          if ! git diff --cached --quiet; then
+            git commit -m "style: format gated raw Git hydration implementation"
+            git push origin HEAD:refs/heads/feat/gated-worktree-hydration
+          fi
