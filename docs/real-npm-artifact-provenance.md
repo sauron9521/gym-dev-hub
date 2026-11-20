@@ -8,12 +8,12 @@ The GitHub Actions workflow checks out `sauron9521/gym-platform` at **commit `73
 
 That trusted lockfile contains an exact registry dependency:
 
-| Attribute | Value |
-| --- | --- |
-| Package | `is-number@7.0.0` |
-| Fixed public source | `https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz` |
-| SHA-512 | `sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==` |
-| Source repository commit | `73b636f5d064c7f24b43607e0c8411e9161f8986` |
+| Attribute                | Value                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------- |
+| Package                  | `is-number@7.0.0`                                                                                 |
+| Fixed public source      | `https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz`                                      |
+| SHA-512                  | `sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==` |
+| Source repository commit | `73b636f5d064c7f24b43607e0c8411e9161f8986`                                                        |
 
 The CI checks that the exact `is-number@7.0.0` lock entry exists **once**, with exactly that SRI, and then downloads **only this fixed URL** over HTTPS into a disposable GitHub-hosted runner staging directory. No registry credentials or GitHub token are persisted for this step. Curl permits no redirects. **The network is available for this tightly scoped trusted CI fetch only**, not for the Docker verification stage.
 
@@ -37,7 +37,7 @@ Two negative isolated Docker cases must fail closed:
 
 ## Important limitations
 
-**This is not a complete provenance attestation.** An SRI hash proves correspondence with the *reviewed lockfile bytes*, not that the npm publisher or upstream code is trustworthy. No signing/transparency-log or vulnerability status checks occur. The runner image's Alpine and npm build-time dependencies are also not yet fully pinned.
+**This is not a complete provenance attestation.** An SRI hash proves correspondence with the _reviewed lockfile bytes_, not that the npm publisher or upstream code is trustworthy. No signing/transparency-log or vulnerability status checks occur. The runner image's Alpine and npm build-time dependencies are also not yet fully pinned.
 
 This one-package demonstration does **not** check all 1,631 lockfile entries, populate a reusable pnpm store, extract a tarball, allow npm lifecycle hooks, build Prisma/native dependencies, or execute a Gym Platform lint/typecheck/test recipe. A true offline workspace provisioner will require a fixed, reviewed artifact manifest; trusted cache acquisition; cross-platform/native build policy; safe extraction; immutable source and private writable dependencies; a per-recipe operator approval token; strict limits and cleanup; and manual PR merge.
 

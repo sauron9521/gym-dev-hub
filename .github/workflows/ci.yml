@@ -26,17 +26,6 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      # Temporary PR24 formatted document snapshot; removed from final diff.
-      - name: Temporary PR24 Prettier output
-        shell: bash
-        run: |
-          set -euo pipefail
-          file=docs/real-npm-artifact-provenance.md
-          pnpm exec prettier --write "$file"
-          echo "DHFMTSTART:$file"
-          base64 -w0 "$file"
-          echo
-          echo "DHFMTEND:$file"
       - name: Formatting
         run: pnpm format:check
       - name: Lint
