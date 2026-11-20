@@ -37,7 +37,6 @@ export interface TaskRunnerPreview {
   notes: string[];
 }
 
-
 /**
  * A locally authorized, single-use capability for one fixed pinned recipe.
  * PR #29 issues/revokes grants but cannot use them to run source code.

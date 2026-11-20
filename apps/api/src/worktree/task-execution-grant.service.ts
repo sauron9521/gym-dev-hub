@@ -143,10 +143,7 @@ export class TaskExecutionGrantService {
       throw new ServiceUnavailableException('Потрібен окремий сильний секрет дозволів задач.');
     }
     const digest = hashSecret(secret);
-    if (
-      this.configuredSecretDigest &&
-      !timingSafeEqual(this.configuredSecretDigest, digest)
-    ) {
+    if (this.configuredSecretDigest && !timingSafeEqual(this.configuredSecretDigest, digest)) {
       this.grants.clear(); // Rotation invalidates every bearer token, even if feature remains on.
     }
     this.configuredSecretDigest = digest;
@@ -231,11 +228,7 @@ export class TaskExecutionGrantService {
     }
   }
 
-  async authorize(
-    sessionId: string,
-    planId: string,
-    input: unknown,
-  ): Promise<TaskExecutionGrant> {
+  async authorize(sessionId: string, planId: string, input: unknown): Promise<TaskExecutionGrant> {
     const parsed = authorizeSchema.safeParse(input);
     if (!parsed.success) throw new BadRequestException('Некоректне погодження задачі.');
     this.authenticate(parsed.data.operatorSecret);

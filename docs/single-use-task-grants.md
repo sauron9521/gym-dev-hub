@@ -17,19 +17,19 @@ Tokens are cryptographically random 32-byte values, returned **only once** when 
 
 ## Scope: only one reviewed snapshot and one recipe
 
-| Bound property | Reviewed value |
-| --- | --- |
-| Target | `sauron9521/gym-platform` |
-| Recipe | `API_TYPECHECK` only |
-| Fixed future argv (preview only) | `pnpm --filter @gym/api typecheck` |
-| Source commit | `7104f723c4ee7b81e7b9b64e9c9483aea344ef7a` |
-| Git tree | `2c140e1e740b3dd8cc7582db726f46b54b73b334` |
-| Source manifest SHA-256 | `dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b` |
-| Worktree | Exact local session + plan ID + SHA-256 fingerprint |
-| Expiry | 45 seconds |
-| Execution | **Disabled** |
+| Bound property                   | Reviewed value                                                     |
+| -------------------------------- | ------------------------------------------------------------------ |
+| Target                           | `sauron9521/gym-platform`                                          |
+| Recipe                           | `API_TYPECHECK` only                                               |
+| Fixed future argv (preview only) | `pnpm --filter @gym/api typecheck`                                 |
+| Source commit                    | `7104f723c4ee7b81e7b9b64e9c9483aea344ef7a`                         |
+| Git tree                         | `2c140e1e740b3dd8cc7582db726f46b54b73b334`                         |
+| Source manifest SHA-256          | `dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b` |
+| Worktree                         | Exact local session + plan ID + SHA-256 fingerprint                |
+| Expiry                           | 45 seconds                                                         |
+| Execution                        | **Disabled**                                                       |
 
-The pinned Git commit/tree/manifest are exactly those audited in PR #28. This is intentionally a *snapshot-bound* policy. A worktree based on a newer Gym Platform commit is **not eligible** for this grant until the relevant source manifest and approval policy are separately reviewed and updated.
+The pinned Git commit/tree/manifest are exactly those audited in PR #28. This is intentionally a _snapshot-bound_ policy. A worktree based on a newer Gym Platform commit is **not eligible** for this grant until the relevant source manifest and approval policy are separately reviewed and updated.
 
 Issuance requires the existing worktree to be fully hydrated, have fresh verified Git integrity, and pass the existing non-executing task preview. The new service checks that the returned recipe, all IDs, fingerprint, commit, fixed argv and proposed Docker restrictions exactly match the authorized policy. It does not accept arbitrary command arguments, scripts, paths or environment variables from the caller.
 
@@ -65,7 +65,7 @@ Content-Type: application/json
 
 A matching token is invalidated before any asynchronous disk audit, so concurrent replay or revocation cannot reauthorize it. Wrong session or plan consumes the attempted token rather than granting access to a different target.
 
-**Important:** there is no public `/task-grant-consume`, `/task-run` or `/execute` endpoint in this PR. The internal `consumeForPolicyCheck` method is covered by unit tests only: it atomically removes a capability, then checks the live task-preview policy *again* and returns `consumed-no-execution` / `executionEnabled: false`. No caller can trigger a Docker process by submitting a grant. Future execution will require separate reviewed design and a new explicit authorization flow.
+**Important:** there is no public `/task-grant-consume`, `/task-run` or `/execute` endpoint in this PR. The internal `consumeForPolicyCheck` method is covered by unit tests only: it atomically removes a capability, then checks the live task-preview policy _again_ and returns `consumed-no-execution` / `executionEnabled: false`. No caller can trigger a Docker process by submitting a grant. Future execution will require separate reviewed design and a new explicit authorization flow.
 
 ## Audit and safety properties
 
@@ -75,6 +75,6 @@ Negative unit tests enforce: opt-in and strong operator secret, strict schema an
 
 ## Limitations and next step
 
-This is a **single-process, localhost-only** authorization prototype, *not* a distributed permission service. A new process cannot recover outstanding grants, and audit durability depends on the local filesystem. NestJS currently has no user login or per-session identity enforcement; the operator secret is a mandatory local control, **not** a substitute for proper authentication if the API is ever exposed to other machines. Avoid logging request bodies in proxies or development middleware.
+This is a **single-process, localhost-only** authorization prototype, _not_ a distributed permission service. A new process cannot recover outstanding grants, and audit durability depends on the local filesystem. NestJS currently has no user login or per-session identity enforcement; the operator secret is a mandatory local control, **not** a substitute for proper authentication if the API is ever exposed to other machines. Avoid logging request bodies in proxies or development middleware.
 
 A future PR must implement an isolated fixed-command runner with a **private writable dependency overlay**, reviewed native/Prisma provisioning, a fresh operator consent and actual secure sandbox policy, bounded logs/timeouts and explicit cleanup. It must bind the new executor to a still-current, verified source snapshot and safely consume the intended grant **before** any side effect. Do not infer executor readiness from a green authorization test. Manual GitHub merge remains mandatory.

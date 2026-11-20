@@ -26,24 +26,6 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      # Temporary PR29 CI formatter capture, removed before review.
-      - name: Temporary PR29 exact Prettier snapshot
-        shell: bash
-        run: |
-          set -euo pipefail
-          files=(
-            apps/api/src/worktree/task-execution-grant.service.ts
-            apps/api/test/task-execution-grant.spec.ts
-            docs/single-use-task-grants.md
-            packages/contracts/src/task-runner.ts
-          )
-          pnpm exec prettier --write "${files[@]}"
-          for file in "${files[@]}"; do
-            echo "DHFMTSTART:$file"
-            base64 -w0 "$file"
-            echo
-            echo "DHFMTEND:$file"
-          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint

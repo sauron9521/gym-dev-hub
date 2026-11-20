@@ -178,8 +178,14 @@ describe('one-time fixed API_TYPECHECK authorization (without a runner)', () => 
     ['fake approval state', { approvalGranted: true }],
     ['execution unexpectedly enabled', { executionEnabled: true }],
     ['command injected', { argv: ['sh', '-c', 'exit 0'] }],
-    ['source mount becomes writable', { proposedBoundary: { ...goodPreview().proposedBoundary, sourceMount: 'writable' } }],
-    ['network requested', { proposedBoundary: { ...goodPreview().proposedBoundary, network: 'bridge' } }],
+    [
+      'source mount becomes writable',
+      { proposedBoundary: { ...goodPreview().proposedBoundary, sourceMount: 'writable' } },
+    ],
+    [
+      'network requested',
+      { proposedBoundary: { ...goodPreview().proposedBoundary, network: 'bridge' } },
+    ],
     ['changed fingerprint', { fingerprint: 'sha256:' + 'c'.repeat(64) }],
   ])('fails closed on preview drift: %s', async (_label, change) => {
     policy.preview.mockResolvedValueOnce({ ...goodPreview(), ...change });
