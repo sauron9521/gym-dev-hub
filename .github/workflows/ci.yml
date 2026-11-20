@@ -26,6 +26,23 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      # Temporary PR31 exact Prettier capture; removed from final branch.
+      - name: Temporary PR31 Prettier snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            scripts/api-typecheck-provisioning-gate.mjs
+            apps/api/test/api-typecheck-provisioning-gate.spec.ts
+            docs/api-typecheck-provisioning-gate.md
+          )
+          pnpm exec prettier --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "DHFMTSTART:$file"
+            base64 -w0 "$file"
+            echo
+            echo "DHFMTEND:$file"
+          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint
