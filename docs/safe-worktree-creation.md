@@ -57,4 +57,4 @@ The two endpoints are allowlisted explicitly; there is no generic Git command, G
 
 Unit tests build **temporary Git repositories** only, not the user's real `gym-platform`. They verify exact commit pinning, one-time token use, disabled-by-default behavior, forbidden origin/path drift, target collisions, audit and state transition. Manual HTTP tests use an isolated fixture and assert no code execution endpoint exists.
 
-**Next:** explicit safe file checkout / worktree hydration and separately scoped permissions, followed by moving Codex into an actual isolated agent worker. Keep every merge manual.
+PR #11 adds a [read-only worktree recovery and hydration preflight](worktree-inspection.md) with Git metadata checks and strict Git tree safety rules. It does **not** perform checkout. A separately approved raw-blob materializer and scoped permissions remain future PRs. Keep every merge manual.
