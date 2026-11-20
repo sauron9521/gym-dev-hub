@@ -26,6 +26,26 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      # Temporary PR17 formatter output for exact Prettier remediation; delete before review.
+      - name: Temporary PR17 formatted file snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            apps/api/src/worktree/worktree-plan.service.ts
+            apps/api/src/worktree/worktree-tool.service.ts
+            apps/api/test/worktree-tool.spec.ts
+            'apps/web/src/app/api/workspace/[...segments]/route.ts'
+            apps/web/src/app/workspace/worktree-tool-panel.tsx
+            docs/controlled-worker-tools.md
+          )
+          pnpm exec prettier --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "DHFMTSTART:$file"
+            base64 -w0 "$file"
+            echo
+            echo "DHFMTEND:$file"
+          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint
