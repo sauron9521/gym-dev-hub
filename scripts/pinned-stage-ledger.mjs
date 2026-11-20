@@ -51,14 +51,20 @@ export function isLivePid(pid) {
 
 function isOwned(record, name, now, checkout) {
   if (
-    !record || record.protocol !== PROTOCOL ||
-    record.scope !== SCOPE || record.checkout !== checkout ||
-    record.stageName !== name || !ENTRY.test(name) ||
+    !record ||
+    record.protocol !== PROTOCOL ||
+    record.scope !== SCOPE ||
+    record.checkout !== checkout ||
+    record.stageName !== name ||
+    !ENTRY.test(name) ||
     typeof record.runId !== 'string' ||
     !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(record.runId) ||
-    !Number.isSafeInteger(record.pid) || record.pid <= 0 ||
-    !/^\d+$/.test(record.dev ?? '') || !/^\d+$/.test(record.ino ?? '')
-  ) return false;
+    !Number.isSafeInteger(record.pid) ||
+    record.pid <= 0 ||
+    !/^\d+$/.test(record.dev ?? '') ||
+    !/^\d+$/.test(record.ino ?? '')
+  )
+    return false;
   const created = Date.parse(record.createdAt);
   return Number.isFinite(created) && now >= created && now - created >= STALE_MS;
 }
@@ -122,7 +128,8 @@ export async function beginPinnedStage(root, checkout) {
     const record = { ...run, ...identity(await folder(stage)), stageName };
     const recordPath = join(journalDir, stageName + '.json');
     await writeFile(recordPath, JSON.stringify(record) + '\n', {
-      flag: 'wx', mode: 0o600,
+      flag: 'wx',
+      mode: 0o600,
     });
     return { stage, root, checkout, run, recordPath, record };
   } catch (error) {
@@ -188,10 +195,18 @@ export async function stageRecoveryReport(root, checkout, now = Date.now()) {
       missing = error?.code === 'ENOENT';
     }
     entries.push({
-      name, removable: owned && !live && (matched || missing),
+      name,
+      removable: owned && !live && (matched || missing),
       recordOnly: missing,
-      reason: !owned ? 'unverified-or-recent' : live ? 'process-still-alive' :
-        matched ? 'verified-stale' : missing ? 'verified-missing-stage' : 'replaced-or-unsafe-stage',
+      reason: !owned
+        ? 'unverified-or-recent'
+        : live
+          ? 'process-still-alive'
+          : matched
+            ? 'verified-stale'
+            : missing
+              ? 'verified-missing-stage'
+              : 'replaced-or-unsafe-stage',
     });
   }
   return entries;
@@ -202,7 +217,8 @@ export async function stageRecoveryReport(root, checkout, now = Date.now()) {
  * Caller must prove Docker has no active provisioning container before invoking.
  */
 export async function pruneVerifiedStages(root, checkout, hasActiveContainers, now = Date.now()) {
-  if (hasActiveContainers) throw new Error('Active provisioning Docker containers: refusing stage cleanup');
+  if (hasActiveContainers)
+    throw new Error('Active provisioning Docker containers: refusing stage cleanup');
   const candidates = await stageRecoveryReport(root, checkout, now);
   const removed = [];
   const skipped = [];
@@ -252,20 +268,25 @@ export async function pruneStaleRunLock(root, checkout, hasActiveContainers, now
   if (hasActiveContainers) return false;
   const path = join(root, LOCK);
   let record;
-  try { record = (await readBoundedJson(path)).value; }
-  catch (error) {
+  try {
+    record = (await readBoundedJson(path)).value;
+  } catch (error) {
     if (error?.code === 'ENOENT') return false;
     throw error;
   }
   const created = Date.parse(record.createdAt);
   if (
-    record.protocol !== PROTOCOL || record.scope !== SCOPE ||
+    record.protocol !== PROTOCOL ||
+    record.scope !== SCOPE ||
     record.checkout !== checkout ||
     typeof record.runId !== 'string' ||
-    !Number.isSafeInteger(record.pid) || record.pid <= 0 ||
-    !Number.isFinite(created) || now - created < STALE_MS ||
+    !Number.isSafeInteger(record.pid) ||
+    record.pid <= 0 ||
+    !Number.isFinite(created) ||
+    now - created < STALE_MS ||
     isLivePid(record.pid)
-  ) return false;
+  )
+    return false;
   // Do not unlock a run that still has any owned journal, including bad ones.
   const remaining = await readdir(join(root, JOURNAL)).catch((error) => {
     if (error?.code === 'ENOENT') return [];
