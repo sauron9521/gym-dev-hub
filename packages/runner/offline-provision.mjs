@@ -56,7 +56,7 @@ async function main() {
   const lock = source.get('pnpm-lock.yaml').toString('utf8');
   if (
     root.name !== '@devhub/offline-fixture' ||
-    root.packageManager !== 'pnpm@12.18.0' ||
+    root.engines?.pnpm !== '12.18.0' ||
     root.dependencies?.['@devhub/offline-lib'] !== 'workspace:*' ||
     local.name !== '@devhub/offline-lib' ||
     !/^lockfileVersion: '9\.0'/m.test(lock) ||
