@@ -47,6 +47,26 @@ export interface WorktreeInspection {
   recoveryIsReadOnly: true;
 }
 
+export interface WorktreeMountPreflight {
+  sourcePath: string;
+  targetPath: '/workspace';
+  readOnly: true;
+  networkEnabled: false;
+  mountEnabled: false;
+  executionEnabled: false;
+}
+
+export interface WorktreeIntegrityReport {
+  planId: string;
+  sessionId: string;
+  status: 'verified' | 'mismatch' | 'not-ready';
+  fileCount: number;
+  verifiedBytes: number;
+  findings: string[];
+  checkedAt: string;
+  mount: WorktreeMountPreflight;
+}
+
 export interface WorktreePlan {
   id: string;
   sessionId: string;
