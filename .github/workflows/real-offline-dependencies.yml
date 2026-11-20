@@ -1,0 +1,180 @@
+name: Real Offline Dependencies (two packages)
+
+on:
+  pull_request:
+    paths:
+      - 'packages/runner/**'
+      - 'scripts/gym-platform-dependency-audit.mjs'
+      - '.github/workflows/real-offline-dependencies.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/real-offline-dependencies.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-offline-deps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-pair:
+    name: Two real pinned dependencies / networkless script-free install
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact Gym Platform source as read-only audit input
+        uses: actions/checkout@v4
+        with:
+          repository: sauron9521/gym-platform
+          ref: 73b636f5d064c7f24b43607e0c8411e9161f8986
+          path: .audit/gym-platform
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Audit real source lockfile and BOTH fixed transitive package pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .audit/gym-platform rev-parse HEAD)" = '73b636f5d064c7f24b43607e0c8411e9161f8986'
+          node scripts/gym-platform-dependency-audit.mjs .audit/gym-platform >/dev/null
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const source = readFileSync('.audit/gym-platform/pnpm-lock.yaml', 'utf8');
+          const fixture = readFileSync('packages/runner/fixtures/real-pair/pnpm-lock.yaml', 'utf8');
+          const pins = {
+            'is-number@7.0.0': 'sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==',
+            'to-regex-range@5.0.1': 'sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==',
+          };
+          for (const [pkg, pin] of Object.entries(pins)) {
+            const line = '  ' + pkg + ':\n    resolution: {integrity: ' + pin + '}';
+            if (source.split(line).length !== 2 || fixture.split(line).length !== 2) {
+              throw new Error('Reviewed SRI pin absent or ambiguous: ' + pkg);
+            }
+          }
+          if (!fixture.includes('is-number: 7.0.0')) throw new Error('Transitive dependency not pinned');
+          console.log('Both real package SRI hashes match the immutable Gym Platform lockfile.');
+          NODE
+
+      - name: Build immutable Node 24 / pnpm 12.18 runner image (trusted network build)
+        run: |
+          docker build --pull=false --tag gym-dev-hub-node-runner:v1 \
+            --file packages/runner/Dockerfile packages/runner
+
+      - name: Trusted network stage — populate two-package store without scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          store="$(mktemp -d)"
+          echo "DEPENDENCY_STORE=$store" >> "$GITHUB_ENV"
+          pnpm --dir packages/runner/fixtures/real-pair fetch \
+            --frozen-lockfile --ignore-scripts --store-dir "$store"
+          if find "$store" -type l -print -quit | grep -q .; then
+            echo 'Symlinks are forbidden in dependency store'
+            exit 1
+          fi
+          count="$(find "$store" -type f | wc -l)"
+          bytes="$(du -sb "$store" | cut -f1)"
+          test "$count" -ge 2
+          test "$count" -le 4096
+          test "$bytes" -lt 67108864
+          chmod -R a+rX "$store"
+          echo "Trusted cache stage fetched $count files, $bytes bytes."
+
+      - name: Offline Docker install of real transitive graph (no package execution)
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="$(realpath packages/runner/fixtures/real-pair)"
+          name="gym-devhub-real-pair-${{ github.run_id }}"
+          cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          docker create --name "$name" --pull=never \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --user=65534:65534 \
+            --ipc=none --pids-limit=128 --memory=2048m --cpus=2 \
+            --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=128m,mode=1777' \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777' \
+            --mount "type=bind,source=$fixture,target=/input,readonly" \
+            --mount "type=bind,source=$DEPENDENCY_STORE,target=/store,readonly" \
+            --stop-timeout=3 --entrypoint /usr/bin/node \
+            gym-dev-hub-node-runner:v1 \
+            /opt/gym-dev-hub/offline-real-pair.mjs >/dev/null
+
+          docker inspect "$name" --format '{{json .HostConfig}}' | jq -e '
+            .NetworkMode == "none" and .ReadonlyRootfs == true
+            and .Privileged == false and (.CapDrop | any(.[]; ascii_downcase == "all"))
+            and .Memory == 2147483648 and .NanoCpus == 2000000000
+            and .PidsLimit == 128 and .IpcMode == "none"
+            and (.Mounts | length) == 2
+            and ([.Mounts[] | select(.Type == "bind" and .ReadOnly == true) | .Target] | sort) == ["/input","/store"]
+            and (.Tmpfs["/workspace"] | contains("noexec"))
+            and (.Tmpfs["/tmp"] | contains("noexec"))
+          '
+          docker inspect "$name" --format '{{json .Mounts}}' | jq -e '
+            length == 2 and
+            ([.[] | select(.Type == "bind" and .RW == false) | .Destination] | sort) == ["/input","/store"]
+          '
+          test "$(docker inspect "$name" --format '{{.Config.User}}')" = '65534:65534'
+          reply="$(docker start --attach "$name")"
+          test "$(docker inspect "$name" --format '{{.State.ExitCode}}')" = '0'
+          printf '%s\n' "$reply" | jq -e '
+            .protocol == 1 and .event == "real-offline-dependencies-installed"
+            and .packageCount == 2 and .directPackages == 1 and .transitivePackages == 1
+            and .packageVersions == ["to-regex-range@5.0.1","is-number@7.0.0"]
+            and .storeFilesCopied >= 2 and .storeBytesCopied > 0
+            and (.lockSha256 | test("^[a-f0-9]{64}$"))
+            and .offline == true and .frozenLockfile == true
+            and .lifecycleScriptsExecuted == false and .projectScriptsExecuted == false
+            and .externalNetworkEnabled == false and .gymPlatformSourceMounted == false
+            and .executionEnabled == false
+          '
+          docker rm "$name"
+          test -z "$(docker ps -aq --filter "name=^$name$")"
+
+      - name: Verify modified SRI or an empty store cannot install offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          altered="$(mktemp -d)"
+          empty="$(mktemp -d)"
+          cleanup() { rm -rf "$altered" "$empty" "$DEPENDENCY_STORE"; }
+          trap cleanup EXIT
+          chmod 755 "$altered" "$empty"
+          cp -a packages/runner/fixtures/real-pair/. "$altered/"
+          sed -i 's/sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li\/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==/sha512-INVALID-SRI/' "$altered/pnpm-lock.yaml"
+
+          for scenario in invalid-pin no-cache; do
+            input="$(realpath packages/runner/fixtures/real-pair)"
+            store="$DEPENDENCY_STORE"
+            if [ "$scenario" = 'invalid-pin' ]; then input="$altered"; fi
+            if [ "$scenario" = 'no-cache' ]; then store="$empty"; fi
+            if docker run --rm --pull=never \
+              --network=none --read-only --cap-drop=ALL \
+              --security-opt=no-new-privileges --user=65534:65534 \
+              --ipc=none --pids-limit=128 --memory=2048m --cpus=2 \
+              --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=128m,mode=1777' \
+              --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777' \
+              --mount "type=bind,source=$input,target=/input,readonly" \
+              --mount "type=bind,source=$store,target=/store,readonly" \
+              --stop-timeout=3 --entrypoint /usr/bin/node \
+              gym-dev-hub-node-runner:v1 \
+              /opt/gym-dev-hub/offline-real-pair.mjs >/dev/null 2>&1; then
+              echo "Unsafe input unexpectedly accepted: $scenario"
+              exit 1
+            fi
+          done
+          test -z "$(docker ps -aq --filter 'ancestor=gym-dev-hub-node-runner:v1')"
+          echo 'Both negative cases rejected without network access or script execution.'
