@@ -15,4 +15,5 @@
 !native-compatibility-preflight.mjs
 !native-runtime-smoke.mjs
 !native-runtime-fixture.mjs
+!api-typecheck-ci.mjs
 !.dockerignore

@@ -77,3 +77,9 @@ This still never loads or executes native packages and does not expose API_TYPEC
 The separate native-runtime-smoke.mjs fixed entrypoint checks the real pinned offline API graph, validates all four native ELF artifacts, copies **only reviewed native package directories** from the private noexec project to a dedicated executable /native tmpfs, then intentionally loads bcrypt and sharp to run tiny fixed fixtures and probes the pinned Prisma schema engine. The original source, /workspace, /results and /tmp remain protected. An unsafe or missing executable scratch mount fails before install; execution is networkless, non-root and bounded.
 
 This is **not** general task execution or API_TYPECHECK. The default runner protocol and Hub HTTP endpoints remain unchanged. See docs/alpine-native-runtime-smoke.md for boundaries and controls.
+
+## Fixed API_TYPECHECK in isolated CI (PR #37a)
+
+The independent `api-typecheck-ci.mjs` now consumes only the internally verified pinned source, script-free offline dependency cache and generated Prisma Client in the existing disposable Docker environment. It runs exactly `node typescript/bin/tsc --noEmit -p tsconfig.build.json` for the reviewed Gym Platform API snapshot, with bounded output and time, without database access or any operator grant. Unit tests deny forged Prisma receipts or changed compiler recipes.
+
+This **does not create a Hub execution endpoint** or allow arbitrary source/task execution. The existing one-use authorization mechanism still deliberately returns `consumed-no-execution`. See `docs/api-typecheck-ci-proof.md` for security boundaries and the follow-up stage that will connect a real one-use grant to controlled execution.
