@@ -133,9 +133,19 @@ export async function beginPinnedStage(root, checkout) {
     });
     return { stage, root, checkout, run, recordPath, record };
   } catch (error) {
-    if (stage) await rm(stage, { recursive: true, force: false }).catch(() => undefined);
-    const observed = await readBoundedJson(lock).catch(() => null);
-    if (observed?.value?.runId === id) await rm(lock);
+    let scratchRemoved = !stage;
+    if (stage) {
+      try {
+        await rm(stage, { recursive: true, force: false });
+        scratchRemoved = true;
+      } catch {
+        // Keep the run lock if scratch cleanup could not be proved.
+      }
+    }
+    if (scratchRemoved) {
+      const observed = await readBoundedJson(lock).catch(() => null);
+      if (observed?.value?.runId === id) await rm(lock);
+    }
     throw error;
   }
 }
