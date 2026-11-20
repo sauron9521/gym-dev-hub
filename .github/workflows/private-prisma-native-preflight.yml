@@ -124,6 +124,34 @@ jobs:
           chmod 755 "$store"
           echo "Real filtered Gym API cache: $files files; $bytes bytes."
 
+      - name: Trusted network stage — fetch exact Prisma 7 Alpine-musl schema engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='d1b3f377ca835d73fd50954a5e22128b9ebdd6b8'
+          platform='linux-musl-openssl-3.0.x'
+          base="https://binaries.prisma.sh/all_commits/$version/$platform/schema-engine.gz"
+          engine="$(mktemp -d)"
+          echo "GYM_PRISMA_ENGINE=$engine" >> "$GITHUB_ENV"
+          curl --fail --location --silent --show-error --retry 3 --max-time 120 \
+            "$base" --output "$engine/schema-engine.gz"
+          curl --fail --location --silent --show-error --retry 3 --max-time 120 \
+            "$base.sha256" --output "$engine/schema-engine.gz.sha256"
+          checksum="$(tr -d '\r\n ' < "$engine/schema-engine.gz.sha256")"
+          [[ "$checksum" =~ ^[a-f0-9]{64}$ ]]
+          test "$(sha256sum "$engine/schema-engine.gz" | cut -d' ' -f1)" = "$checksum"
+          gzip -t "$engine/schema-engine.gz"
+          gzip -dc "$engine/schema-engine.gz" > "$engine/schema-engine"
+          test "$(stat -c%s "$engine/schema-engine")" -ge 1000000
+          test "$(stat -c%s "$engine/schema-engine")" -le 180000000
+          test "$(head -c4 "$engine/schema-engine" | od -An -tx1 | tr -d ' \n')" = '7f454c46'
+          chmod 555 "$engine/schema-engine"
+          rm "$engine/schema-engine.gz" "$engine/schema-engine.gz.sha256"
+          actual="$(sha256sum "$engine/schema-engine" | cut -d' ' -f1)"
+          echo "GYPIN_PRISMA_ENGINE_SHA256=$actual"
+          test "$actual" = 'REPLACE_WITH_REVIEWED_MUSL_ENGINE_SHA256'
+          chmod 755 "$engine"
+
       - name: Build verified CI-only Node runner image
         shell: bash
         run: |
@@ -150,6 +178,7 @@ jobs:
             --mount "type=bind,source=$GYM_SOURCE_SNAPSHOT,target=/source,readonly" \
             --mount "type=bind,source=$GYM_SOURCE_MANIFEST,target=/manifest,readonly" \
             --mount "type=bind,source=$GYM_API_PNPM_STORE,target=/store,readonly" \
+            --mount "type=bind,source=$GYM_PRISMA_ENGINE,target=/engine,readonly" \
             --stop-timeout=3 --entrypoint /usr/bin/node \
             gym-dev-hub-node-runner:v1 \
             /opt/gym-dev-hub/prisma-native-preflight.mjs > /dev/null
@@ -159,15 +188,15 @@ jobs:
             and .Privileged == false and (.CapDrop | any(.[]; ascii_downcase == "all"))
             and .Memory == 5368709120 and .NanoCpus == 2000000000
             and .PidsLimit == 128 and .IpcMode == "none"
-            and (.Mounts | length) == 3
-            and ([.Mounts[] | select(.Type == "bind" and .ReadOnly == true) | .Target] | sort) == ["/manifest","/source","/store"]
+            and (.Mounts | length) == 4
+            and ([.Mounts[] | select(.Type == "bind" and .ReadOnly == true) | .Target] | sort) == ["/engine","/manifest","/source","/store"]
             and (.Tmpfs["/workspace"] | contains("noexec"))
             and (.Tmpfs["/results"] | contains("noexec"))
             and (.Tmpfs["/tmp"] | contains("noexec"))
           '
           docker inspect "$name" --format '{{json .Mounts}}' | jq -e '
-            length == 3 and
-            ([.[] | select(.Type == "bind" and .RW == false) | .Destination] | sort) == ["/manifest","/source","/store"]
+            length == 4 and
+            ([.[] | select(.Type == "bind" and .RW == false) | .Destination] | sort) == ["/engine","/manifest","/source","/store"]
           '
           test "$(docker inspect "$name" --format '{{.Config.User}}')" = '65534:65534'
           reply="$(docker start --attach "$name")"
@@ -178,6 +207,9 @@ jobs:
             and .sourceTree == "2c140e1e740b3dd8cc7582db726f46b54b73b334"
             and .sourceManifestSha256 == "dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b"
             and .prismaVersion == "7.10.1"
+            and .schemaEngineCommit == "d1b3f377ca835d73fd50954a5e22128b9ebdd6b8"
+            and (.schemaEngineSha256 | test("^[a-f0-9]{64}$"))
+            and .schemaEnginePlatform == "linux-musl-openssl-3.0.x"
             and .outputPath == "apps/api/src/infra/database/generated/prisma"
             and .generatedFiles >= 6 and .generatedBytes >= 2000
             and .networkEnabled == false and .sourceReadOnly == true
@@ -199,7 +231,7 @@ jobs:
           altered="$(mktemp -d)"
           empty="$(mktemp -d)"
           cleanup() {
-            rm -rf "$altered" "$empty" "$GYM_SOURCE_SNAPSHOT" "$GYM_SOURCE_MANIFEST" "$GYM_API_PNPM_STORE"
+            rm -rf "$altered" "$empty" "$GYM_SOURCE_SNAPSHOT" "$GYM_SOURCE_MANIFEST" "$GYM_API_PNPM_STORE" "$GYM_PRISMA_ENGINE"
           }
           trap cleanup EXIT
           chmod 755 "$altered" "$empty"
@@ -220,6 +252,7 @@ jobs:
               --mount "type=bind,source=$source,target=/source,readonly" \
               --mount "type=bind,source=$GYM_SOURCE_MANIFEST,target=/manifest,readonly" \
               --mount "type=bind,source=$store,target=/store,readonly" \
+              --mount "type=bind,source=$GYM_PRISMA_ENGINE,target=/engine,readonly" \
               --stop-timeout=3 --entrypoint /usr/bin/node \
               gym-dev-hub-node-runner:v1 \
               /opt/gym-dev-hub/prisma-native-preflight.mjs >/dev/null 2>&1; then
