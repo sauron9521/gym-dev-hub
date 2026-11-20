@@ -11,7 +11,7 @@ The production `gym-platform` mono-repository currently uses `pnpm@12.18.0`, a l
 1. Builds the dedicated Node 24 / pnpm 12.18.0 toolchain image from PR #20, adding a **CI-only** `offline-provision.mjs` (normal worker entrypoint stays `runner.mjs`, with `RUN` and `INSTALL` still rejected).
 2. Starts a disposable Docker container (in CI only) with the **checked-in four-file local fixture** as its only read-only bind mount under `/input`; `/workspace` is disposable writable tmpfs. No host workspace, project source, credentials, Docker socket, or network are mounted or exposed.
 3. Validates regular non-symlink fixture inputs, strict paths, total byte bounds, the expected fixture package names, `pnpm@12.18.0`, workspace dependency and lockfile version 9.
-4. Copies only those four files into `/workspace`, exclusively creating each staged file. Executes the *fixed, non-user-configurable* argv:
+4. Copies only those four files into `/workspace`, exclusively creating each staged file. Executes the _fixed, non-user-configurable_ argv:
    ```text
    /bin/sh /usr/bin/devhub-pnpm install --offline --frozen-lockfile --ignore-scripts
    ```
@@ -22,20 +22,20 @@ The production `gym-platform` mono-repository currently uses `pnpm@12.18.0`, a l
 
 ### Runtime restrictions in fixture CI
 
-| Attribute | Fixture proof |
-| --- | --- |
-| Network | `none` |
-| Root filesystem | Read-only |
-| UID/GID | `65534:65534` |
-| Capabilities | Dropped (`ALL`) |
-| Docker socket | Not mounted |
-| Input mount | One *reviewed fixture*, read-only |
-| Output | Ephemeral `/workspace` and `/tmp` tmpfs mounts, `noexec` |
-| Memory / CPU / PIDs | 2 GiB / 2 / 128 |
-| pnpm | Offline, frozen lockfile, ignore scripts |
-| Timeout | 30 seconds for pnpm |
-| Output cap | 8 KiB for captured pnpm output |
-| Real project | **Not mounted, not installed, not run** |
+| Attribute           | Fixture proof                                            |
+| ------------------- | -------------------------------------------------------- |
+| Network             | `none`                                                   |
+| Root filesystem     | Read-only                                                |
+| UID/GID             | `65534:65534`                                            |
+| Capabilities        | Dropped (`ALL`)                                          |
+| Docker socket       | Not mounted                                              |
+| Input mount         | One _reviewed fixture_, read-only                        |
+| Output              | Ephemeral `/workspace` and `/tmp` tmpfs mounts, `noexec` |
+| Memory / CPU / PIDs | 2 GiB / 2 / 128                                          |
+| pnpm                | Offline, frozen lockfile, ignore scripts                 |
+| Timeout             | 30 seconds for pnpm                                      |
+| Output cap          | 8 KiB for captured pnpm output                           |
+| Real project        | **Not mounted, not installed, not run**                  |
 
 ## Explicit gaps for actual Gym Platform
 

@@ -106,9 +106,9 @@ async function main() {
   }
 
   const installed = JSON.parse(
-    (await readFile(join(OUTPUT, 'node_modules', '@devhub', 'offline-lib', 'package.json'))).toString(
-      'utf8',
-    ),
+    (
+      await readFile(join(OUTPUT, 'node_modules', '@devhub', 'offline-lib', 'package.json'))
+    ).toString('utf8'),
   );
   const afterLock = await readFile(join(OUTPUT, 'pnpm-lock.yaml'));
   if (installed.name !== '@devhub/offline-lib' || SHA256(afterLock) !== lockHash) {
