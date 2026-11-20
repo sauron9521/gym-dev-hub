@@ -90,7 +90,8 @@ function run(command, args, cwd, timeout) {
       CI: 'true',
     },
   });
-  if (task.error || task.signal || task.status === null) throw new Error('Bounded process interrupted');
+  if (task.error || task.signal || task.status === null)
+    throw new Error('Bounded process interrupted');
   return task;
 }
 
@@ -141,10 +142,7 @@ async function inspectStore(path, depth, tally) {
 
 async function packageVersion(name) {
   const nodes = name.startsWith('@') ? name.split('/') : [name];
-  const roots = [
-    join(PROJECT, 'node_modules'),
-    join(PROJECT, 'apps', 'api', 'node_modules'),
-  ];
+  const roots = [join(PROJECT, 'node_modules'), join(PROJECT, 'apps', 'api', 'node_modules')];
   for (const root of roots) {
     try {
       const bytes = await readFile(join(root, ...nodes, 'package.json'));
@@ -179,8 +177,18 @@ async function main() {
 
   // The original Git-pinned bind never becomes writable. All package-manager
   // operations happen exclusively on a disposable copy in private tmpfs.
-  await cp(SOURCE, PROJECT, { recursive: true, dereference: false, force: false, errorOnExist: true });
-  await cp(STORE, LOCAL_STORE, { recursive: true, dereference: false, force: false, errorOnExist: true });
+  await cp(SOURCE, PROJECT, {
+    recursive: true,
+    dereference: false,
+    force: false,
+    errorOnExist: true,
+  });
+  await cp(STORE, LOCAL_STORE, {
+    recursive: true,
+    dereference: false,
+    force: false,
+    errorOnExist: true,
+  });
 
   const installed = run(
     '/bin/sh',
