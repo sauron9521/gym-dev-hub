@@ -3,4 +3,5 @@
 !runner.mjs
 !offline-provision.mjs
 !cache-verify.mjs
+!real-artifact-verify.mjs
 !.dockerignore

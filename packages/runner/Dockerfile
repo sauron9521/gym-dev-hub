@@ -22,5 +22,7 @@ COPY --chown=65534:65534 runner.mjs /opt/gym-dev-hub/runner.mjs
 COPY --chown=65534:65534 offline-provision.mjs /opt/gym-dev-hub/offline-provision.mjs
 # Separate CI-only trust-pin verification. Not exposed via runner.mjs.
 COPY --chown=65534:65534 cache-verify.mjs /opt/gym-dev-hub/cache-verify.mjs
+# CI-only actual registry tarball SRI verifier. Not exposed by runner protocol.
+COPY --chown=65534:65534 real-artifact-verify.mjs /opt/gym-dev-hub/real-artifact-verify.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]
