@@ -34,11 +34,7 @@ async function checkedDirectory(path) {
 }
 
 function readManifestEntries(bytes) {
-  if (
-    bytes.length === 0 ||
-    bytes.length > MAX_MANIFEST_BYTES ||
-    bytes[bytes.length - 1] !== 0
-  ) {
+  if (bytes.length === 0 || bytes.length > MAX_MANIFEST_BYTES || bytes[bytes.length - 1] !== 0) {
     throw new Error('Manifest is missing, oversized or not NUL-delimited');
   }
 
@@ -62,7 +58,9 @@ function readManifestEntries(bytes) {
       name.includes('\\') ||
       name.includes('\0') ||
       /[\r\n\t]/.test(name) ||
-      name.split('/').some((segment) => !segment || segment === '.' || segment === '..' || segment === '.git') ||
+      name
+        .split('/')
+        .some((segment) => !segment || segment === '.' || segment === '..' || segment === '.git') ||
       records.has(name)
     ) {
       throw new Error('Unsafe or duplicate Git source path');
@@ -148,9 +146,7 @@ async function main() {
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_MANIFEST_BYTES) {
     throw new Error('Unsafe manifest file');
   }
-  const { records, digest, total, executable } = readManifestEntries(
-    await readFile(manifestPath),
-  );
+  const { records, digest, total, executable } = readManifestEntries(await readFile(manifestPath));
   const observed = await verifySnapshot(SOURCE, records);
   if (observed.executable !== executable || observed.bytes !== total) {
     throw new Error('Observed Git file mode or size changed');

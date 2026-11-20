@@ -1,6 +1,6 @@
 # PR #28 — Full immutable Gym Platform tracked-source snapshot
 
-This is a standalone **CI-only** proof that Gym Dev Hub can safely mount and verify the **entire tracked source tree** of one reviewed Gym Platform commit, *without* mounting the source repository's Git metadata, any untracked files, environment secrets or private local worktree state.
+This is a standalone **CI-only** proof that Gym Dev Hub can safely mount and verify the **entire tracked source tree** of one reviewed Gym Platform commit, _without_ mounting the source repository's Git metadata, any untracked files, environment secrets or private local worktree state.
 
 It **does not** allow any caller to execute project code, build Gym Platform, run tests, or request a new permission grant. The normal diagnostic `runner.mjs` remains non-executing, and no NestJS or web execution endpoint is added.
 
@@ -24,7 +24,7 @@ To avoid accepting an attacker-controlled manifest as its own trust authority, t
 `packages/runner/full-source-audit.mjs` is a fixed, argument-free, CI-only entrypoint copied into the runner image. In Docker it receives **only two read-only bind mounts**, `/source` (archive of exactly the 1,258 tracked source files) and `/manifest` (the independently pinned manifest). It:
 
 - Rejects an unsafe manifest, wrong SHA-256, unsupported entry mode/type, repeated or traversal paths, unexpected file count/size or executable-mode drift.
-- Walks the *entire* mounted source directory and rejects extra, missing, symlink, non-regular or hardlinked files, excessive directory nesting and unexpectedly executable files.
+- Walks the _entire_ mounted source directory and rejects extra, missing, symlink, non-regular or hardlinked files, excessive directory nesting and unexpectedly executable files.
 - Verifies each file's Git blob SHA-1 against the canonical reviewed manifest, plus exact file sizes and executable-mode information.
 - Emits a bounded structured JSON summary with the pinned commit/tree and **no execution granted**.
 
@@ -36,6 +36,6 @@ Negative tests in the **same isolated Docker policy** must reject five cases: mo
 
 This snapshot covers **Git-tracked files only**. It does not include untracked, ignored or generated assets in a developer's local worktree; it does not run `git checkout` or change local branches, access a developer's Windows machine, install native modules, or hydrate node_modules. Source files may contain checked-in examples or policies, but no user secrets or `.git` folder are mounted.
 
-This is a **read-only data-integrity proof, not a sandbox for executing arbitrary source**. It does not yet create a private writable dependency overlay, a one-time execution approval, a fixed `API_TYPECHECK` launcher, audit-log integration, or CI feedback into PR editing. An image containing the CI-only verifier is *not* equivalent to making it callable through the product API.
+This is a **read-only data-integrity proof, not a sandbox for executing arbitrary source**. It does not yet create a private writable dependency overlay, a one-time execution approval, a fixed `API_TYPECHECK` launcher, audit-log integration, or CI feedback into PR editing. An image containing the CI-only verifier is _not_ equivalent to making it callable through the product API.
 
 The next recommended small PR is a **single-use, recipe-specific operator authorization policy** bound to the immutable source manifest and task/worktree identity. Then add a separately reviewed, disposable writable overlay and a limited, time-bounded, non-networked real-project check with the required pinned toolchain and native dependencies. All GitHub merges remain manual; Windows Docker Desktop still needs separate validation.
