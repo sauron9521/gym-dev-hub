@@ -9,16 +9,25 @@ import { WorkspaceService } from './workspace/workspace.service.js';
 import { CodexBridgeService } from './codex/codex-bridge.service.js';
 import { CodexController } from './codex/codex.controller.js';
 import { CodexChatService } from './codex/codex-chat.service.js';
+import { BoundaryController } from './boundary/boundary.controller.js';
+import { BoundaryService } from './boundary/boundary.service.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
-  controllers: [AppController, GitHubController, WorkspaceController, CodexController],
+  controllers: [
+    AppController,
+    GitHubController,
+    WorkspaceController,
+    CodexController,
+    BoundaryController,
+  ],
   providers: [
     GitHubService,
     ReadinessService,
     WorkspaceService,
     CodexBridgeService,
     CodexChatService,
+    BoundaryService,
   ],
 })
 export class AppModule {}

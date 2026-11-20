@@ -40,3 +40,5 @@ export type {
   ChatTurnSnapshot,
   ChatStreamEvent,
 } from './codex.js';
+
+export type { ExecutionBoundaryStatus, BoundaryState } from './boundary.js';

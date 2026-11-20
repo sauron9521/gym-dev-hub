@@ -1551,3 +1551,111 @@ strong {
     max-width: 100%;
   }
 }
+
+/* Docker boundary preflight — informational only; no agent runner. */
+.ws-boundary-panel {
+  margin: 18px 0;
+  border: 1px solid #365070;
+  border-radius: 13px;
+  background: #142133;
+  padding: 21px 24px;
+}
+.ws-boundary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ws-boundary-heading h2 {
+  font:
+    800 16px Manrope,
+    system-ui,
+    sans-serif;
+  margin: 6px 0 0;
+}
+.ws-boundary-panel > p {
+  color: #a5b6d0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ws-boundary-policies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 16px 0;
+}
+.ws-boundary-policies span {
+  font:
+    700 10px system-ui,
+    sans-serif;
+  padding: 7px 9px;
+  border: 1px solid #324661;
+  border-radius: 6px;
+  background: #172940;
+  color: #bdd0ee;
+}
+.ws-boundary-state {
+  flex-shrink: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #aec1da;
+  background: #27374c;
+}
+.ws-boundary-passed {
+  color: #a9e7cc;
+  background: #1e4336;
+}
+.ws-boundary-running {
+  color: #f1d7a4;
+  background: #3e3520;
+}
+.ws-boundary-unavailable,
+.ws-boundary-failed {
+  color: #ffb5b5;
+  background: #47272b;
+}
+.ws-boundary-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid #2b3b55;
+  padding-top: 17px;
+}
+.ws-boundary-bottom > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ws-boundary-bottom strong {
+  color: #dbe7fa;
+  font-size: 12px;
+}
+.ws-boundary-bottom small,
+.ws-boundary-time {
+  color: #91a2ba;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.ws-boundary-bottom .ws-primary {
+  flex-shrink: 0;
+}
+.ws-boundary-time {
+  display: block;
+  margin-top: 12px;
+}
+@media (max-width: 700px) {
+  .ws-boundary-panel {
+    padding: 17px;
+  }
+  .ws-boundary-bottom {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ws-boundary-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

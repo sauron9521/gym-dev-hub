@@ -26,6 +26,10 @@ See [GitHub Dashboard and PR Checks setup](docs/github-dashboard.md) for the per
 
 Open <http://127.0.0.1:3100/workspace> to create separate implementation-task sessions, open multiple tabs, update task statuses, and save local notes. The Agent Chat interface now supports opt-in **real read-only Codex text turns with SSE streaming**. Agent command execution, Git worktrees and PR creation remain future work. Session files remain local and are gitignored. See [Agent Workspace setup](docs/agent-workspace.md).
 
+### Docker Execution Boundary (preflight)
+
+The Workspace now includes a [Docker isolation preflight](docs/execution-boundary.md) which checks an ephemeral non-networked, read-only test container. **This is not a runnable agent environment** and does not grant file access or Git permissions.
+
 ### Codex Adapter (opt-in)
 
 The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. PR #6 adds a separate text-only [Codex Agent Chat](docs/agent-chat.md) using these threads, while keeping worktree and PR mutation disabled. See [Codex Adapter setup and security](docs/codex-adapter.md).

@@ -9,6 +9,10 @@ function allowedPath(segments: string[], method: string): string | null {
     if (segments[1] === 'status' && method === 'GET') return '/workspace/codex/status';
     if (segments[1] === 'connect' && method === 'POST') return '/workspace/codex/connect';
   }
+  if (segments.length === 2 && segments[0] === 'boundary') {
+    if (segments[1] === 'status' && method === 'GET') return '/workspace/boundary/status';
+    if (segments[1] === 'preflight' && method === 'POST') return '/workspace/boundary/preflight';
+  }
   if (segments[0] !== 'sessions') return null;
   if (segments.length === 1 && (method === 'GET' || method === 'POST')) {
     return '/workspace/sessions';
@@ -88,7 +92,13 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
       cache: 'no-store',
       signal: isEventStream
         ? request.signal
-        : AbortSignal.timeout(path.includes('codex') || path.endsWith('/chat') ? 20_000 : 10_000),
+        : AbortSignal.timeout(
+            path.endsWith('/boundary/preflight')
+              ? 45_000
+              : path.includes('codex') || path.endsWith('/chat')
+                ? 20_000
+                : 10_000,
+          ),
       redirect: 'error',
     });
     if (isEventStream && upstream.ok) {
