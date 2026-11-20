@@ -1,4 +1,10 @@
-export type { TaskRunnerRecipeId, TaskRunnerPreview } from './task-runner.js';
+export type {
+  TaskRunnerRecipeId,
+  TaskRunnerPreview,
+  TaskExecutionGrant,
+  TaskExecutionGrantRevocation,
+  TaskExecutionGrantReceipt,
+} from './task-runner.js';
 
 export interface HealthResponse {
   status: 'ok';
