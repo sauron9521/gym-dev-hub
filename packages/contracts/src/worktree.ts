@@ -13,7 +13,10 @@ export type WorktreeAuditEvent =
   | 'hydration-failed'
   | 'mount-probe-started'
   | 'mount-probe-verified'
-  | 'mount-probe-failed';
+  | 'mount-probe-failed'
+  | 'code-read-started'
+  | 'code-read-completed'
+  | 'code-read-failed';
 
 export interface WorktreeAuditEntry {
   event: WorktreeAuditEvent;
@@ -84,6 +87,26 @@ export interface WorktreeMountProbeResult {
   checkedAt: string;
   sourcePath: string;
   targetPath: '/workspace';
+  readOnly: true;
+  networkEnabled: false;
+  containerRemoved: true;
+  agentExecutionEnabled: false;
+}
+
+export interface WorktreeCodeReadGrant {
+  grantToken: string;
+  filePath: string;
+  expiresAt: string;
+  baseHeadSha: string;
+  purpose: 'READ_ONE_SCOPED_CODE_FILE';
+}
+
+export interface WorktreeCodeReadResult {
+  sessionId: string;
+  planId: string;
+  filePath: string;
+  content: string;
+  checkedAt: string;
   readOnly: true;
   networkEnabled: false;
   containerRemoved: true;
