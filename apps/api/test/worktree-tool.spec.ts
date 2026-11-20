@@ -117,16 +117,31 @@ describe('separate one-shot fixed worker tool approval', () => {
       containerRemoved: true,
     });
     expect(runMountedWorkerProbe).toHaveBeenCalledWith(root, undefined, 'src/test.ts');
-    expect(plans.recordToolRun.mock.calls.map(([, , step]) => step)).toEqual(['started', 'completed']);
-    await expect(service.execute(SESSION, PLAN, { grantToken: grant.grantToken }))
-      .rejects.toThrow('використано');
+    expect(plans.recordToolRun.mock.calls.map(([, , step]) => step)).toEqual([
+      'started',
+      'completed',
+    ]);
+    await expect(service.execute(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow(
+      'використано',
+    );
   });
 
   it('refuses arbitrary tools, invalid path, extra fields and weak independent secret', async () => {
-    await expect(service.authorize(SESSION, PLAN, { ...request(), tool: 'SHELL' })).rejects.toThrow();
-    await expect(service.authorize(SESSION, PLAN, { ...request(), filePath: '../secret.ts' })).rejects.toThrow();
-    await expect(service.authorize(SESSION, PLAN, { ...request(), args: ['--privileged'] })).rejects.toThrow();
-    await expect(service.authorize(SESSION, PLAN, { ...request(), operatorSecret: 'invalid-long-secret-abcdefghijklmnopqrstuvwxyz' })).rejects.toThrow('секрет');
+    await expect(
+      service.authorize(SESSION, PLAN, { ...request(), tool: 'SHELL' }),
+    ).rejects.toThrow();
+    await expect(
+      service.authorize(SESSION, PLAN, { ...request(), filePath: '../secret.ts' }),
+    ).rejects.toThrow();
+    await expect(
+      service.authorize(SESSION, PLAN, { ...request(), args: ['--privileged'] }),
+    ).rejects.toThrow();
+    await expect(
+      service.authorize(SESSION, PLAN, {
+        ...request(),
+        operatorSecret: 'invalid-long-secret-abcdefghijklmnopqrstuvwxyz',
+      }),
+    ).rejects.toThrow('секрет');
     expect(runMountedWorkerProbe).not.toHaveBeenCalled();
   });
 
@@ -138,36 +153,55 @@ describe('separate one-shot fixed worker tool approval', () => {
   });
 
   it('requires fresh Docker preflight and verified Git blob integrity', async () => {
-    boundary.status.mockReturnValue({ state: 'passed', checkedAt: new Date(Date.now() - 6 * 60_000).toISOString() });
+    boundary.status.mockReturnValue({
+      state: 'passed',
+      checkedAt: new Date(Date.now() - 6 * 60_000).toISOString(),
+    });
     await expect(service.authorize(SESSION, PLAN, request())).rejects.toThrow('Docker Safety');
     boundary.status.mockReturnValue({ state: 'passed', checkedAt: new Date().toISOString() });
     const grant = await service.authorize(SESSION, PLAN, request());
     integrity.verify.mockResolvedValueOnce({ status: 'mismatch' });
-    await expect(service.execute(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow('Docker tool');
+    await expect(service.execute(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow(
+      'Docker tool',
+    );
     expect(runMountedWorkerProbe).not.toHaveBeenCalled();
   });
 
   it('rejects unknown files and bounded-size violations before issuing a grant', async () => {
-    await expect(service.authorize(SESSION, PLAN, { ...request(), filePath: 'src/nope.ts' })).rejects.toThrow();
+    await expect(
+      service.authorize(SESSION, PLAN, { ...request(), filePath: 'src/nope.ts' }),
+    ).rejects.toThrow();
     await writeFile(join(root, 'src', 'large.ts'), 'x'.repeat(8193));
-    await expect(service.authorize(SESSION, PLAN, { ...request(), filePath: 'src/large.ts' })).rejects.toThrow();
+    await expect(
+      service.authorize(SESSION, PLAN, { ...request(), filePath: 'src/large.ts' }),
+    ).rejects.toThrow();
   });
 
   it('fails closed if the worker returns unexpected content or errors', async () => {
     const grant = await service.authorize(SESSION, PLAN, request());
     vi.mocked(runMountedWorkerProbe).mockResolvedValueOnce('not-a-checksum');
-    await expect(service.execute(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow('Docker tool');
+    await expect(service.execute(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow(
+      'Docker tool',
+    );
     expect(plans.recordToolRun.mock.calls.map(([, , step]) => step)).toEqual(['started', 'failed']);
   });
 
   it('consumes grants on cross-session attempts, timeout and replay', async () => {
     const grant = await service.authorize(SESSION, PLAN, request());
-    await expect(service.execute('00000000-0000-4000-8000-000000000999', PLAN, { grantToken: grant.grantToken })).rejects.toThrow('використано');
-    await expect(service.execute(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow('використано');
+    await expect(
+      service.execute('00000000-0000-4000-8000-000000000999', PLAN, {
+        grantToken: grant.grantToken,
+      }),
+    ).rejects.toThrow('використано');
+    await expect(service.execute(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow(
+      'використано',
+    );
     const second = await service.authorize(SESSION, PLAN, request());
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now + 61_000);
-    await expect(service.execute(SESSION, PLAN, { grantToken: second.grantToken })).rejects.toThrow('прострочено');
+    await expect(service.execute(SESSION, PLAN, { grantToken: second.grantToken })).rejects.toThrow(
+      'прострочено',
+    );
     expect(runMountedWorkerProbe).not.toHaveBeenCalled();
   });
 });

@@ -72,8 +72,8 @@ export function WorktreeToolPanel({ sessionId, report, fingerprint }: Props) {
       <div className="overline">CONTROLLED WORKER TOOL · PR #17</div>
       <h4>Інструмент SHA-256 одного файла</h4>
       <p>
-        Запускає тільки фіксовану перевірку контрольної суми у тимчасовому Docker worker.
-        Не виконує код репозиторію, shell-команди агента, Git push чи merge.
+        Запускає тільки фіксовану перевірку контрольної суми у тимчасовому Docker worker. Не виконує
+        код репозиторію, shell-команди агента, Git push чи merge.
       </p>
       <label htmlFor="worker-tool-path">Відносний шлях до файла (до 8 КБ)</label>
       <input
@@ -97,8 +97,8 @@ export function WorktreeToolPanel({ sessionId, report, fingerprint }: Props) {
           disabled={busy || Boolean(grant)}
           onChange={(event) => setApproved(event.target.checked)}
         />
-        Погоджую тільки інструмент SHA256_FILE для цього файла в конкретному Git commit.
-        Це не дозвіл на виконання довільних команд або зміну коду.
+        Погоджую тільки інструмент SHA256_FILE для цього файла в конкретному Git commit. Це не
+        дозвіл на виконання довільних команд або зміну коду.
       </label>
       <label htmlFor="worker-tool-secret">Окремий секрет інструментів</label>
       <input
@@ -124,7 +124,12 @@ export function WorktreeToolPanel({ sessionId, report, fingerprint }: Props) {
             Дозволено: <code>{grant.filePath}</code> у <code>{grant.baseHeadSha}</code>, до{' '}
             {new Date(grant.expiresAt).toLocaleTimeString('uk-UA')}.
           </small>
-          <button type="button" className="ws-primary" disabled={busy} onClick={() => void execute()}>
+          <button
+            type="button"
+            className="ws-primary"
+            disabled={busy}
+            onClick={() => void execute()}
+          >
             Обчислити SHA-256 і видалити контейнер
           </button>
         </div>
@@ -134,14 +139,20 @@ export function WorktreeToolPanel({ sessionId, report, fingerprint }: Props) {
           <p>
             SHA-256 файла <code>{result.filePath}</code>; Docker контейнер завершено.
           </p>
-          <pre className="ws-code-read-result"><code>{result.sha256}</code></pre>
+          <pre className="ws-code-read-result">
+            <code>{result.sha256}</code>
+          </pre>
         </div>
       )}
-      {error && <p role="alert" className="ws-chat-error">{error}</p>}
+      {error && (
+        <p role="alert" className="ws-chat-error">
+          {error}
+        </p>
+      )}
       <small>
         Потрібні DEV_HUB_ENABLE_WORKTREE_MOUNT=true, DEV_HUB_ENABLE_WORKER_TOOLS=true,
-        DEV_HUB_WORKER_TOOL_SECRET та свіжий Docker Safety Preflight.
-        Worker може відмовити в читанні файлів з правами 0600.
+        DEV_HUB_WORKER_TOOL_SECRET та свіжий Docker Safety Preflight. Worker може відмовити в
+        читанні файлів з правами 0600.
       </small>
     </div>
   );

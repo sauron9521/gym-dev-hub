@@ -7,11 +7,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import type {
-  WorktreeToolGrant,
-  WorktreeToolResult,
-  WorktreePlan,
-} from '@gym-dev-hub/contracts';
+import type { WorktreeToolGrant, WorktreeToolResult, WorktreePlan } from '@gym-dev-hub/contracts';
 import { BoundaryService } from '../boundary/boundary.service.js';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeIntegrityService } from './worktree-integrity.service.js';

@@ -51,7 +51,7 @@ The Next.js Workspace same-origin proxy expressly allowlists both routes. There 
 
 ## Known limitations and follow-ups
 
-- The hydrated source files are mode `0600`; UID 65534 usually cannot read them. Failure is expected until a separately reviewed *safe ephemeral copy/permission strategy* is implemented. PR #17 never changes host file permissions or bypasses the worker security policy.
+- The hydrated source files are mode `0600`; UID 65534 usually cannot read them. Failure is expected until a separately reviewed _safe ephemeral copy/permission strategy_ is implemented. PR #17 never changes host file permissions or bypasses the worker security policy.
 - Windows Docker Desktop path translations and 8.3 paths still require a local Home-PC verification; hosted CI cannot establish the machine's path policy.
 - A successful SHA-256 tool action is **not** a permission for Codex to execute code, install packages, run tests, write files or invoke a shell.
 - The local user account and administrator can modify files concurrently; the repeated integrity check is a best-effort boundary, not an OS-level immutable snapshot.

@@ -142,8 +142,8 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
         ? request.signal
         : AbortSignal.timeout(
             path.endsWith('/mount-probe') ||
-            path.endsWith('/code-read') ||
-            path.endsWith('/tool-execute')
+              path.endsWith('/code-read') ||
+              path.endsWith('/tool-execute')
               ? 45_000
               : path.endsWith('/boundary/preflight')
                 ? 45_000
