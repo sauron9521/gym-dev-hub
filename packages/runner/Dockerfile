@@ -24,5 +24,7 @@ COPY --chown=65534:65534 offline-provision.mjs /opt/gym-dev-hub/offline-provisio
 COPY --chown=65534:65534 cache-verify.mjs /opt/gym-dev-hub/cache-verify.mjs
 # CI-only actual registry tarball SRI verifier. Not exposed by runner protocol.
 COPY --chown=65534:65534 real-artifact-verify.mjs /opt/gym-dev-hub/real-artifact-verify.mjs
+# CI-only fixed real two-package offline install (not available through runner protocol).
+COPY --chown=65534:65534 offline-real-pair.mjs /opt/gym-dev-hub/offline-real-pair.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]
