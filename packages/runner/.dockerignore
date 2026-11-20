@@ -6,4 +6,5 @@
 !real-artifact-verify.mjs
 !offline-real-pair.mjs
 !offline-typescript-smoke.mjs
+!pinned-source-typecheck.mjs
 !.dockerignore
