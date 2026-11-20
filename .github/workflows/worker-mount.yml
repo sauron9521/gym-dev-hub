@@ -6,6 +6,8 @@ on:
       - 'apps/api/src/worktree/worktree-mount-*.ts'
       - 'apps/api/src/worktree/worktree-code-read.service.ts'
       - 'apps/api/src/worktree/worktree-tool.service.ts'
+      - 'apps/api/src/worktree/worktree-file-stage.ts'
+      - 'apps/api/test/worktree-file-stage.spec.ts'
       - 'apps/api/test/worktree-tool.spec.ts'
       - 'apps/api/test/worktree-code-read.spec.ts'
       - 'apps/api/test/worktree-mount-*.spec.ts'
