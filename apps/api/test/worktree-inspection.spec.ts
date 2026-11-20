@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { WorktreePlan } from '@gym-dev-hub/contracts';
@@ -88,7 +88,7 @@ describe('read-only worktree recovery inspection (real Git fixture)', () => {
       id,
       sessionId: '00000000-0000-4000-8000-000000000456',
       repository: 'sauron9521/gym-platform',
-      sourcePath: source,
+      sourcePath: await realpath(source),
       targetPath: target,
       proposedBranch,
       baseHeadSha: head,
