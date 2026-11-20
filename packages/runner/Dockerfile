@@ -38,5 +38,8 @@ COPY --chown=65534:65534 overlay-preflight.mjs /opt/gym-dev-hub/overlay-prefligh
 COPY --chown=65534:65534 offline-api-cache.mjs /opt/gym-dev-hub/offline-api-cache.mjs
 # CI-only approved Prisma 7 generator proof, no API/task runner entrypoint.
 COPY --chown=65534:65534 prisma-native-preflight.mjs /opt/gym-dev-hub/prisma-native-preflight.mjs
+# CI-only metadata inventory for Alpine/musl native binaries; no dlopen or API execution.
+COPY --chown=65534:65534 native-binary-inspect.mjs /opt/gym-dev-hub/native-binary-inspect.mjs
+COPY --chown=65534:65534 native-compatibility-preflight.mjs /opt/gym-dev-hub/native-compatibility-preflight.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]
