@@ -16,8 +16,11 @@ const ENGINE = '/engine/schema-engine';
 const PROJECT = '/workspace/project';
 
 async function main() {
-  if (process.argv.length !== 2) throw new Error('Unexpected native audit arguments');
-  const child = spawnSync('/usr/bin/node', ['/opt/gym-dev-hub/offline-api-cache.mjs'], {
+  if (process.argv.length !== 2) {
+    throw new Error('Unexpected native audit arguments');
+  }
+  const cacheEntrypoint = '/opt/gym-dev-hub/offline-api-cache.mjs';
+  const child = spawnSync('/usr/bin/node', [cacheEntrypoint], {
     cwd: '/opt/gym-dev-hub',
     shell: false,
     encoding: 'utf8',
@@ -36,7 +39,9 @@ async function main() {
     },
   });
   if (child.error || child.signal || child.status !== 0) {
-    throw new Error('Pinned offline dependency preflight failed before native inspection');
+    throw new Error(
+      'Pinned offline dependency preflight failed before native inspection',
+    );
   }
   const install = JSON.parse(child.stdout.trim());
   if (
@@ -53,12 +58,17 @@ async function main() {
   ) {
     throw new Error('Unreviewed or unverified API artifact closure');
   }
-  const sha = createHash('sha256').update(await readFile(ENGINE)).digest('hex');
-  if (sha !== ENGINE_SHA256) throw new Error('Prisma native engine identity mismatch');
+  const engineBytes = await readFile(ENGINE);
+  const sha = createHash('sha256').update(engineBytes).digest('hex');
+  if (sha !== ENGINE_SHA256) {
+    throw new Error('Prisma native engine identity mismatch');
+  }
 
   const inventory = await inspectInstalledNativeArtifacts(PROJECT, ENGINE);
   if (inventory.prismaSchemaEngine.status !== 'elf64-x86_64-header') {
-    throw new Error('Pinned Prisma schema-engine is not a usable ELF64 x86_64 header');
+    throw new Error(
+      'Pinned Prisma schema-engine is not a usable ELF64 x86_64 header',
+    );
   }
   process.stdout.write(
     JSON.stringify({
@@ -81,7 +91,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message.slice(0, 1200) : 'unknown';
+  const message =
+    error instanceof Error ? error.message.slice(0, 1200) : 'unknown';
   process.stderr.write('Native prebuilt inventory rejected: ' + message + '\n');
   process.exitCode = 1;
 });
