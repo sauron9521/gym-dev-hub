@@ -75,7 +75,7 @@ export function WorktreeHydrationPanel({ sessionId, plan, completed, onRefresh }
 
   return (
     <div className="ws-worktree-authorization" aria-label="Погодження наповнення worktree">
-      <div className="overline">RAW GIT BLOB HYDRATION · PR #12</div>
+      <div className="overline">RAW GIT BLOB HYDRATION · PR #13</div>
       <h4>Контрольоване наповнення worktree</h4>
       <p>
         Git-файли записуються в окрему робочу область без checkout filters, hooks або запуску
