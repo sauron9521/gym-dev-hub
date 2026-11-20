@@ -1,0 +1,232 @@
+name: Pinned Gym Platform Source Typecheck (CI-only)
+
+on:
+  pull_request:
+    paths:
+      - 'packages/runner/**'
+      - 'scripts/gym-platform-dependency-audit.mjs'
+      - '.github/workflows/pinned-gym-source-typecheck.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/pinned-gym-source-typecheck.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pinned-gym-source-typecheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-typecheck:
+    name: Real SHA-pinned source subset / offline TypeScript Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout immutable public Gym Platform commit without credentials
+        uses: actions/checkout@v4
+        with:
+          repository: sauron9521/gym-platform
+          ref: 73b636f5d064c7f24b43607e0c8411e9161f8986
+          path: .audit/gym-platform
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Audit entire reviewed lockfile and build a four-file read-only snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .audit/gym-platform rev-parse HEAD)" = '73b636f5d064c7f24b43607e0c8411e9161f8986'
+          node scripts/gym-platform-dependency-audit.mjs .audit/gym-platform > /dev/null
+          snapshot="$(mktemp -d)"
+          echo "GYM_SNAPSHOT=$snapshot" >> "$GITHUB_ENV"
+          chmod 755 "$snapshot"
+          specs=(
+            'domain.ts|packages/domain/src/index.ts|4bfb3dd4455f6612eb818ad694ccbb7e56f743ce'
+            'locales.ts|packages/i18n/src/locales.ts|acdfbb8e07aa031e8ac0ca05e8d3fb6026ffc77a'
+            'workout-analytics-window.ts|apps/api/src/modules/workout-analytics/utils/workout-analytics-window.ts|cab78200f48bfe265ff374df9eebe4fd3902684e'
+            'exercises-pagination.ts|apps/mobile/src/features/exercises/lib/exercises-pagination.ts|bc1a7817f2cfcf0f6bf3672502d0212cb843b276'
+          )
+          for spec in "${specs[@]}"; do
+            IFS='|' read -r name path sha <<< "$spec"
+            test "$(git -C .audit/gym-platform rev-parse "HEAD:$path")" = "$sha"
+            test -f ".audit/gym-platform/$path"
+            test ! -L ".audit/gym-platform/$path"
+            cp -- ".audit/gym-platform/$path" "$snapshot/$name"
+            test "$(git hash-object "$snapshot/$name")" = "$sha"
+            chmod 644 "$snapshot/$name"
+          done
+          test "$(find "$snapshot" -type f | wc -l)" -eq 4
+          test -z "$(find "$snapshot" -type l -print -quit)"
+          echo 'Four actual Git-pinned source files staged; no full repository mount.'
+
+      - name: Verify exact TypeScript package SRI in real Gym Platform lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const source = readFileSync('.audit/gym-platform/pnpm-lock.yaml', 'utf8');
+          const fixture = readFileSync('packages/runner/fixtures/typescript-toolchain/pnpm-lock.yaml', 'utf8');
+          const reviewed = '  typescript@6.0.3:\n    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}';
+          if (source.split(reviewed).length !== 2 || fixture.split(reviewed).length !== 2) {
+            throw new Error('Unreviewed or ambiguous TypeScript compiler integrity');
+          }
+          console.log('Real TypeScript 6.0.3 SRI independently confirmed.');
+          NODE
+
+      - name: Build trusted CI-only runner image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull=false --tag gym-dev-hub-node-runner:v1 \
+            --file packages/runner/Dockerfile packages/runner
+
+      - name: Trusted network stage — fetch only reviewed TypeScript compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          store="$(mktemp -d)"
+          echo "GYM_TS_STORE=$store" >> "$GITHUB_ENV"
+          pnpm --dir packages/runner/fixtures/typescript-toolchain fetch \
+            --frozen-lockfile --ignore-scripts --store-dir "$store"
+
+          # pnpm 12 creates a project backlink into this GitHub checkout;
+          # verify the exact target before removing that bookkeeping symlink.
+          projects="$store/v11/projects"
+          if [ -d "$projects" ]; then
+            for entry in "$projects"/*; do
+              if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then continue; fi
+              test -L "$entry"
+              [[ "$(basename "$entry")" =~ ^[a-f0-9]{32}$ ]]
+              test "$(readlink "$entry")" = "$(realpath packages/runner/fixtures/typescript-toolchain)"
+              rm -- "$entry"
+            done
+          fi
+          rm -rf packages/runner/fixtures/typescript-toolchain/node_modules
+          test -z "$(find packages/runner/fixtures/typescript-toolchain -type l -print -quit)"
+          git diff --exit-code -- packages/runner/fixtures/typescript-toolchain
+          test -z "$(find "$store" -type l -print -quit)"
+          files="$(find "$store" -type f | wc -l)"
+          bytes="$(du -sb "$store" | cut -f1)"
+          test "$files" -ge 2
+          test "$files" -le 8192
+          test "$bytes" -lt 157286400
+          chmod -R a+rX "$store"
+          echo "Reviewed offline TypeScript store staged: $files files."
+
+      - name: Typecheck real immutable source subset inside networkless Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="gym-devhub-source-check-${{ github.run_id }}"
+          cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          docker create --name "$name" --pull=never \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --user=65534:65534 \
+            --ipc=none --pids-limit=128 --memory=2048m --cpus=2 \
+            --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=384m,mode=1777' \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777' \
+            --mount "type=bind,source=$GYM_SNAPSHOT,target=/input,readonly" \
+            --mount "type=bind,source=$(realpath packages/runner/fixtures/typescript-toolchain),target=/fixture,readonly" \
+            --mount "type=bind,source=$GYM_TS_STORE,target=/store,readonly" \
+            --stop-timeout=3 --entrypoint /usr/bin/node \
+            gym-dev-hub-node-runner:v1 \
+            /opt/gym-dev-hub/pinned-source-typecheck.mjs > /dev/null
+
+          docker inspect "$name" --format '{{json .HostConfig}}' | jq -e '
+            .NetworkMode == "none" and .ReadonlyRootfs == true
+            and .Privileged == false and (.CapDrop | any(.[]; ascii_downcase == "all"))
+            and .Memory == 2147483648 and .NanoCpus == 2000000000
+            and .PidsLimit == 128 and .IpcMode == "none"
+            and (.Mounts | length) == 3
+            and ([.Mounts[] | select(.Type == "bind" and .ReadOnly == true) | .Target] | sort) == ["/fixture","/input","/store"]
+            and (.Tmpfs["/workspace"] | contains("noexec"))
+            and (.Tmpfs["/tmp"] | contains("noexec"))
+          '
+          docker inspect "$name" --format '{{json .Mounts}}' | jq -e '
+            length == 3 and
+            ([.[] | select(.Type == "bind" and .RW == false) | .Destination] | sort) == ["/fixture","/input","/store"]
+          '
+          test "$(docker inspect "$name" --format '{{.Config.User}}')" = '65534:65534'
+          reply="$(docker start --attach "$name")"
+          test "$(docker inspect "$name" --format '{{.State.ExitCode}}')" = '0'
+          printf '%s\n' "$reply" | jq -e '
+            .protocol == 1 and .event == "pinned-gym-platform-source-typechecked"
+            and .sourceCommit == "73b636f5d064c7f24b43607e0c8411e9161f8986"
+            and .compiler == "typescript@6.0.3"
+            and .sourceBlobsVerified == 4
+            and .typecheckedFiles == ["domain.ts","locales.ts","workout-analytics-window.ts","exercises-pagination.ts"]
+            and .sourceExecuted == false and .packageCompilerExecuted == true
+            and .entireGymPlatformChecked == false and .targetProjectScriptsExecuted == false
+            and .lifecycleScriptsExecuted == false and .networkEnabled == false
+            and .offlineInstall == true and .sourceOnlyRead == true
+            and .apiTaskExecutionEnabled == false
+            and .fixedRecipe == "TYPECHECK_PINNED_SOURCE_SUBSET"
+            and (.lockSha256 | test("^[a-f0-9]{64}$"))
+            and .storeFiles >= 2
+          '
+          docker rm "$name"
+          test -z "$(docker ps -aq --filter "name=^$name$")"
+          echo 'Four real Gym Platform source modules typechecked with pinned offline TypeScript 6.'
+
+      - name: Reject altered, symlinked and missing source/store
+        shell: bash
+        run: |
+          set -euo pipefail
+          altered="$(mktemp -d)"
+          empty="$(mktemp -d)"
+          cleanup() { rm -rf "$altered" "$empty" "$GYM_SNAPSHOT" "$GYM_TS_STORE"; }
+          trap cleanup EXIT
+          chmod 755 "$altered" "$empty"
+          cp -a "$GYM_SNAPSHOT/." "$altered/"
+
+          for scenario in changed-source symlink-source empty-store; do
+            cp -a "$GYM_SNAPSHOT/." "$altered/"
+            input="$GYM_SNAPSHOT"
+            store="$GYM_TS_STORE"
+            if [ "$scenario" = changed-source ]; then
+              printf '\n// unapproved mutation\n' >> "$altered/domain.ts"
+              input="$altered"
+            fi
+            if [ "$scenario" = symlink-source ]; then
+              rm "$altered/locales.ts"
+              ln -s /dev/null "$altered/locales.ts"
+              input="$altered"
+            fi
+            if [ "$scenario" = empty-store ]; then store="$empty"; fi
+            if docker run --rm --pull=never \
+              --network=none --read-only --cap-drop=ALL \
+              --security-opt=no-new-privileges --user=65534:65534 \
+              --ipc=none --pids-limit=128 --memory=2048m --cpus=2 \
+              --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=384m,mode=1777' \
+              --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777' \
+              --mount "type=bind,source=$input,target=/input,readonly" \
+              --mount "type=bind,source=$(realpath packages/runner/fixtures/typescript-toolchain),target=/fixture,readonly" \
+              --mount "type=bind,source=$store,target=/store,readonly" \
+              --stop-timeout=3 --entrypoint /usr/bin/node \
+              gym-dev-hub-node-runner:v1 \
+              /opt/gym-dev-hub/pinned-source-typecheck.mjs > /dev/null 2>&1; then
+              echo "Untrusted input accepted: $scenario"
+              exit 1
+            fi
+            # Reset the temporary negative fixture completely for next case.
+            rm -rf "$altered"
+            altered="$(mktemp -d)"
+            chmod 755 "$altered"
+          done
+          test -z "$(docker ps -aq --filter 'ancestor=gym-dev-hub-node-runner:v1')"
+          echo 'All changed source, source symlink and empty store cases rejected.'
