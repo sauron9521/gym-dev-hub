@@ -19,8 +19,9 @@
 17. **Fixed controlled worker tool**: independently approved, one-shot SHA256_FILE capability in isolated Docker; no source code execution or arbitrary commands (PR #17).
 18. **Safe worker file access**: independently enabled single-file, SHA-pinned temporary staging for non-root worker, no chmod on original worktree and mandatory cleanup (PR #18).
 19. **Fixed task-runner policy preview**: preview six verified gym-platform pnpm recipes with exact argv, pinned worktree identity, and explicit proposed isolation. No execution (PR #19).
-20. **Controlled execution (future)**: separately approved test runner image, isolated dependency setup, bounded outputs and review; no auto-merge.
-21. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-22. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+20. **Isolated Node runner foundation**: dedicated Node.js 24 / pnpm 12.18.0 diagnostic image, fixed non-executing protocol, verified Docker restrictions and immutable image policy; no project scripts (PR #20).
+21. **Controlled execution (future)**: separately approved project-dependency setup, immutable source snapshot, safe test runner with bounded outputs and review; no auto-merge.
+22. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+23. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
