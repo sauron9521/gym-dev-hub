@@ -1,0 +1,14 @@
+{
+  "name": "@devhub/offline-fixture",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "postinstall": "node -e \"require('node:fs').writeFileSync('/workspace/root-script-executed', 'bad')\""
+  },
+  "dependencies": {
+    "@devhub/offline-lib": "workspace:*"
+  },
+  "engines": {
+    "pnpm": "12.18.0"
+  }
+}

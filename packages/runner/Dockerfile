@@ -13,8 +13,12 @@ RUN apk add --no-cache nodejs npm \
     && test "$(node -p 'process.versions.node.split(".")[0]')" = "24" \
     && npm install --global --ignore-scripts --no-audit --no-fund pnpm@12.18.0 \
     && test "$(pnpm --version)" = "12.18.0" \
+    && ln -s "$(command -v pnpm)" /usr/bin/devhub-pnpm \
+    && test "$(/usr/bin/devhub-pnpm --version)" = "12.18.0" \
     && npm cache clean --force
 
 COPY --chown=65534:65534 runner.mjs /opt/gym-dev-hub/runner.mjs
+# CI-only offline fixture demonstrator: not reachable through the fixed runtime protocol.
+COPY --chown=65534:65534 offline-provision.mjs /opt/gym-dev-hub/offline-provision.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]

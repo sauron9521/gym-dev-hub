@@ -1,0 +1,15 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@devhub/offline-lib':
+        specifier: workspace:*
+        version: link:packages/offline-lib
+
+  packages/offline-lib: {}
