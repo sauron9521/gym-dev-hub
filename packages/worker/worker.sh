@@ -3,7 +3,7 @@
 # repository content. Explicit scoped reads are bounded and always read-only.
 set -efu
 reject() {
-  printf '%s\n' '{"protocol":1,"event":"rejected","executionEnabled":false,"code":"DENIED"}'
+  printf '%s\n' '{"protocol":1,"event":"rejected","executionEnabled":false,"code":"UNSUPPORTED_REQUEST"}'
 }
 while IFS= read -r request; do
   case "$request" in
