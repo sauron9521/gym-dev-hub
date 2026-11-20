@@ -71,4 +71,3 @@ The separate CI-only `native-compatibility-preflight.mjs` rehydrates the verifie
 The trusted GitHub Actions stage validates independently reviewed lockfile SHA-512 records for sharp 0.35.5 and libvips 1.3.4 musl x64 optional packages, then temporarily configures pnpm to fetch both linux-x64 (glibc) and linux-x64-musl packages with scripts disabled. The original pinned workspace config is restored before source cleanliness checks. The isolated Docker static inventory now **fails if either musl binary is missing**.
 
 This still never loads or executes native packages and does not expose API_TYPECHECK or arbitrary commands. Native runtime compatibility remains gated behind an independent, narrowly scoped follow-up.
-
