@@ -109,7 +109,7 @@ describe('Gym Platform static pinned dependency audit', () => {
       'build allowance',
     );
     expect(() => auditWorkspaceText(WORKSPACE.replace('audit:', '  evil: true\n\naudit:'))).toThrow(
-      'Unrecognized',
+      'Unexpected change',
     );
     expect(() =>
       auditWorkspaceText(WORKSPACE.replace('    - GHSA-fc5q-39xc-vjpf', '    - GHSA-new-risk')),
