@@ -1,6 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "include": [
-    "src/bad.ts"
-  ]
+  "include": ["src/bad.ts"]
 }

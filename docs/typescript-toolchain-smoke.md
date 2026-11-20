@@ -8,13 +8,13 @@ A separate, credential-free CI step checks out the known public `sauron9521/gym-
 
 The real pnpm lockfile and the tiny fixture both contain exactly one resolution for:
 
-| Property | Value |
-| --- | --- |
-| Package | `typescript@6.0.3` |
+| Property          | Value                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------- |
+| Package           | `typescript@6.0.3`                                                                                |
 | SHA-512 integrity | `sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==` |
-| Node runtime | Node.js 24 / pnpm 12.18.0 |
-| Platform | Linux CI, Alpine-based sandbox |
-| Compiler runs | **One valid fixture succeeds; one intentional `TS2322` must fail** |
+| Node runtime      | Node.js 24 / pnpm 12.18.0                                                                         |
+| Platform          | Linux CI, Alpine-based sandbox                                                                    |
+| Compiler runs     | **One valid fixture succeeds; one intentional `TS2322` must fail**                                |
 
 The TypeScript tarball is downloaded using `pnpm fetch --frozen-lockfile --ignore-scripts` in a **trusted, temporary networked CI step**, without Gym Platform secrets, database access, or shell commands from the package. The pnpm v12 project-index backlink is validated against its expected CI location and removed; generated `node_modules` in the host fixture is removed, and any remaining store symlink is rejected.
 

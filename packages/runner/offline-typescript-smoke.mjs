@@ -16,8 +16,8 @@ const FILES = Object.freeze({
   'package.json': 'fd42b2310e5b547735a3b5a975cc0cda1c5b3426',
   'pnpm-workspace.yaml': '77125aa68b16356bb413d241df61f535e8bad266',
   'pnpm-lock.yaml': 'd84cf67c1cabc0f585d1c9be670be4d4a09eb76d',
-  'tsconfig.json': 'e559f75533c2ef3811f58f640d52c2e3329c8a23',
-  'tsconfig.reject.json': '187ab28c1ace8910c784f10579290919ba18a2c3',
+  'tsconfig.json': 'c9eba9399443570db7214a679134671d15bca658',
+  'tsconfig.reject.json': '38d2a08392a36f998a697276a55e25d2373ba4da',
   'src/good.ts': '2ba3f4c92f8070778b3c5b9e26aad0ce4dbd8925',
   'src/bad.ts': 'a8c21386bd2f32b28a1009b9169255ec0009d61f',
 });
@@ -178,7 +178,9 @@ async function main() {
   const tsc = join(WORK, 'node_modules', 'typescript', 'bin', 'tsc');
   const good = invoke('/usr/bin/node', [tsc, '--noEmit', '-p', 'tsconfig.json'], 45000);
   if (good.status !== 0) {
-    throw new Error('Valid TypeScript fixture unexpectedly failed: ' + (good.stdout || good.stderr).slice(0, 600));
+    throw new Error(
+      'Valid TypeScript fixture unexpectedly failed: ' + (good.stdout || good.stderr).slice(0, 600),
+    );
   }
   const rejected = invoke('/usr/bin/node', [tsc, '--noEmit', '-p', 'tsconfig.reject.json'], 45000);
   if (

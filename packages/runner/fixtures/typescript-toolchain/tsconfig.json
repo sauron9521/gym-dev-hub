@@ -8,7 +8,5 @@
     "types": [],
     "skipLibCheck": true
   },
-  "include": [
-    "src/good.ts"
-  ]
+  "include": ["src/good.ts"]
 }
