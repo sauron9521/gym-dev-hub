@@ -71,3 +71,10 @@ The separate CI-only `native-compatibility-preflight.mjs` rehydrates the verifie
 The trusted GitHub Actions stage validates independently reviewed lockfile SHA-512 records for sharp 0.35.5 and libvips 1.3.4 musl x64 optional packages, then temporarily configures pnpm to fetch both linux-x64 (glibc) and linux-x64-musl packages with scripts disabled. The original pinned workspace config is restored before source cleanliness checks. The isolated Docker static inventory now **fails if either musl binary is missing**.
 
 This still never loads or executes native packages and does not expose API_TYPECHECK or arbitrary commands. Native runtime compatibility remains gated behind an independent, narrowly scoped follow-up.
+
+## CI-only Alpine native runtime smoke (PR #36)
+
+The separate native-runtime-smoke.mjs fixed entrypoint checks the real pinned offline API graph, validates all four native ELF artifacts, copies **only reviewed native package directories** from the private noexec project to a dedicated executable /native tmpfs, then intentionally loads bcrypt and sharp to run tiny fixed fixtures and probes the pinned Prisma schema engine. The original source, /workspace, /results and /tmp remain protected. An unsafe or missing executable scratch mount fails before install; execution is networkless, non-root and bounded.
+
+This is **not** general task execution or API_TYPECHECK. The default runner protocol and Hub HTTP endpoints remain unchanged. See docs/alpine-native-runtime-smoke.md for boundaries and controls.
+
