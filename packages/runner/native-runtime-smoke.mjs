@@ -102,7 +102,10 @@ async function inspectTree(path, tally, depth = 0) {
 async function copyReviewedPackage(name, expectedVersion, tally) {
   const parts = name.split('/');
   let path;
-  for (const root of [join(PROJECT, 'node_modules'), join(PROJECT, 'apps', 'api', 'node_modules')]) {
+  for (const root of [
+    join(PROJECT, 'node_modules'),
+    join(PROJECT, 'apps', 'api', 'node_modules'),
+  ]) {
     const candidate = join(root, ...parts);
     try {
       await lstat(candidate);
