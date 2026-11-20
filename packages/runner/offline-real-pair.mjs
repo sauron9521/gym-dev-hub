@@ -20,8 +20,10 @@ const TRUSTED_GIT_BLOBS = Object.freeze({
   'pnpm-lock.yaml': '8272c11d2b696f2fc1b14ff4cf93dbc43b2f5c50',
 });
 const PINS = Object.freeze({
-  'is-number@7.0.0': 'sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==',
-  'to-regex-range@5.0.1': 'sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==',
+  'is-number@7.0.0':
+    'sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==',
+  'to-regex-range@5.0.1':
+    'sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==',
 });
 const MAX_STORE_BYTES = 64 * 1024 * 1024;
 const MAX_STORE_FILES = 4096;
@@ -108,8 +110,10 @@ async function main() {
   const fixtureDir = await lstat(INPUT);
   const storeDir = await lstat(STORE);
   if (
-    !fixtureDir.isDirectory() || fixtureDir.isSymbolicLink() ||
-    !storeDir.isDirectory() || storeDir.isSymbolicLink()
+    !fixtureDir.isDirectory() ||
+    fixtureDir.isSymbolicLink() ||
+    !storeDir.isDirectory() ||
+    storeDir.isSymbolicLink()
   ) {
     throw new Error('Input and store must be real directories');
   }
@@ -141,8 +145,16 @@ async function main() {
 
   const proc = spawnSync(
     '/bin/sh',
-    ['/usr/bin/devhub-pnpm', 'install', '--offline', '--frozen-lockfile',
-      '--ignore-scripts', '--trust-lockfile', '--store-dir', TARGET_STORE],
+    [
+      '/usr/bin/devhub-pnpm',
+      'install',
+      '--offline',
+      '--frozen-lockfile',
+      '--ignore-scripts',
+      '--trust-lockfile',
+      '--store-dir',
+      TARGET_STORE,
+    ],
     {
       cwd: OUTPUT,
       shell: false,
@@ -164,14 +176,22 @@ async function main() {
   );
   if (proc.error || proc.status !== 0 || proc.signal) {
     const detail = (proc.stderr || proc.stdout || proc.error?.message || 'unknown')
-      .toString().slice(0, 500);
+      .toString()
+      .slice(0, 500);
     throw new Error('Frozen offline installation failed: ' + detail);
   }
 
   const direct = await readJson(join(OUTPUT, 'node_modules', 'to-regex-range', 'package.json'));
   const indirect = await readJson(
-    join(OUTPUT, 'node_modules', '.pnpm', 'to-regex-range@5.0.1',
-      'node_modules', 'is-number', 'package.json'),
+    join(
+      OUTPUT,
+      'node_modules',
+      '.pnpm',
+      'to-regex-range@5.0.1',
+      'node_modules',
+      'is-number',
+      'package.json',
+    ),
   );
   if (
     direct.name !== 'to-regex-range' ||
@@ -189,24 +209,26 @@ async function main() {
   for (const name of ['preinstall', 'install', 'postinstall', 'prepare']) {
     await ensureMissing(join(OUTPUT, name + '-ran'));
   }
-  process.stdout.write(JSON.stringify({
-    protocol: 1,
-    event: 'real-offline-dependencies-installed',
-    packageCount: 2,
-    directPackages: 1,
-    transitivePackages: 1,
-    packageVersions: ['to-regex-range@5.0.1', 'is-number@7.0.0'],
-    lockSha256,
-    storeFilesCopied: tally.files,
-    storeBytesCopied: tally.bytes,
-    offline: true,
-    frozenLockfile: true,
-    lifecycleScriptsExecuted: false,
-    projectScriptsExecuted: false,
-    externalNetworkEnabled: false,
-    gymPlatformSourceMounted: false,
-    executionEnabled: false,
-  }) + '\n');
+  process.stdout.write(
+    JSON.stringify({
+      protocol: 1,
+      event: 'real-offline-dependencies-installed',
+      packageCount: 2,
+      directPackages: 1,
+      transitivePackages: 1,
+      packageVersions: ['to-regex-range@5.0.1', 'is-number@7.0.0'],
+      lockSha256,
+      storeFilesCopied: tally.files,
+      storeBytesCopied: tally.bytes,
+      offline: true,
+      frozenLockfile: true,
+      lifecycleScriptsExecuted: false,
+      projectScriptsExecuted: false,
+      externalNetworkEnabled: false,
+      gymPlatformSourceMounted: false,
+      executionEnabled: false,
+    }) + '\n',
+  );
 }
 
 main().catch((error) => {
