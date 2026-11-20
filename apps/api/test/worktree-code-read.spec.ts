@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import type { WorktreeIntegrityReport, WorktreePlan } from '@gym-dev-hub/contracts';
 import { WorktreeCodeReadService } from '../src/worktree/worktree-code-read.service.js';
 import { runMountedWorkerProbe } from '../src/worktree/worktree-mount-probe.js';
+import { withPinnedFileStage } from '../src/worktree/worktree-file-stage.js';
+
+vi.mock('../src/worktree/worktree-file-stage.js', () => ({ withPinnedFileStage: vi.fn() }));
 
 vi.mock('../src/worktree/worktree-mount-probe.js', async (original) => ({
   ...(await original<typeof import('../src/worktree/worktree-mount-probe.js')>()),
@@ -79,6 +82,7 @@ describe('explicit scoped code-reading authorization', () => {
     };
     service = new WorktreeCodeReadService(plans as never, integrity as never, boundary as never);
     vi.mocked(runMountedWorkerProbe).mockResolvedValue('export const ready = true;\n');
+    vi.mocked(withPinnedFileStage).mockImplementation(async (_plan, _path, action) => action({ sourcePath: join(root, 'single-use-stage'), fileName: 'main.ts', bytes: Buffer.from('export const ready = true;\n'), sha256: 'a'.repeat(64) }));
   });
 
   afterEach(async () => {
@@ -107,7 +111,7 @@ describe('explicit scoped code-reading authorization', () => {
       agentExecutionEnabled: false,
       containerRemoved: true,
     });
-    expect(runMountedWorkerProbe).toHaveBeenCalledWith(root, 'src/main.ts');
+    expect(runMountedWorkerProbe).toHaveBeenCalledWith(join(root, 'single-use-stage'), 'main.ts');
     expect(plans.recordCodeRead.mock.calls.map(([, , step]) => step)).toEqual([
       'started',
       'completed',
