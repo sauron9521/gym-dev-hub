@@ -1,0 +1,52 @@
+name: Temporary PR15 formatter - remove before review
+on:
+  push:
+    branches: [feat/ephemeral-worker-readonly-mount]
+    paths:
+      - '.github/workflows/_temporary-pr15-formatter.yml'
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/ephemeral-worker-readonly-mount
+          persist-credentials: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply Prettier to only reported files
+        run: |
+          pnpm exec prettier --write \
+            apps/api/src/worktree/worktree-mount-probe.ts \
+            apps/api/src/worktree/worktree-mount.service.ts \
+            apps/api/src/worktree/worktree-plan.controller.ts \
+            apps/api/src/worktree/worktree-plan.service.ts \
+            apps/api/test/worktree-mount-probe.spec.ts \
+            apps/api/test/worktree-mount.service.spec.ts \
+            'apps/web/src/app/api/workspace/[...segments]/route.ts' \
+            apps/web/src/app/workspace/worktree-hydration-panel.tsx \
+            apps/web/src/app/workspace/worktree-integrity-panel.tsx \
+            apps/web/src/app/workspace/worktree-mount-panel.test.tsx \
+            apps/web/src/app/workspace/worktree-mount-panel.tsx
+      - name: Commit formatted feature code
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- apps/api/src/worktree apps/api/test/worktree-mount-* \
+            'apps/web/src/app/api/workspace/[...segments]/route.ts' \
+            apps/web/src/app/workspace/worktree-hydration-panel.tsx \
+            apps/web/src/app/workspace/worktree-integrity-panel.tsx \
+            apps/web/src/app/workspace/worktree-mount-panel.test.tsx \
+            apps/web/src/app/workspace/worktree-mount-panel.tsx
+          if ! git diff --cached --quiet; then
+            git commit -m 'style: format approved read-only worker mount'
+            git push origin HEAD:refs/heads/feat/ephemeral-worker-readonly-mount
+          fi
