@@ -11,4 +11,6 @@
 !overlay-preflight.mjs
 !offline-api-cache.mjs
 !prisma-native-preflight.mjs
+!native-binary-inspect.mjs
+!native-compatibility-preflight.mjs
 !.dockerignore
