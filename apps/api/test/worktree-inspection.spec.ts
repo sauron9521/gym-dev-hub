@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { WorktreePlan } from '@gym-dev-hub/contracts';
+import { verifyLocalRepository } from '../src/worktree/worktree-plan.service.js';
 import {
   inspectTreeListing,
   WorktreeInspectionService,
@@ -108,6 +109,11 @@ describe('read-only worktree recovery inspection (real Git fixture)', () => {
   });
 
   it('reports a verified metadata-only worktree as safe for a future hydration step', async () => {
+    const resolvedRepository = await verifyLocalRepository(
+      plan.repository,
+      process.env.DEV_HUB_REPOS_ROOT!,
+    );
+    expect(resolvedRepository.toLowerCase()).toBe(source.toLowerCase());
     const before = await readdir(target);
     const result = await inspector.inspect(plan);
     expect(result.state, result.findings.join(' | ')).toBe('ready-for-hydration');
