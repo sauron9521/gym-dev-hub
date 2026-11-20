@@ -37,3 +37,7 @@ GitHub Actions fetches **one exact public `is-number@7.0.0` tarball** from npm's
 ## Two real pinned npm packages, installed fully offline (PR #25)
 
 A standalone, CI-only `offline-real-pair.mjs` demonstrates `pnpm fetch` of exactly two reviewed real npm packages (`to-regex-range@5.0.1` and transitive `is-number@7.0.0`) in a credential-free trusted CI step, followed by a **frozen, offline, script-free** installation inside an isolated Docker container. The pnpm store and the three-file fixture are read-only host inputs; everything written by pnpm is in an ephemeral noexec tmpfs. The installed dependency graph is checked using package metadata only, without importing the packages. No native builds, code execution, real Gym Platform source or permanent package cache are added. See `docs/real-offline-dependency-install.md`.
+
+## Real TypeScript 6 toolchain smoke (PR #26)
+
+The CI-only `offline-typescript-smoke.mjs` installs the **real `typescript@6.0.3`** from a checked, read-only, temporary store inside a networkless Docker container, then executes the compiler on exactly two reviewed, tiny TypeScript fixtures: one must typecheck and one must fail with `TS2322`. This deliberately executes npm-published TypeScript compiler code **inside CI Docker only**, not any Gym Platform code. Inputs are individually Git-blob-pinned, the installer remains `--offline --frozen-lockfile --ignore-scripts --trust-lockfile` and the diagnostic `runner.mjs` API remains non-executing. See `docs/typescript-toolchain-smoke.md`.
