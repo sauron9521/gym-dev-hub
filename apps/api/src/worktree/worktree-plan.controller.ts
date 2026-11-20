@@ -6,7 +6,8 @@ import { WorktreeInspectionService } from './worktree-inspection.service.js';
 import type { WorktreeCreationGrant, WorktreeHydrationGrant } from '@gym-dev-hub/contracts';
 import { WorktreeHydrationService } from './worktree-hydration.service.js';
 import { WorktreeIntegrityService } from './worktree-integrity.service.js';
-import type { WorktreeIntegrityReport } from '@gym-dev-hub/contracts';
+import type { WorktreeIntegrityReport, WorktreeMountGrant, WorktreeMountProbeResult } from '@gym-dev-hub/contracts';
+import { WorktreeMountService } from './worktree-mount.service.js';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
 export class WorktreePlanController {
@@ -16,6 +17,7 @@ export class WorktreePlanController {
     private readonly inspection: WorktreeInspectionService,
     private readonly hydration: WorktreeHydrationService,
     private readonly integrity: WorktreeIntegrityService,
+    private readonly mount: WorktreeMountService,
   ) {}
 
   @Get()
@@ -72,6 +74,24 @@ export class WorktreePlanController {
     @Param('planId') planId: string,
   ): Promise<WorktreeIntegrityReport> {
     return this.integrity.verify(sessionId, planId);
+  }
+
+  @Post(':planId/mount-authorize')
+  mountAuthorize(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeMountGrant> {
+    return this.mount.authorize(sessionId, planId, body);
+  }
+
+  @Post(':planId/mount-probe')
+  mountProbe(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeMountProbeResult> {
+    return this.mount.probe(sessionId, planId, body);
   }
 
   @Post(':planId/hydration-authorize')
