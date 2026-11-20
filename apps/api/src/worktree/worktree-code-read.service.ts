@@ -18,6 +18,7 @@ import { BoundaryService } from '../boundary/boundary.service.js';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeIntegrityService } from './worktree-integrity.service.js';
 import { runMountedWorkerProbe, validateScopedCodePath } from './worktree-mount-probe.js';
+import { withPinnedFileStage } from './worktree-file-stage.js';
 
 const TTL_MS = 60_000;
 const MAX_READ_BYTES = 8_192;
@@ -196,8 +197,14 @@ export class WorktreeCodeReadService {
       await assertRegularScopedFile(plan, grant.filePath);
       await this.plans.recordCodeRead(sessionId, planId, 'started');
       recorded = true;
-      const content = await runMountedWorkerProbe(grant.sourcePath, grant.filePath);
-      if (typeof content !== 'string') throw new Error('Worker did not return file');
+      const content = await withPinnedFileStage(plan, grant.filePath, async (stage) => {
+        const expected = new TextDecoder('utf-8', { fatal: true }).decode(stage.bytes);
+        const actual = await runMountedWorkerProbe(stage.sourcePath, stage.fileName);
+        if (actual !== expected) {
+          throw new Error('Worker file does not match pinned Git blob');
+        }
+        return expected;
+      });
       await this.plans.recordCodeRead(sessionId, planId, 'completed');
       recorded = false;
       return {
@@ -216,7 +223,7 @@ export class WorktreeCodeReadService {
         await this.plans.recordCodeRead(sessionId, planId, 'failed').catch(() => undefined);
       }
       throw new ServiceUnavailableException(
-        'Scoped read не виконано. Перевір права читання UID 65534, Docker Desktop і worktree.',
+        'Scoped read не виконано. Перевір права читання Docker Desktop, pinned Git blob і видалення snapshot.',
       );
     } finally {
       this.reading = false;
