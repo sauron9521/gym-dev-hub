@@ -25,8 +25,9 @@
 23. **Real Gym Platform dependency manifest audit**: fixed, commit- and Git-blob-pinned read-only review of both pnpm 12 lockfile documents, all SHA-512 resolutions, native build allowances and audit exceptions; no installs (PR #23).
 24. **One real npm artifact provenance**: fetch one reviewed, SHA-512-pinned `gym-platform` registry tarball in a trusted CI stage and verify/stage it in networkless Docker without extraction or scripts (PR #24).
 25. **Real offline two-package install**: populate a short-lived pnpm cache from two independently pinned real Gym Platform dependencies in trusted CI, then install the fixed transitive graph offline in Docker without lifecycle scripts, with negative cases (PR #25).
-26. **Controlled execution (future)**: separately approved broad real cache, native build strategy, immutable source snapshot, safe test runner with bounded outputs and review; no auto-merge.
-27. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-28. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+26. **Pinned TypeScript toolchain smoke**: provision real Gym Platform `typescript@6.0.3` offline and execute a fixed positive/negative TS compiler fixture under networkless Docker CI, with no target repository source or API execution (PR #26).
+27. **Controlled execution (future)**: separately approved broad real cache, native build strategy, immutable source snapshot, safe test runner with bounded outputs and review; no auto-merge.
+28. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+29. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
