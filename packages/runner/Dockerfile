@@ -32,5 +32,7 @@ COPY --chown=65534:65534 offline-typescript-smoke.mjs /opt/gym-dev-hub/offline-t
 COPY --chown=65534:65534 pinned-source-typecheck.mjs /opt/gym-dev-hub/pinned-source-typecheck.mjs
 # CI-only full immutable Git source snapshot auditor; no project scripts or API surface.
 COPY --chown=65534:65534 full-source-audit.mjs /opt/gym-dev-hub/full-source-audit.mjs
+# CI-only ephemeral scratch-volume proof; not available via runner protocol.
+COPY --chown=65534:65534 overlay-preflight.mjs /opt/gym-dev-hub/overlay-preflight.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]

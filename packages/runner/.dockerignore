@@ -8,4 +8,5 @@
 !offline-typescript-smoke.mjs
 !pinned-source-typecheck.mjs
 !full-source-audit.mjs
+!overlay-preflight.mjs
 !.dockerignore

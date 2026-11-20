@@ -4,7 +4,6 @@
  * read/write isolation. It NEVER evaluates target source, runs pnpm or scripts.
  * Unreachable from the ordinary runner protocol and NestJS API.
  */
-import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { lstat, mkdir, open, readFile, readdir, stat, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
