@@ -16,7 +16,10 @@ export type WorktreeAuditEvent =
   | 'mount-probe-failed'
   | 'code-read-started'
   | 'code-read-completed'
-  | 'code-read-failed';
+  | 'code-read-failed'
+  | 'tool-run-started'
+  | 'tool-run-completed'
+  | 'tool-run-failed';
 
 export interface WorktreeAuditEntry {
   event: WorktreeAuditEvent;
@@ -111,6 +114,31 @@ export interface WorktreeCodeReadResult {
   networkEnabled: false;
   containerRemoved: true;
   agentExecutionEnabled: false;
+}
+
+export type WorktreeToolCapability = 'SHA256_FILE';
+
+export interface WorktreeToolGrant {
+  grantToken: string;
+  purpose: 'RUN_FIXED_WORKER_TOOL';
+  tool: WorktreeToolCapability;
+  filePath: string;
+  baseHeadSha: string;
+  expiresAt: string;
+}
+
+export interface WorktreeToolResult {
+  sessionId: string;
+  planId: string;
+  tool: WorktreeToolCapability;
+  filePath: string;
+  sha256: string;
+  checkedAt: string;
+  readOnly: true;
+  networkEnabled: false;
+  containerRemoved: true;
+  arbitraryCommandExecutionEnabled: false;
+  repositoryCodeExecutionEnabled: false;
 }
 
 export interface WorktreePlan {

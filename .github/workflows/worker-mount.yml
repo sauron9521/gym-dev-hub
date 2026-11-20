@@ -5,6 +5,8 @@ on:
     paths:
       - 'apps/api/src/worktree/worktree-mount-*.ts'
       - 'apps/api/src/worktree/worktree-code-read.service.ts'
+      - 'apps/api/src/worktree/worktree-tool.service.ts'
+      - 'apps/api/test/worktree-tool.spec.ts'
       - 'apps/api/test/worktree-code-read.spec.ts'
       - 'apps/api/test/worktree-mount-*.spec.ts'
       - 'packages/worker/**'
@@ -85,3 +87,25 @@ jobs:
           test ! -e mount-fixture/secret.ts
           test -z "$(docker ps --all --quiet --filter "name=gym-dev-hub-ci-read-${{ github.run_id }}")"
           echo 'Fixed protocol passed; bounded read succeeded, traversal rejected, worker removed.'
+      - name: Verify fixed CHECK/1 SHA256 tool and deny command injection
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$(realpath mount-fixture)"
+          expected="$(sha256sum mount-fixture/proof.ts | cut -d ' ' -f1)"
+          reply="$(
+            printf 'HELLO/1\nCHECK/1 SHA256 proof.ts\nCHECK/1 SHA256 ../secret.ts\nRUN/1 sh -c whoami\nSHUTDOWN/1\n' |
+              docker run --rm -i --pull=never --name "gym-dev-hub-ci-check-${{ github.run_id }}" \
+                --network=none --read-only --cap-drop=ALL \
+                --security-opt=no-new-privileges \
+                --pids-limit=32 --memory=128m --cpus=0.5 \
+                --user=65534:65534 --ipc=none \
+                --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+                --mount "type=bind,source=$src,target=/workspace,readonly" \
+                gym-dev-hub-worker:v1
+          )"
+          printf '%s\n' "$reply" | jq -s -e --arg expected "$expected" \
+            'length == 5 and .[0].event == "ready" and .[1].event == "digest" and .[1].sha256 == $expected and .[1].executionEnabled == false and .[2].event == "rejected" and .[3].event == "rejected" and .[4].event == "stopped"'
+          test ! -e mount-fixture/secret.ts
+          test -z "$(docker ps --all --quiet --filter "name=^gym-dev-hub-ci-check-${{ github.run_id }}$")"
+          echo 'Fixed SHA256 tool passed; traversal and arbitrary RUN rejected.'

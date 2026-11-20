@@ -111,7 +111,7 @@ export function validateObservedMounts(
 }
 
 type Pending = {
-  expected: 'ready' | 'pong' | 'stopped' | 'file';
+  expected: 'ready' | 'pong' | 'stopped' | 'file' | 'digest';
   resolve: (value: string | undefined) => void;
   reject: (error: Error) => void;
   timer: NodeJS.Timeout;
@@ -121,8 +121,13 @@ type Pending = {
 export async function runMountedWorkerProbe(
   sourcePath: string,
   readPath?: string,
+  checksumPath?: string,
 ): Promise<string | undefined> {
+  if (readPath !== undefined && checksumPath !== undefined) {
+    throw new Error('Only one fixed tool capability per worker');
+  }
   if (readPath !== undefined) validateScopedCodePath(readPath);
+  if (checksumPath !== undefined) validateScopedCodePath(checksumPath);
   const context = await callDocker(
     ['context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'],
     8_000,
@@ -189,6 +194,7 @@ export async function runMountedWorkerProbe(
           event?: string;
           executionEnabled?: boolean;
           contentBase64?: string;
+          sha256?: string;
         };
         try {
           reply = JSON.parse(line) as typeof reply;
@@ -232,6 +238,14 @@ export async function runMountedWorkerProbe(
             running.kill();
             return;
           }
+        }
+        if (waiter.expected === 'digest') {
+          if (!reply.sha256 || !/^[0-9a-f]{64}$/.test(reply.sha256)) {
+            fail(new Error('Untrusted worker checksum response'));
+            running.kill();
+            return;
+          }
+          text = reply.sha256;
         }
         pending = null;
         clearTimeout(waiter.timer);
@@ -319,6 +333,9 @@ export async function runMountedWorkerProbe(
     }
     await exchange('PING/1', 'pong');
     if (readPath) readContent = await exchange(`READ/1 ${readPath}`, 'file');
+    if (checksumPath) {
+      readContent = await exchange(`CHECK/1 SHA256 ${checksumPath}`, 'digest');
+    }
     await exchange('SHUTDOWN/1', 'stopped');
     running.stdin.end();
   } finally {
