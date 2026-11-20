@@ -59,12 +59,16 @@ export function readImporterEntry(importer, group, name, specifier) {
 }
 
 export function packageIntegrity(document, name, version) {
+  const packageStart = document.indexOf('\npackages:\n');
+  const snapshotStart = document.indexOf('\nsnapshots:\n', packageStart);
+  requireSafe(packageStart >= 0 && snapshotStart > packageStart, 'malformed registry package section');
+  const packagesOnly = document.slice(packageStart, snapshotStart);
   const key = name + '@' + version;
   const line = '  ' + (name.startsWith('@') ? "'" + key + "'" : key) + ':\n';
-  requireSafe(document.split(line).length === 2, 'missing/duplicate resolved package ' + key);
-  const start = document.indexOf(line) + line.length;
-  const end = document.indexOf('\n  ', start);
-  const section = document.slice(start, end < 0 ? undefined : end);
+  requireSafe(packagesOnly.split(line).length === 2, 'missing/duplicate resolved package ' + key);
+  const start = packagesOnly.indexOf(line) + line.length;
+  const end = packagesOnly.indexOf('\n  ', start);
+  const section = packagesOnly.slice(start, end < 0 ? undefined : end);
   const match = /^    resolution: \{integrity: (sha512-[A-Za-z0-9+/]{86}==)\}$/m.exec(section);
   requireSafe(match !== null, 'untrusted SHA512 for ' + key);
   return match[1];
