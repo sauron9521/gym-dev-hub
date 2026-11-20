@@ -33,6 +33,9 @@ const auditSchema = z.strictObject({
     'code-read-started',
     'code-read-completed',
     'code-read-failed',
+    'tool-run-started',
+    'tool-run-completed',
+    'tool-run-failed',
   ]),
   timestamp: z.iso.datetime(),
 });
@@ -622,4 +625,29 @@ export class WorktreePlanService {
       });
     }, true);
   }
+  async recordToolRun(
+    sessionId: string,
+    planId: string,
+    stage: 'started' | 'completed' | 'failed',
+  ): Promise<void> {
+    await this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (plan.state !== 'created' || plan.hydrationState !== 'completed') {
+        throw new ConflictException('План недоступний для Docker tool audit.');
+      }
+      if (plan.history.length >= 250) {
+        throw new ConflictException('Ліміт журналу аудиту, створюй нову сесію.');
+      }
+      plan.history.push({
+        event:
+          stage === 'started'
+            ? 'tool-run-started'
+            : stage === 'completed'
+              ? 'tool-run-completed'
+              : 'tool-run-failed',
+        timestamp: new Date().toISOString(),
+      });
+    }, true);
+  }
+
 }
