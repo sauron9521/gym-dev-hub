@@ -1,0 +1,61 @@
+name: Read-Only Worker Mount (Linux)
+
+on:
+  pull_request:
+    paths:
+      - 'apps/api/src/worktree/worktree-mount-*.ts'
+      - 'apps/api/test/worktree-mount-*.spec.ts'
+      - 'packages/worker/**'
+      - '.github/workflows/worker-mount.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-mount-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-docker-mount:
+    name: Fixed-protocol worker / read-only host mount
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build unchanged fixed-protocol worker
+        run: |
+          docker build --pull=false --network=none \
+            --tag gym-dev-hub-worker:v1 \
+            --file packages/worker/Dockerfile packages/worker
+      - name: Verify isolated read-only mount and mandatory container removal
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect gym-dev-hub-worker:v1 --format '{{.Config.User}}')" = '65534:65534'
+          mkdir -p mount-fixture
+          printf 'fixture only\n' > mount-fixture/proof.txt
+          chmod 644 mount-fixture/proof.txt
+          src="$(realpath mount-fixture)"
+          name="gym-dev-hub-ci-mount-${{ github.run_id }}"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+
+          docker run -d -i --pull=never --name "$name" \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --pids-limit=32 --memory=128m --cpus=0.5 \
+            --user=65534:65534 --ipc=none \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+            --mount "type=bind,source=$src,target=/workspace,readonly" \
+            gym-dev-hub-worker:v1
+
+          docker inspect "$name" --format '{{json .Mounts}}' | jq -e \
+            'length == 1 and .[0].Type == "bind" and .[0].Destination == "/workspace" and .[0].RW == false'
+          test "$(docker inspect "$name" --format '{{.HostConfig.NetworkMode}}')" = 'none'
+          test "$(docker inspect "$name" --format '{{.HostConfig.ReadonlyRootfs}}')" = 'true'
+          test "$(docker inspect "$name" --format '{{.HostConfig.Privileged}}')" = 'false'
+          test "$(docker inspect "$name" --format '{{.Config.User}}')" = '65534:65534'
+          docker exec "$name" /bin/sh -c 'test -r /workspace/proof.txt && ! touch /workspace/should-never-exist'
+          test ! -e mount-fixture/should-never-exist
+          docker rm -f "$name"
+          test -z "$(docker ps --all --quiet --filter "name=^$name$")"
+          echo 'Approved fixture only: read-only mount verified and isolated container removed.'

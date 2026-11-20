@@ -10,7 +10,10 @@ export type WorktreeAuditEvent =
   | 'creation-failed'
   | 'hydration-started'
   | 'hydration-completed'
-  | 'hydration-failed';
+  | 'hydration-failed'
+  | 'mount-probe-started'
+  | 'mount-probe-verified'
+  | 'mount-probe-failed';
 
 export interface WorktreeAuditEntry {
   event: WorktreeAuditEvent;
@@ -65,6 +68,26 @@ export interface WorktreeIntegrityReport {
   findings: string[];
   checkedAt: string;
   mount: WorktreeMountPreflight;
+}
+
+export interface WorktreeMountGrant {
+  grantToken: string;
+  expiresAt: string;
+  baseHeadSha: string;
+  purpose: 'EPHEMERAL_READ_ONLY_WORKER_MOUNT';
+}
+
+export interface WorktreeMountProbeResult {
+  planId: string;
+  sessionId: string;
+  state: 'verified';
+  checkedAt: string;
+  sourcePath: string;
+  targetPath: '/workspace';
+  readOnly: true;
+  networkEnabled: false;
+  containerRemoved: true;
+  agentExecutionEnabled: false;
 }
 
 export interface WorktreePlan {

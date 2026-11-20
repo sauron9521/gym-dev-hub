@@ -32,7 +32,7 @@ The Workspace now includes a [Docker isolation preflight](docs/execution-boundar
 
 ### Isolated Worker Foundation
 
-The Workspace can now start, ping and stop a [fixed-protocol Docker worker](docs/isolated-worker.md) built locally from `packages/worker`. It does not execute AI or shell commands, and it receives no host mounts. Build the local image before running its controls; the Docker Safety Preflight must pass first.
+The Workspace can now start, ping and stop a [fixed-protocol Docker worker](docs/isolated-worker.md) built locally from `packages/worker`. It does not execute AI or shell commands. The ordinary worker receives no host mounts; PR #15 adds a separate, explicitly gated **ephemeral** read-only mount probe that does not execute code. Build the local image before running its controls; the Docker Safety Preflight must pass first.
 
 ### Worktree Plans & Review (PR #9)
 
@@ -53,6 +53,10 @@ A created, inspected worktree can be populated from pinned **raw Git blobs** aft
 ### Post-Hydration Integrity & Mount Preview (PR #14)
 
 The Workspace can now [verify every copied Git blob against the pinned commit](docs/worktree-integrity.md), detect unexpected files and preview a fixed read-only Docker mount policy. **No actual mounts, Docker actions or Codex permissions are enabled**; the report is diagnostic only.
+
+### Ephemeral Read-Only Worker Mount (PR #15)
+
+An independently approved [read-only Docker mount probe](docs/worktree-mount.md) verifies that an integrity-checked worktree can be bound into a **short-lived, fixed-protocol worker**. The probe always stops and removes the container. **Disabled by default**, it does not enable agent execution or add mounts to the ordinary worker.
 
 ### Codex Adapter (opt-in)
 

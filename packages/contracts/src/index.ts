@@ -55,4 +55,6 @@ export type {
   WorktreeHydrationGrant,
   WorktreeIntegrityReport,
   WorktreeMountPreflight,
+  WorktreeMountGrant,
+  WorktreeMountProbeResult,
 } from './worktree.js';
