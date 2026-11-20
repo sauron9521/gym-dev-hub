@@ -1,0 +1,29 @@
+name: Temporary Prettier Diagnostic
+
+on:
+  pull_request:
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/tmp-format-diagnostic.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  format-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pnpm install --frozen-lockfile
+      - name: Show exact formatter diff (no repository writes)
+        shell: bash
+        run: |
+          pnpm exec prettier --write packages/runner/native-binary-inspect.mjs packages/runner/native-compatibility-preflight.mjs
+          git diff -- packages/runner/native-binary-inspect.mjs packages/runner/native-compatibility-preflight.mjs
