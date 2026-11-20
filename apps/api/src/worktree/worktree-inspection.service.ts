@@ -190,6 +190,7 @@ export class WorktreeInspectionService {
     let totalBytes = 0;
     let targetExists = false;
     let metadataOnly = false;
+    let stage = 'repository';
 
     try {
       const source = await verifyLocalRepository(plan.repository, this.reposRoot);
@@ -202,6 +203,7 @@ export class WorktreeInspectionService {
       ) {
         throw new Error('Target path drift');
       }
+      stage = 'worktree-root';
       await verifyRoot(plan.targetPath, this.worktreesRoot);
       const targetStat = await lstat(plan.targetPath).catch((error: NodeJS.ErrnoException) => {
         if (error.code === 'ENOENT') return null;
@@ -220,6 +222,7 @@ export class WorktreeInspectionService {
         metadataOnly = entries.length === 1 && entries[0] === '.git';
         if (!metadataOnly) findings.push('У worktree вже є файли: потрібна ручна перевірка.');
 
+        stage = 'git-registration';
         const topLevel = await gitRead(plan.targetPath, ['rev-parse', '--show-toplevel']);
         const commonDir = await gitRead(plan.targetPath, [
           'rev-parse',
@@ -247,6 +250,7 @@ export class WorktreeInspectionService {
       if (!plan.baseHeadSha || !SHA.test(plan.baseHeadSha)) {
         findings.push('Немає зафіксованого Git commit.');
       } else {
+        stage = 'git-tree';
         const listing = await gitRead(source, [
           'ls-tree',
           '-r',
@@ -261,7 +265,7 @@ export class WorktreeInspectionService {
         findings.push(...summary.violations);
       }
     } catch {
-      findings.push('Не вдалося підтвердити шляхи або Git-метадані. Потрібна ручна перевірка.');
+      findings.push(`Не вдалося завершити read-only перевірку (етап: ${stage}). Потрібна ручна перевірка.`);
     }
 
     if (plan.state !== 'created' || !plan.worktreeCreated) {
