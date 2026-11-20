@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { WorktreeIntegrityReport } from '@gym-dev-hub/contracts';
 import { WorktreeMountPanel } from './worktree-mount-panel';
 import { WorktreeCodeReadPanel } from './worktree-code-read-panel';
+import { WorktreeToolPanel } from './worktree-tool-panel';
 
 type Props = { sessionId: string; planId: string; fingerprint?: string };
 
@@ -97,6 +98,12 @@ export function WorktreeIntegrityPanel({ sessionId, planId, fingerprint }: Props
               />
               <WorktreeCodeReadPanel
                 key={report.checkedAt + '-read'}
+                sessionId={sessionId}
+                report={report}
+                fingerprint={fingerprint}
+              />
+              <WorktreeToolPanel
+                key={report.checkedAt + '-tool'}
                 sessionId={sessionId}
                 report={report}
                 fingerprint={fingerprint}
