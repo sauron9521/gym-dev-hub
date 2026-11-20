@@ -23,8 +23,12 @@ const base: WorktreePlan = {
 describe('WorktreeHydrationPanel', () => {
   it('requires an explicit checkbox and secret before exposing hydration grant', () => {
     const html = renderToStaticMarkup(
-      <WorktreeHydrationPanel sessionId={base.sessionId} plan={base}
-        completed={false} onRefresh={async () => undefined} />,
+      <WorktreeHydrationPanel
+        sessionId={base.sessionId}
+        plan={base}
+        completed={false}
+        onRefresh={async () => undefined}
+      />,
     );
     expect(html).toContain('Контрольоване наповнення worktree');
     expect(html).toContain('type="password"');
@@ -35,9 +39,12 @@ describe('WorktreeHydrationPanel', () => {
 
   it('renders a terminal failure without any action that can overwrite partial files', () => {
     const html = renderToStaticMarkup(
-      <WorktreeHydrationPanel sessionId={base.sessionId}
+      <WorktreeHydrationPanel
+        sessionId={base.sessionId}
         plan={{ ...base, hydrationState: 'failed', hydrationFiles: 1, hydrationBytes: 24 }}
-        completed={false} onRefresh={async () => undefined} />,
+        completed={false}
+        onRefresh={async () => undefined}
+      />,
     );
     expect(html).toContain('потрібна ручна перевірка');
     expect(html).toContain('Повторний запис і автоматичне очищення вимкнені');

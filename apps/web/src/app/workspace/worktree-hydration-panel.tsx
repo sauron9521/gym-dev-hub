@@ -63,7 +63,11 @@ export function WorktreeHydrationPanel({ sessionId, plan, completed, onRefresh }
       await onRefresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Hydration не завершено.');
-      try { await onRefresh(); } catch { /* Keep error visible. */ }
+      try {
+        await onRefresh();
+      } catch {
+        /* Keep error visible. */
+      }
     } finally {
       setBusy(false);
     }
@@ -73,42 +77,83 @@ export function WorktreeHydrationPanel({ sessionId, plan, completed, onRefresh }
     <div className="ws-worktree-authorization" aria-label="Погодження наповнення worktree">
       <div className="overline">RAW GIT BLOB HYDRATION · PR #12</div>
       <h4>Контрольоване наповнення worktree</h4>
-      <p>Git-файли записуються в окрему робочу область без checkout filters, hooks або запуску агентів.
-        Попередній репозиторій не змінюється.</p>
+      <p>
+        Git-файли записуються в окрему робочу область без checkout filters, hooks або запуску
+        агентів. Попередній репозиторій не змінюється.
+      </p>
       {plan.hydrationState ? (
         <div className="ws-worktree-inspection-result" role="status">
-          <strong>{plan.hydrationState === 'completed' ? 'Файли скопійовано' :
-            plan.hydrationState === 'running' ? 'Операція почата, перевір стан' :
-              'Hydration перервано — потрібна ручна перевірка'}</strong>
-          <p>Зафіксовано файлів: {plan.hydrationFiles ?? 0}, байтів: {plan.hydrationBytes ?? 0}.</p>
+          <strong>
+            {plan.hydrationState === 'completed'
+              ? 'Файли скопійовано'
+              : plan.hydrationState === 'running'
+                ? 'Операція почата, перевір стан'
+                : 'Hydration перервано — потрібна ручна перевірка'}
+          </strong>
+          <p>
+            Зафіксовано файлів: {plan.hydrationFiles ?? 0}, байтів: {plan.hydrationBytes ?? 0}.
+          </p>
           <small>Повторний запис і автоматичне очищення вимкнені.</small>
         </div>
       ) : (
         <>
           <label className="ws-plan-confirm">
-            <input type="checkbox" checked={confirmed} disabled={busy || !allowed || Boolean(grant)}
-              onChange={(event) => setConfirmed(event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={confirmed}
+              disabled={busy || !allowed || Boolean(grant)}
+              onChange={(event) => setConfirmed(event.target.checked)}
+            />
             Погоджую запис лише в worktree <code>{plan.targetPath}</code> із Git коміту{' '}
             <code>{plan.baseHeadSha}</code>. Не дозволяю виконання коду чи очищення файлів.
           </label>
           <label htmlFor="hydration-operator-secret">Секрет локального оператора</label>
-          <input id="hydration-operator-secret" type="password" autoComplete="off"
-            value={operatorSecret} onChange={(event) => setOperatorSecret(event.target.value)}
-            placeholder="DEV_HUB_WORKTREE_OPERATOR_SECRET" disabled={busy || !allowed || Boolean(grant)} />
-          <button type="button" className="refresh"
-            disabled={!allowed || busy || Boolean(grant) || !confirmed || operatorSecret.length < 32}
-            onClick={() => void authorize()}>Окремо авторизувати наповнення</button>
-          {grant && <div className="ws-worktree-grant">
-            <small>Одноразовий дозвіл до {new Date(grant.expiresAt).toLocaleTimeString('uk-UA')}. 
-              Git commit: <code>{grant.baseHeadSha}</code></small>
-            <button type="button" className="ws-primary" disabled={!allowed || busy}
-              onClick={() => void hydrate()}>Записати Git-файли в worktree</button>
-          </div>}
+          <input
+            id="hydration-operator-secret"
+            type="password"
+            autoComplete="off"
+            value={operatorSecret}
+            onChange={(event) => setOperatorSecret(event.target.value)}
+            placeholder="DEV_HUB_WORKTREE_OPERATOR_SECRET"
+            disabled={busy || !allowed || Boolean(grant)}
+          />
+          <button
+            type="button"
+            className="refresh"
+            disabled={
+              !allowed || busy || Boolean(grant) || !confirmed || operatorSecret.length < 32
+            }
+            onClick={() => void authorize()}
+          >
+            Окремо авторизувати наповнення
+          </button>
+          {grant && (
+            <div className="ws-worktree-grant">
+              <small>
+                Одноразовий дозвіл до {new Date(grant.expiresAt).toLocaleTimeString('uk-UA')}. Git
+                commit: <code>{grant.baseHeadSha}</code>
+              </small>
+              <button
+                type="button"
+                className="ws-primary"
+                disabled={!allowed || busy}
+                onClick={() => void hydrate()}
+              >
+                Записати Git-файли в worktree
+              </button>
+            </div>
+          )}
         </>
       )}
-      {error && <p className="ws-chat-error" role="alert">{error}</p>}
-      <small>Функцію вимкнено за замовчуванням. Потрібно окремо задати
-        DEV_HUB_ENABLE_WORKTREE_HYDRATION=true. Всі дозволи одноразові.</small>
+      {error && (
+        <p className="ws-chat-error" role="alert">
+          {error}
+        </p>
+      )}
+      <small>
+        Функцію вимкнено за замовчуванням. Потрібно окремо задати
+        DEV_HUB_ENABLE_WORKTREE_HYDRATION=true. Всі дозволи одноразові.
+      </small>
     </div>
   );
 }

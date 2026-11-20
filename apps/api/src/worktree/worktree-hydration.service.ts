@@ -11,10 +11,7 @@ import { lstat, mkdir, open, realpath } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import type {
-  WorktreeHydrationGrant,
-  WorktreePlan,
-} from '@gym-dev-hub/contracts';
+import type { WorktreeHydrationGrant, WorktreePlan } from '@gym-dev-hub/contracts';
 import { WorktreeInspectionService, inspectTreeListing } from './worktree-inspection.service.js';
 import { WorktreePlanService } from './worktree-plan.service.js';
 
@@ -44,18 +41,30 @@ function parseEntries(listing: string): Entry[] {
     throw new ConflictException('Git tree не пройшов перевірку безпеки.');
   }
   if (!listing) return [];
-  return listing.split('\0').filter(Boolean).map((line) => {
-    const match = /^([0-7]{6}) blob ([0-9a-f]{40,64}) +([0-9]+)\t(.+)$/s.exec(line);
-    if (!match || !['100644', '100755'].includes(match[1]!)) {
-      throw new ConflictException('Некоректний запис Git tree.');
-    }
-    return { path: match[4]!, oid: match[2]!, size: Number(match[3]) };
-  });
+  return listing
+    .split('\0')
+    .filter(Boolean)
+    .map((line) => {
+      const match = /^([0-7]{6}) blob ([0-9a-f]{40,64}) +([0-9]+)\t(.+)$/s.exec(line);
+      if (!match || !['100644', '100755'].includes(match[1]!)) {
+        throw new ConflictException('Некоректний запис Git tree.');
+      }
+      return { path: match[4]!, oid: match[2]!, size: Number(match[3]) };
+    });
 }
 
 function isolatedGitEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
-  for (const key of ['PATH', 'Path', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'HOME', 'USERPROFILE']) {
+  for (const key of [
+    'PATH',
+    'Path',
+    'SystemRoot',
+    'WINDIR',
+    'TEMP',
+    'TMP',
+    'HOME',
+    'USERPROFILE',
+  ]) {
     if (process.env[key]) env[key] = process.env[key];
   }
   env.GIT_CONFIG_NOSYSTEM = '1';
@@ -72,11 +81,29 @@ function gitBytes(cwd: string, args: string[], maxBuffer: number): Promise<Buffe
   return new Promise((resolveOutput, reject) => {
     execFile(
       'git',
-      ['--no-optional-locks', '-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=.devhub-disabled-hooks', '-C', cwd, ...args],
-      { shell: false, windowsHide: true, encoding: 'buffer', maxBuffer, timeout: 20_000, env: isolatedGitEnv() },
+      [
+        '--no-optional-locks',
+        '-c',
+        'core.fsmonitor=false',
+        '-c',
+        'core.hooksPath=.devhub-disabled-hooks',
+        '-C',
+        cwd,
+        ...args,
+      ],
+      {
+        shell: false,
+        windowsHide: true,
+        encoding: 'buffer',
+        maxBuffer,
+        timeout: 20_000,
+        env: isolatedGitEnv(),
+      },
       (error, stdout) => {
         if (error) {
-          reject(new ServiceUnavailableException('Git object недоступний або перевищив обмеження.'));
+          reject(
+            new ServiceUnavailableException('Git object недоступний або перевищив обмеження.'),
+          );
         } else {
           resolveOutput(Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout));
         }
@@ -160,7 +187,11 @@ export class WorktreeHydrationService {
       throw new ConflictException('Маніфест змінився.');
     }
     const report = await this.inspection.inspect(plan);
-    if (report.state !== 'ready-for-hydration' || !plan.baseHeadSha || !SHA.test(plan.baseHeadSha)) {
+    if (
+      report.state !== 'ready-for-hydration' ||
+      !plan.baseHeadSha ||
+      !SHA.test(plan.baseHeadSha)
+    ) {
       throw new ConflictException('Worktree не пройшов read-only перевірку.');
     }
     const token = randomBytes(32).toString('base64url');
@@ -169,7 +200,11 @@ export class WorktreeHydrationService {
       if (grant.expiresAt <= Date.now()) this.grants.delete(key);
     }
     this.grants.set(createHash('sha256').update(token).digest('hex'), {
-      sessionId, planId, fingerprint: plan.fingerprint, commit: plan.baseHeadSha, expiresAt,
+      sessionId,
+      planId,
+      fingerprint: plan.fingerprint,
+      commit: plan.baseHeadSha,
+      expiresAt,
     });
     return {
       grantToken: token,
@@ -186,8 +221,12 @@ export class WorktreeHydrationService {
     const tokenKey = createHash('sha256').update(parsed.data.grantToken).digest('hex');
     const grant = this.grants.get(tokenKey);
     this.grants.delete(tokenKey); // Consume synchronously before any await.
-    if (!grant || grant.sessionId !== sessionId || grant.planId !== planId ||
-        Date.now() >= grant.expiresAt) {
+    if (
+      !grant ||
+      grant.sessionId !== sessionId ||
+      grant.planId !== planId ||
+      Date.now() >= grant.expiresAt
+    ) {
       throw new ForbiddenException('Дозвіл прострочений, використаний або недійсний.');
     }
 
@@ -199,14 +238,25 @@ export class WorktreeHydrationService {
     if (report.state !== 'ready-for-hydration') {
       throw new ConflictException('Worktree змінився після погодження. Hydration заблоковано.');
     }
-    const reserved = await this.plans.reserveHydration(sessionId, planId, grant.fingerprint, grant.commit);
+    const reserved = await this.plans.reserveHydration(
+      sessionId,
+      planId,
+      grant.fingerprint,
+      grant.commit,
+    );
     try {
-      const listing = (await gitBytes(reserved.sourcePath, [
-        'ls-tree', '-r', '-l', '-z', '--full-tree', grant.commit,
-      ], 2 * 1024 * 1024)).toString('utf8');
+      const listing = (
+        await gitBytes(
+          reserved.sourcePath,
+          ['ls-tree', '-r', '-l', '-z', '--full-tree', grant.commit],
+          2 * 1024 * 1024,
+        )
+      ).toString('utf8');
       const entries = parseEntries(listing);
-      if (entries.length !== report.fileCount ||
-          entries.reduce((sum, entry) => sum + entry.size, 0) !== report.totalBytes) {
+      if (
+        entries.length !== report.fileCount ||
+        entries.reduce((sum, entry) => sum + entry.size, 0) !== report.totalBytes
+      ) {
         throw new ConflictException('Git tree змінився після перевірки.');
       }
       // Recheck the target's metadata before the first write, after the durable reservation.
@@ -218,14 +268,17 @@ export class WorktreeHydrationService {
       let bytesWritten = 0;
       for (const entry of entries) {
         const dest = await safeParentDirectories(reserved.targetPath, entry.path);
-        const data = await gitBytes(reserved.sourcePath, ['cat-file', 'blob', entry.oid], MAX_BLOB_BYTES + 1);
+        const data = await gitBytes(
+          reserved.sourcePath,
+          ['cat-file', 'blob', entry.oid],
+          MAX_BLOB_BYTES + 1,
+        );
         if (data.length !== entry.size) {
           throw new ConflictException('Git blob не відповідає очікуваному розміру.');
         }
         const handle = await open(
           dest,
-          constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL |
-            (constants.O_NOFOLLOW ?? 0),
+          constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
           0o600,
         );
         try {
@@ -240,7 +293,13 @@ export class WorktreeHydrationService {
           await this.plans.recordHydrationProgress(sessionId, planId, filesWritten, bytesWritten);
         }
       }
-      return await this.plans.finishHydration(sessionId, planId, 'completed', filesWritten, bytesWritten);
+      return await this.plans.finishHydration(
+        sessionId,
+        planId,
+        'completed',
+        filesWritten,
+        bytesWritten,
+      );
     } catch {
       // No destructive cleanup. Partial output is retained for manual inspection.
       await this.plans.finishHydration(sessionId, planId, 'failed').catch(() => undefined);

@@ -26,7 +26,9 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
 
   function git(...args: string[]): string {
     return execFileSync('git', ['-C', source, ...args], {
-      encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
   }
 
@@ -68,10 +70,12 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
     sessionId = session.id;
     const planned = await plans.create(sessionId);
     await plans.acknowledge(sessionId, planned.id, {
-      fingerprint: planned.fingerprint, confirmation: 'I_APPROVE_THIS_PLAN_ONLY',
+      fingerprint: planned.fingerprint,
+      confirmation: 'I_APPROVE_THIS_PLAN_ONLY',
     });
     const grant = await creation.authorize(sessionId, planned.id, {
-      fingerprint: planned.fingerprint, operatorSecret: TEST_SECRET,
+      fingerprint: planned.fingerprint,
+      operatorSecret: TEST_SECRET,
     });
     plan = await creation.create(sessionId, planned.id, { grantToken: grant.grantToken });
     expect(plan.state).toBe('created');
@@ -80,16 +84,23 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
   afterEach(async () => {
     vi.restoreAllMocks();
     for (const name of [
-      'DEV_HUB_REPOS_ROOT', 'DEV_HUB_WORKTREES_ROOT', 'DEV_HUB_WORKSPACE_FILE',
-      'DEV_HUB_PLAN_FILE', 'GITHUB_REPOSITORIES', 'DEV_HUB_ENABLE_WORKTREE_CREATION',
-      'DEV_HUB_ENABLE_WORKTREE_HYDRATION', 'DEV_HUB_WORKTREE_OPERATOR_SECRET',
-    ]) delete process.env[name];
+      'DEV_HUB_REPOS_ROOT',
+      'DEV_HUB_WORKTREES_ROOT',
+      'DEV_HUB_WORKSPACE_FILE',
+      'DEV_HUB_PLAN_FILE',
+      'GITHUB_REPOSITORIES',
+      'DEV_HUB_ENABLE_WORKTREE_CREATION',
+      'DEV_HUB_ENABLE_WORKTREE_HYDRATION',
+      'DEV_HUB_WORKTREE_OPERATOR_SECRET',
+    ])
+      delete process.env[name];
     await rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   });
 
   async function issueGrant() {
     return hydration.authorize(sessionId, plan.id, {
-      fingerprint: plan.fingerprint, operatorSecret: TEST_SECRET,
+      fingerprint: plan.fingerprint,
+      operatorSecret: TEST_SECRET,
     });
   }
 
@@ -104,15 +115,20 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
       hydrationFiles: 3,
       executionEnabled: false,
     });
-    expect(await readFile(join(plan.targetPath, 'binary.dat')))
-      .toEqual(Buffer.from([0, 1, 2, 255, 10, 0]));
-    expect(await readFile(join(plan.targetPath, 'src', 'hello.txt'), 'utf8'))
-      .toBe('Text from committed Git blob\n');
-    expect(await readFile(join(plan.targetPath, '.gitattributes'), 'utf8'))
-      .toBe('*.txt filter=untrusted\n');
+    expect(await readFile(join(plan.targetPath, 'binary.dat'))).toEqual(
+      Buffer.from([0, 1, 2, 255, 10, 0]),
+    );
+    expect(await readFile(join(plan.targetPath, 'src', 'hello.txt'), 'utf8')).toBe(
+      'Text from committed Git blob\n',
+    );
+    expect(await readFile(join(plan.targetPath, '.gitattributes'), 'utf8')).toBe(
+      '*.txt filter=untrusted\n',
+    );
     expect(git('status', '--porcelain')).toBe('');
-    expect((await plans.list(sessionId))[0].history.map(e => e.event).slice(-2))
-      .toEqual(['hydration-started', 'hydration-completed']);
+    expect((await plans.list(sessionId))[0].history.map((e) => e.event).slice(-2)).toEqual([
+      'hydration-started',
+      'hydration-completed',
+    ]);
     const recheck = await inspection.inspect(result);
     expect(recheck.state).toBe('needs-review'); // No false "empty" preflight after materialization.
   });
@@ -123,10 +139,11 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
       hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }),
       hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }),
     ]);
-    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter(r => r.status === 'rejected')).toHaveLength(1);
-    await expect(hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }))
-      .rejects.toThrow('Дозвіл прострочений');
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    await expect(
+      hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }),
+    ).rejects.toThrow('Дозвіл прострочений');
   });
 
   it('is disabled by default and requires a distinct opt-in', async () => {
@@ -135,27 +152,34 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
     process.env.DEV_HUB_ENABLE_WORKTREE_HYDRATION = 'true';
     const grant = await issueGrant();
     process.env.DEV_HUB_ENABLE_WORKTREE_HYDRATION = 'false';
-    await expect(hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }))
-      .rejects.toThrow('Hydration вимкнено');
+    await expect(
+      hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }),
+    ).rejects.toThrow('Hydration вимкнено');
     process.env.DEV_HUB_ENABLE_WORKTREE_HYDRATION = 'true';
-    await expect(hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }))
-      .rejects.toThrow('Дозвіл прострочений');
+    await expect(
+      hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }),
+    ).rejects.toThrow('Дозвіл прострочений');
   });
 
   it('rejects wrong operator secret without altering the worktree', async () => {
-    await expect(hydration.authorize(sessionId, plan.id, {
-      fingerprint: plan.fingerprint,
-      operatorSecret: 'invalid-operator-secret-with-32-chars-1234',
-    })).rejects.toThrow('Невірний секрет');
+    await expect(
+      hydration.authorize(sessionId, plan.id, {
+        fingerprint: plan.fingerprint,
+        operatorSecret: 'invalid-operator-secret-with-32-chars-1234',
+      }),
+    ).rejects.toThrow('Невірний секрет');
     expect(await readdir(plan.targetPath)).toEqual(['.git']);
   });
 
   it('refuses hydration after an unexpected file appears', async () => {
     const grant = await issueGrant();
     await writeFile(join(plan.targetPath, 'manual-file.txt'), 'do not overwrite');
-    await expect(hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }))
-      .rejects.toThrow('Worktree змінився');
-    expect(await readFile(join(plan.targetPath, 'manual-file.txt'), 'utf8')).toBe('do not overwrite');
+    await expect(
+      hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }),
+    ).rejects.toThrow('Worktree змінився');
+    expect(await readFile(join(plan.targetPath, 'manual-file.txt'), 'utf8')).toBe(
+      'do not overwrite',
+    );
     expect((await plans.list(sessionId))[0].hydrationState).toBeUndefined();
   });
 
@@ -163,8 +187,9 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
     const grant = await issueGrant();
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now + 61_000);
-    await expect(hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }))
-      .rejects.toThrow('Дозвіл прострочений');
+    await expect(
+      hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }),
+    ).rejects.toThrow('Дозвіл прострочений');
     expect(await readdir(plan.targetPath)).toEqual(['.git']);
   });
 
@@ -177,8 +202,9 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
       if (outcome === 'completed') throw new Error('simulated storage failure');
       throw new Error('unexpected outcome');
     });
-    await expect(hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }))
-      .rejects.toThrow('Hydration перервано');
+    await expect(
+      hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken }),
+    ).rejects.toThrow('Hydration перервано');
     const stored = (await plans.list(sessionId))[0];
     expect(stored.hydrationState).toBe('failed');
     expect(await lstat(join(plan.targetPath, 'binary.dat'))).toBeDefined();

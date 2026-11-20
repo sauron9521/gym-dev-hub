@@ -46,7 +46,12 @@ const planSchema = z.strictObject({
   worktreeCreated: z.boolean(),
   hydrationState: z.enum(['running', 'completed', 'failed']).optional(),
   hydrationFiles: z.number().int().nonnegative().max(5000).optional(),
-  hydrationBytes: z.number().int().nonnegative().max(100 * 1024 * 1024).optional(),
+  hydrationBytes: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(100 * 1024 * 1024)
+    .optional(),
   baseHeadSha: z
     .string()
     .regex(/^[0-9a-f]{40,64}$/)
@@ -438,7 +443,10 @@ export class WorktreePlanService {
   }
 
   async reserveHydration(
-    sessionId: string, planId: string, fingerprint: string, commit: string,
+    sessionId: string,
+    planId: string,
+    fingerprint: string,
+    commit: string,
   ): Promise<WorktreePlan> {
     const session = await this.workspace.get(sessionId);
     if (session.status === 'completed') {
@@ -466,15 +474,21 @@ export class WorktreePlanService {
   }
 
   async recordHydrationProgress(
-    sessionId: string, planId: string, files: number, bytes: number,
+    sessionId: string,
+    planId: string,
+    files: number,
+    bytes: number,
   ): Promise<void> {
     await this.transact((store) => {
       const plan = this.find(store, sessionId, planId);
       if (
         plan.hydrationState !== 'running' ||
-        !Number.isSafeInteger(files) || !Number.isSafeInteger(bytes) ||
-        files < (plan.hydrationFiles ?? 0) || bytes < (plan.hydrationBytes ?? 0) ||
-        files > 5000 || bytes > 100 * 1024 * 1024
+        !Number.isSafeInteger(files) ||
+        !Number.isSafeInteger(bytes) ||
+        files < (plan.hydrationFiles ?? 0) ||
+        bytes < (plan.hydrationBytes ?? 0) ||
+        files > 5000 ||
+        bytes > 100 * 1024 * 1024
       ) {
         throw new ConflictException('Непослідовний стан hydration.');
       }
@@ -484,8 +498,11 @@ export class WorktreePlanService {
   }
 
   async finishHydration(
-    sessionId: string, planId: string, outcome: 'completed' | 'failed',
-    files?: number, bytes?: number,
+    sessionId: string,
+    planId: string,
+    outcome: 'completed' | 'failed',
+    files?: number,
+    bytes?: number,
   ): Promise<WorktreePlan> {
     return this.transact((store) => {
       const plan = this.find(store, sessionId, planId);
@@ -494,9 +511,12 @@ export class WorktreePlanService {
       }
       if (outcome === 'completed') {
         if (
-          !Number.isSafeInteger(files) || !Number.isSafeInteger(bytes) ||
-          files! < (plan.hydrationFiles ?? 0) || bytes! < (plan.hydrationBytes ?? 0) ||
-          files! > 5000 || bytes! > 100 * 1024 * 1024
+          !Number.isSafeInteger(files) ||
+          !Number.isSafeInteger(bytes) ||
+          files! < (plan.hydrationFiles ?? 0) ||
+          bytes! < (plan.hydrationBytes ?? 0) ||
+          files! > 5000 ||
+          bytes! > 100 * 1024 * 1024
         ) {
           throw new ConflictException('Некоректний результат hydration.');
         }

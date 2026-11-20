@@ -303,12 +303,18 @@ export function WorktreePlanPanel({ sessionId, repository, completed }: Props) {
         <WorktreeInspectionPanel key={latest.id} sessionId={sessionId} planId={latest.id} />
       )}
       {latest?.state === 'created' && (
-        <WorktreeHydrationPanel key={latest.id} plan={latest} sessionId={sessionId}
-          completed={completed} onRefresh={refreshPlans} />
+        <WorktreeHydrationPanel
+          key={latest.id}
+          plan={latest}
+          sessionId={sessionId}
+          completed={completed}
+          onRefresh={refreshPlans}
+        />
       )}
       <small className="ws-plan-note">
         Погодження плану діє 15 хвилин. Окремий одноразовий дозвіл діє 60 секунд. Нова Git-гілка і
-        metadata-only worktree не дають агенту дозволу виконувати команди. Наповнення Git-файлами потребує нового окремого погодження.
+        metadata-only worktree не дають агенту дозволу виконувати команди. Наповнення Git-файлами
+        потребує нового окремого погодження.
       </small>
     </section>
   );
