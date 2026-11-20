@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { chmod, lstat, mkdtemp, open, realpath, rmdir, unlink } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, win32 } from 'node:path';
 import type { WorktreePlan } from '@gym-dev-hub/contracts';
 import { validateScopedCodePath } from './worktree-mount-probe.js';
 
@@ -101,9 +101,27 @@ export async function withPinnedFileStage<T>(
     throw new Error('Ephemeral pinned file staging is not enabled');
   }
   validateScopedCodePath(filePath);
+  const originalPath = resolve(plan.targetPath);
+  const supplied = await lstat(plan.targetPath);
+  if (!supplied.isDirectory() || supplied.isSymbolicLink()) {
+    throw new Error('Worktree source must be an ordinary directory');
+  }
   const root = await realpath(plan.targetPath);
-  if (root !== resolve(plan.targetPath) || !(await lstat(root)).isDirectory()) {
-    throw new Error('Worktree source must be a canonical ordinary directory');
+  const actual = await lstat(root);
+  if (
+    !actual.isDirectory() ||
+    actual.dev !== supplied.dev ||
+    actual.ino !== supplied.ino
+  ) {
+    throw new Error('Worktree directory changed during canonicalization');
+  }
+  if (
+    process.platform === 'win32'
+      ? win32.parse(root).root.toLowerCase() !==
+        win32.parse(originalPath).root.toLowerCase()
+      : root !== originalPath
+  ) {
+    throw new Error('Worktree path escapes its approved volume');
   }
   const original = await lstat(join(root, ...filePath.split('/')));
   if (!original.isFile() || original.isSymbolicLink() || original.size > MAX_BYTES) {
