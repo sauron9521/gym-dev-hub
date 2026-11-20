@@ -7,6 +7,7 @@ import type {
   WorktreeCreationGrant,
 } from '@gym-dev-hub/contracts';
 import { WorktreeInspectionPanel } from './worktree-inspection-panel';
+import { WorktreeHydrationPanel } from './worktree-hydration-panel';
 
 const labels: Record<WorktreePlanState, string> = {
   pending: 'Очікує погодження',
@@ -153,6 +154,10 @@ export function WorktreePlanPanel({ sessionId, repository, completed }: Props) {
     }
   }
 
+  async function refreshPlans() {
+    setPlans(await fetchPlans(base(sessionId)));
+  }
+
   return (
     <section className="ws-plan-panel" aria-label="Worktree manifest and approval">
       <div className="ws-boundary-heading">
@@ -297,9 +302,13 @@ export function WorktreePlanPanel({ sessionId, repository, completed }: Props) {
       {latest && ['creating', 'created', 'failed'].includes(latest.state) && (
         <WorktreeInspectionPanel key={latest.id} sessionId={sessionId} planId={latest.id} />
       )}
+      {latest?.state === 'created' && (
+        <WorktreeHydrationPanel key={latest.id} plan={latest} sessionId={sessionId}
+          completed={completed} onRefresh={refreshPlans} />
+      )}
       <small className="ws-plan-note">
         Погодження плану діє 15 хвилин. Окремий одноразовий дозвіл діє 60 секунд. Нова Git-гілка і
-        metadata-only worktree не дають агенту доступу до коду або команд.
+        metadata-only worktree не дають агенту дозволу виконувати команди. Наповнення Git-файлами потребує нового окремого погодження.
       </small>
     </section>
   );
