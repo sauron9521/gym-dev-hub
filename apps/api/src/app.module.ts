@@ -18,6 +18,7 @@ import { WorktreePlanController } from './worktree/worktree-plan.controller.js';
 import { WorktreeGitService } from './worktree/worktree-git.service.js';
 import { WorktreeAuthorizationService } from './worktree/worktree-authorization.service.js';
 import { WorktreeInspectionService } from './worktree/worktree-inspection.service.js';
+import { WorktreeHydrationService } from './worktree/worktree-hydration.service.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -42,6 +43,7 @@ import { WorktreeInspectionService } from './worktree/worktree-inspection.servic
     WorktreeGitService,
     WorktreeAuthorizationService,
     WorktreeInspectionService,
+    WorktreeHydrationService,
   ],
 })
 export class AppModule {}
