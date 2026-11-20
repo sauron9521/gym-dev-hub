@@ -265,7 +265,9 @@ export class WorktreeInspectionService {
         findings.push(...summary.violations);
       }
     } catch {
-      findings.push(`Не вдалося завершити read-only перевірку (етап: ${stage}). Потрібна ручна перевірка.`);
+      findings.push(
+        `Не вдалося завершити read-only перевірку (етап: ${stage}). Потрібна ручна перевірка.`,
+      );
     }
 
     if (plan.state !== 'created' || !plan.worktreeCreated) {
