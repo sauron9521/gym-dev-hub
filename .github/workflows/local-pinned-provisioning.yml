@@ -6,6 +6,7 @@ on:
       - 'packages/local-provisioner/**'
       - 'scripts/provision-pinned-api-local*'
       - 'scripts/pinned-provision-recovery*'
+      - 'scripts/pinned-stage-ledger*'
       - 'packages/runner/Dockerfile'
       - 'packages/runner/api-typecheck-local.mjs'
       - 'package.json'
@@ -16,6 +17,7 @@ on:
       - 'packages/local-provisioner/**'
       - 'scripts/provision-pinned-api-local*'
       - 'scripts/pinned-provision-recovery*'
+      - 'scripts/pinned-stage-ledger*'
       - 'packages/runner/Dockerfile'
       - 'packages/runner/api-typecheck-local.mjs'
       - '.github/workflows/local-pinned-provisioning.yml'
@@ -40,6 +42,8 @@ jobs:
         run: node --test scripts/provision-pinned-api-local.test.mjs
       - name: Reject foreign, running, recent and unsafe cleanup candidates
         run: node --test scripts/pinned-provision-recovery.test.mjs
+      - name: Assert host-private stage ledger denies unsafe recovery
+        run: node --test scripts/pinned-stage-ledger.test.mjs
       - name: Syntax-check the fixed network provisioning script
         run: sh -n packages/local-provisioner/stage-pinned-api.sh
       - name: Run full pinned provisioning and actual offline TypeScript proof
@@ -59,6 +63,7 @@ jobs:
           if (status.event !== 'pinned-provisioning-recovery-preview' ||
               status.containers.length !== 0 ||
               status.stagedDirectories.length !== 0 ||
+              status.ownedStageRecords.length !== 0 ||
               status.unrelatedContainersTouched !== false ||
               status.stagedDirectoriesRemoved !== false) {
             throw new Error('Recovery status did not leave provisioned assets untouched');
