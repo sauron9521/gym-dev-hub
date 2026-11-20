@@ -35,7 +35,7 @@
 33. **Isolated Prisma Client generation proof**: use the full pinned offline API dependency cache to run one reviewed fixed Prisma 7 code-generation step in a private, non-networked Docker overlay, without touching the immutable source or enabling the Hub task runner (PR #33).
 34. **Native binary static inventory**: CI-only inspect pinned Prisma engine and potential bcrypt/sharp/libvips Alpine-musl ELF headers without loading native modules. Missing packages and unverified ABI/runtime are reported honestly; no task execution (PR #34).
 35. **Pinned Alpine-musl artifact provisioning**: fetch the exact lock/SRI-pinned sharp and libvips optional packages in credential-free trusted CI using temporary cross-platform pnpm configuration, then require all expected ELF64/x86_64 headers in the offline container (PR #35).
-36. **Native runtime smoke (future)**: separately prove musl loader, shared-library and Node native-addon compatibility in an isolated executable-only scratch mount, without enabling arbitrary task commands.
+36. **Fixed Alpine native runtime smoke**: CI-only load pinned bcrypt and sharp with a tiny image roundtrip and run the pinned Prisma schema-engine version probe from a bounded networkless Docker container. Keep /workspace noexec; copy only reviewed native packages to a separate ephemeral exec /native tmpfs (PR #36).
 37. **Controlled execution (future)**: require a fresh one-use operator grant for the fixed API_TYPECHECK recipe, bounded logs, and mandatory cleanup; no auto-merge.
 38. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
 39. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
