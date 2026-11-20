@@ -26,5 +26,7 @@ COPY --chown=65534:65534 cache-verify.mjs /opt/gym-dev-hub/cache-verify.mjs
 COPY --chown=65534:65534 real-artifact-verify.mjs /opt/gym-dev-hub/real-artifact-verify.mjs
 # CI-only fixed real two-package offline install (not available through runner protocol).
 COPY --chown=65534:65534 offline-real-pair.mjs /opt/gym-dev-hub/offline-real-pair.mjs
+# CI-only TypeScript 6 smoke: fixture-only compiled code, no API/runner access.
+COPY --chown=65534:65534 offline-typescript-smoke.mjs /opt/gym-dev-hub/offline-typescript-smoke.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]
