@@ -61,3 +61,7 @@ The CI-only `offline-api-cache.mjs` verifies a complete pinned Gym Platform sour
 ## Private Prisma 7 client generation proof (PR #33)
 
 The CI-only `prisma-native-preflight.mjs` invokes the already reviewed, **script-free offline API dependency rehydration** on one immutable Gym Platform Git snapshot, then intentionally executes a **single fixed pinned Prisma CLI** in the disposable, offline, nonroot Docker container. Client files are written to the _private copied project_ under `/workspace/project/apps/api/src/infra/database/generated/prisma`; the public source bind remains read-only and unchanged. The standard runner protocol, Hub API and Codex cannot call the proof. Native engine/prebuilt runtime suitability is not established by generating Prisma code; see `docs/private-prisma-native-preflight.md`.
+
+## Static musl native binary inventory (PR #34)
+
+The separate CI-only `native-compatibility-preflight.mjs` rehydrates the verified API dependency cache offline and inspects **only ELF file headers**, without loading Prisma engines, `bcrypt`, `sharp` or libvips. It records whether matching Alpine/musl x86_64 candidates are absent, and never claims runtime readiness from a matching header. The Hub API, operator grants and regular runner remain non-executing. See `docs/native-binary-static-audit.md` for negative tests and the remaining dynamic-link/runtime gate.
