@@ -34,4 +34,3 @@ In the trusted, network-enabled CI staging step, pnpm 12.18.0 temporarily receiv
 The offline, non-root, networkless Docker **static inspector now requires all four native ELF64/x86_64 headers**, including bcrypt and the separately SHA-256-pinned Prisma schema-engine. If the musl optional packages are missing, this workflow must fail (rather than reporting an incomplete set as success).
 
 This is still **not** a certification of dynamic linking, exported symbols, runtime image processing or the actual API typecheck. No native module is loaded in this slice, no task execution or agent permission is activated. Actual runtime loading should be proved in a subsequent separately approved CI-only isolation design.
-
