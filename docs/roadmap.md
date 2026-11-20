@@ -21,8 +21,9 @@
 19. **Fixed task-runner policy preview**: preview six verified gym-platform pnpm recipes with exact argv, pinned worktree identity, and explicit proposed isolation. No execution (PR #19).
 20. **Isolated Node runner foundation**: dedicated Node.js 24 / pnpm 12.18.0 diagnostic image, fixed non-executing protocol, verified Docker restrictions and immutable image policy; no project scripts (PR #20).
 21. **Offline dependency provisioning proof**: reproducible, fixture-only pnpm workspace preparation with `--offline --frozen-lockfile --ignore-scripts` under a no-network read-only Docker boundary; native dependency builds remain blocked (PR #21).
-22. **Controlled execution (future)**: separately approved project-dependency setup, immutable source snapshot, safe test runner with bounded outputs and review; no auto-merge.
-23. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-24. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+22. **Pinned dependency cache integrity proof**: independently pinned SHA-512 SRI, immutable input manifest verification, content-addressed compressed archive in private tmpfs, tampering denial. Fixture-only, no package execution (PR #22).
+23. **Controlled execution (future)**: separately approved real package cache, native build strategy, immutable source snapshot, safe test runner with bounded outputs and review; no auto-merge.
+24. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+25. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

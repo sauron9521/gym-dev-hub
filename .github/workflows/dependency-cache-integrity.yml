@@ -1,0 +1,150 @@
+name: Dependency Cache Integrity (fixture only)
+
+on:
+  pull_request:
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/dependency-cache-integrity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/dependency-cache-integrity.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-cache-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cache-integrity:
+    name: Pinned SHA-512 cache / no package execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build reviewed Node/pnpm image; verify harmless fixture is a real archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull=false --tag gym-dev-hub-node-runner:v1 \
+            --file packages/runner/Dockerfile packages/runner
+          base64 --decode packages/runner/fixtures/cache/cache-fixture.tgz.b64 | tar -tzf - |
+            grep -Fx 'package/package.json'
+          base64 --decode packages/runner/fixtures/cache/cache-fixture.tgz.b64 | tar -tzf - |
+            grep -Fx 'package/index.js'
+
+      - name: Verify SHA-512 pin, ephemeral cache, Docker isolation and mandatory cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="$(realpath packages/runner/fixtures/cache)"
+          name="gym-dev-hub-cache-${{ github.run_id }}"
+          cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          docker create --name "$name" --pull=never \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --user=65534:65534 --ipc=none \
+            --pids-limit=128 --memory=2048m --cpus=2 \
+            --tmpfs='/cache:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+            --mount "type=bind,source=$fixture,target=/input,readonly" \
+            --stop-timeout=3 --entrypoint /usr/bin/node \
+            gym-dev-hub-node-runner:v1 \
+            /opt/gym-dev-hub/cache-verify.mjs >/dev/null
+
+          docker inspect "$name" --format '{{json .HostConfig}}' | jq -e '
+            .NetworkMode == "none" and .ReadonlyRootfs == true
+            and .Privileged == false and (.CapDrop | any(.[]; ascii_downcase == "all"))
+            and .Memory == 2147483648 and .NanoCpus == 2000000000
+            and .PidsLimit == 128 and .IpcMode == "none"
+            and (.Mounts | length) == 1
+            and .Mounts[0].Type == "bind"
+            and .Mounts[0].Target == "/input"
+            and .Mounts[0].ReadOnly == true
+            and (.Tmpfs["/cache"] | contains("noexec"))
+            and (.Tmpfs["/tmp"] | contains("noexec"))
+          '
+          docker inspect "$name" --format '{{json .Mounts}}' | jq -e '
+            length == 1 and .[0].Type == "bind"
+            and .[0].Destination == "/input" and .[0].RW == false
+          '
+          test "$(docker inspect "$name" --format '{{.Config.User}}')" = '65534:65534'
+          reply="$(docker start --attach "$name")"
+          test "$(docker inspect "$name" --format '{{.State.ExitCode}}')" = '0'
+          printf '%s\n' "$reply" | jq -e '
+            .protocol == 1 and .event == "integrity-cache-staged"
+            and .executionEnabled == false
+            and .package == "@devhub/cache-fixture@1.0.0"
+            and .integrity == "sha512-vy8Bx06sU5x0mIZgF7KQALH13zx2KincLdBFCGlfr0xgncG3pqd8aEH9gLDlHN3Y8gR4bXQki5VUWhoqWZBJRA=="
+            and (.cacheKey | test("^sha512-[a-f0-9]{128}$"))
+            and .cachedBytes == 215
+            and .archiveExtracted == false
+            and .lifecycleScriptsExecuted == false
+            and .dependencyInstallExecuted == false
+          '
+          docker rm "$name"
+          test -z "$(docker ps -aq --filter "name=^$name$")"
+          echo 'Pinned archive verified and cached on tmpfs; no package extraction or execution.'
+
+      - name: Reject byte tampering, forged integrity manifest and symlink input
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad=''
+          trap 'if [ -n "$bad" ]; then rm -rf "$bad"; fi' EXIT
+          for scenario in tampered forged symlink; do
+            bad="$(mktemp -d)"
+            chmod 755 "$bad"
+            cp -a packages/runner/fixtures/cache/. "$bad/"
+
+            if [ "$scenario" = 'symlink' ]; then
+              rm "$bad/cache-fixture.tgz.b64"
+              ln -s cache-manifest.json "$bad/cache-fixture.tgz.b64"
+            else
+              python3 - "$bad" "$scenario" <<'PY'
+          import base64
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          mode = sys.argv[2]
+          archive = root / 'cache-fixture.tgz.b64'
+          value = bytearray(base64.b64decode(archive.read_text().strip()))
+          value[30] ^= 1
+          archive.write_text(base64.b64encode(value).decode() + '\n')
+          if mode == 'forged':
+              manifest = root / 'cache-manifest.json'
+              data = json.loads(manifest.read_text())
+              data['integrity'] = 'sha512-' + base64.b64encode(hashlib.sha512(value).digest()).decode()
+              manifest.write_text(json.dumps(data) + '\n')
+          PY
+            fi
+
+            # Deliberately use the same restricted Docker policy for negative inputs.
+            if docker run --rm --pull=never \
+              --network=none --read-only --cap-drop=ALL \
+              --security-opt=no-new-privileges \
+              --user=65534:65534 --ipc=none \
+              --pids-limit=128 --memory=2048m --cpus=2 \
+              --tmpfs='/cache:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+              --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+              --mount "type=bind,source=$bad,target=/input,readonly" \
+              --stop-timeout=3 --entrypoint /usr/bin/node \
+              gym-dev-hub-node-runner:v1 \
+              /opt/gym-dev-hub/cache-verify.mjs >/dev/null 2>&1; then
+              echo "Unsafe cache input unexpectedly accepted: $scenario"
+              exit 1
+            fi
+            rm -rf "$bad"
+            bad=''
+          done
+          test -z "$(docker ps -aq --filter "ancestor=gym-dev-hub-node-runner:v1")"
+          echo 'All mutated, forged, and symlink inputs rejected.'

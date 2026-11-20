@@ -23,3 +23,9 @@ See `docs/node-runner-foundation.md` for the security/rollout plan.
 The separate `offline-provision.mjs` is a **CI-only fixed fixture** command. It is unreachable via the normal `runner.mjs` protocol. A dedicated workflow runs `pnpm install --offline --frozen-lockfile --ignore-scripts` against a tiny, reviewed, local-only workspace, with a read-only fixture input and ephemeral tmpfs output, no network, non-root UID and resource limits. Malicious fixture lifecycle scripts must **not** run.
 
 This is **not** a way to install `gym-platform` packages yet. Its actual Prisma/native dependency builds require a separately approved isolated build strategy. There is no API endpoint, package download at runtime or task-execution permission in this PR.
+
+## Content-addressed cache integrity proof (PR #22)
+
+The dedicated `cache-verify.mjs` is a **CI-only** tool. It validates a reviewed, tiny npm tarball against an **independent image-pinned SHA-512 SRI**, not merely the untrusted input manifest. It stages the verified compressed archive under its SHA-512 digest in an ephemeral, non-executable tmpfs, re-reads and compares it, and rejects a modified archive, a forged manifest, and symlink inputs. It **never** extracts the archive, runs package hooks, installs external packages, or mounts `gym-platform`.
+
+The normal `runner.mjs` protocol still rejects arbitrary execution. See `docs/dependency-cache-integrity.md` for the trust model, tests and real-dependency limitations.
