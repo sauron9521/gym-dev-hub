@@ -23,7 +23,10 @@ export function inspectElfHeader(header) {
   if (header[4] !== 2 || header[5] !== 1 || ![0, 3].includes(header[7])) {
     throw new Error('ELF is not supported little-endian 64-bit Linux');
   }
-  if (![2, 3].includes(header.readUInt16LE(16)) || header.readUInt16LE(18) !== 62) {
+  if (
+    ![2, 3].includes(header.readUInt16LE(16)) ||
+    header.readUInt16LE(18) !== 62
+  ) {
     throw new Error('ELF is not an x86_64 executable or shared object');
   }
   return { format: 'ELF64', architecture: 'x86_64', headerValidated: true };
@@ -68,7 +71,10 @@ async function firstCandidate(project, paths) {
     const file = join(project, suffix);
     const finding = await inspectElfFile(file, project);
     if (finding.status !== 'missing') {
-      return { ...finding, path: relative(project, file).replaceAll('\\', '/') };
+      return {
+        ...finding,
+        path: relative(project, file).replaceAll('\\', '/'),
+      };
     }
   }
   return { status: 'missing' };
@@ -76,7 +82,13 @@ async function firstCandidate(project, paths) {
 
 async function libvipsCandidate(project) {
   for (const prefix of ['node_modules', 'apps/api/node_modules']) {
-    const dir = join(project, prefix, '@img', 'sharp-libvips-linuxmusl-x64', 'lib');
+    const dir = join(
+      project,
+      prefix,
+      '@img',
+      'sharp-libvips-linuxmusl-x64',
+      'lib',
+    );
     let names;
     try {
       names = await readdir(dir);
@@ -84,13 +96,20 @@ async function libvipsCandidate(project) {
       if (error?.code === 'ENOENT') continue;
       throw error;
     }
-    const candidates = names.filter((name) => /^libvips-cpp\.so(?:\.[0-9.]+)?$/.test(name));
-    if (candidates.length > 4) throw new Error('Unexpected number of libvips ELF files');
+    const candidates = names.filter((name) =>
+      /^libvips-cpp\.so(?:\.[0-9.]+)?$/.test(name),
+    );
+    if (candidates.length > 4) {
+      throw new Error('Unexpected number of libvips ELF files');
+    }
     for (const name of candidates) {
       const path = join(dir, name);
       const finding = await inspectElfFile(path, project);
       if (finding.status !== 'missing') {
-        return { ...finding, path: relative(project, path).replaceAll('\\', '/') };
+        return {
+          ...finding,
+          path: relative(project, path).replaceAll('\\', '/'),
+        };
       }
     }
   }
@@ -116,9 +135,11 @@ export async function inspectInstalledNativeArtifacts(project, engine) {
     sharp,
     libvips,
     prismaSchemaEngine,
-    allExpectedHeadersPresent: [bcrypt, sharp, libvips, prismaSchemaEngine].every(
-      (item) => item.status === 'elf64-x86_64-header',
-    ),
+    allExpectedHeadersPresent:
+      bcrypt.status === 'elf64-x86_64-header' &&
+      sharp.status === 'elf64-x86_64-header' &&
+      libvips.status === 'elf64-x86_64-header' &&
+      prismaSchemaEngine.status === 'elf64-x86_64-header',
     runtimeCompatibilityCertified: false,
   };
 }
