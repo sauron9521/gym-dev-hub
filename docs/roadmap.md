@@ -27,8 +27,9 @@
 25. **Real offline two-package install**: populate a short-lived pnpm cache from two independently pinned real Gym Platform dependencies in trusted CI, then install the fixed transitive graph offline in Docker without lifecycle scripts, with negative cases (PR #25).
 26. **Pinned TypeScript toolchain smoke**: provision real Gym Platform `typescript@6.0.3` offline and execute a fixed positive/negative TS compiler fixture under networkless Docker CI, with no target repository source or API execution (PR #26).
 27. **Pinned Gym Platform source typecheck proof**: verified immutable snapshot of four import-free real TS modules from Gym Platform across API/mobile/shared packages; offline TypeScript compiler in isolated CI Docker, no project scripts or API execution (PR #27).
-28. **Controlled execution (future)**: separately approved broad real cache, native build strategy, immutable full source snapshot, safe test runner with bounded outputs and review; no auto-merge.
-29. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-30. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+28. **Immutable full source snapshot audit**: independently reviewed commit/tree, full tracked-file Git blob manifest, and read-only no-network Docker verification of all 1,258 files with failure cases. No task commands or operator grant yet (PR #28).
+29. **Controlled execution (future)**: separately approved real toolchain, native build strategy, per-recipe one-time operator grant, private writable overlays, bounded logs and cleanup; no auto-merge.
+30. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+31. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
