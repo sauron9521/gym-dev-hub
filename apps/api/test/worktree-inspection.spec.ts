@@ -110,6 +110,7 @@ describe('read-only worktree recovery inspection (real Git fixture)', () => {
   it('reports a verified metadata-only worktree as safe for a future hydration step', async () => {
     const before = await readdir(target);
     const result = await inspector.inspect(plan);
+    expect(result.state, result.findings.join(' | ')).toBe('ready-for-hydration');
     expect(result).toMatchObject({
       state: 'ready-for-hydration',
       targetExists: true,
