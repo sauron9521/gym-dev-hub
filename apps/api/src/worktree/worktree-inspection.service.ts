@@ -163,10 +163,9 @@ async function verifyRoot(target: string, root: string): Promise<void> {
     if (parent === current) break;
     current = parent;
   }
-  const canonical = await realpath(root);
-  if (resolve(canonical).toLowerCase() !== resolve(root).toLowerCase()) {
-    throw new Error('Worktree root changed');
-  }
+  // Windows may resolve an 8.3 short-name alias (RUNNER~1) for a safe
+  // directory. Compare the lstat chain above, not raw path spellings.
+  await realpath(root);
   if (resolve(target) !== resolve(root, target.split(/[\\/]/).at(-1) ?? '')) {
     throw new Error('Target outside worktree root');
   }
