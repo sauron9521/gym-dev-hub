@@ -1830,3 +1830,11 @@ strong {
 .ws-worktree-grant code {
   overflow-wrap: anywhere;
 }
+
+/* Read-only recovery inspection. A green result never enables checkout. */
+.ws-worktree-inspection { margin-top: 18px; padding: 16px; background: #182a40; border: 1px solid #395371; border-radius: 10px; }
+.ws-worktree-inspection h4 { margin: 0 0 8px; font-size: 13px; font-weight: 800; }
+.ws-worktree-inspection p, .ws-worktree-inspection li { color: #abc0dd; font-size: 11px; line-height: 1.6; }
+.ws-worktree-inspection-result { margin-top: 14px; border-top: 1px solid #3e5775; padding-top: 13px; }
+.ws-worktree-inspection-result strong { font-size: 12px; color: #d6e6fc; }
+.ws-worktree-inspection-result small { display: block; margin-top: 10px; color: #91a9cb; font-size: 10px; }
