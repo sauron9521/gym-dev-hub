@@ -11,8 +11,9 @@
 9. **Isolated worker foundation**: locally built dedicated worker image, fixed HELLO/PING/SHUTDOWN protocol, lifecycle and fail-closed Docker policies (PR #8).
 10. **Worktree manifest & acknowledgement**: allowlisted local source/repository validation, immutable planned worktree paths, fingerprinted review, TTL and revocation, without Git mutations (PR #9).
 11. **Metadata-only worktree creation**: explicit local operator secret, SHA-pinned single-use grant, safe Git worktree registration without checkout, state/audit recovery (PR #10).
-12. **Isolated execution**: safe file checkout, scoped worker mounts, and controlled agent command execution in separate safe PRs.
-13. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-14. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+12. **Worktree recovery and hydration preflight**: read-only Git metadata checks, tree safety scan, no auto cleanup and no checkout (PR #11).
+13. **Isolated execution**: approved raw-blob materialization, scoped worker mounts, and controlled agent command execution in separate safe PRs.
+14. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+15. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
