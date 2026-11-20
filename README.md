@@ -46,7 +46,7 @@ An acknowledged [worktree plan](docs/worktree-plans.md) can now be turned into a
 
 The Workspace can run a [read-only Git worktree inspection](docs/worktree-inspection.md) on created or interrupted plans. It validates worktree registration, the pinned commit and Git tree safety before any future checkout. **This does not hydrate files, delete anything, or authorize agents.**
 
-### Explicit Raw Git Worktree Hydration (PR #12)
+### Explicit Raw Git Worktree Hydration (PR #13)
 
 A created, inspected worktree can be populated from pinned **raw Git blobs** after a second, independent operator-secret approval. [Safe hydration setup, limits, and recovery](docs/worktree-hydration.md). Disabled by default; the process does not execute Git hooks, checkout filters, Codex, or arbitrary commands. Incomplete hydration never auto-cleans or retries.
 
