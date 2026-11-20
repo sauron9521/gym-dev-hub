@@ -39,9 +39,7 @@ async function main() {
     },
   });
   if (child.error || child.signal || child.status !== 0) {
-    throw new Error(
-      'Pinned offline dependency preflight failed before native inspection',
-    );
+    throw new Error('Pinned offline dependency preflight failed before native inspection');
   }
   const install = JSON.parse(child.stdout.trim());
   if (
@@ -66,9 +64,7 @@ async function main() {
 
   const inventory = await inspectInstalledNativeArtifacts(PROJECT, ENGINE);
   if (inventory.prismaSchemaEngine.status !== 'elf64-x86_64-header') {
-    throw new Error(
-      'Pinned Prisma schema-engine is not a usable ELF64 x86_64 header',
-    );
+    throw new Error('Pinned Prisma schema-engine is not a usable ELF64 x86_64 header');
   }
   process.stdout.write(
     JSON.stringify({
@@ -91,8 +87,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  const message =
-    error instanceof Error ? error.message.slice(0, 1200) : 'unknown';
+  const message = error instanceof Error ? error.message.slice(0, 1200) : 'unknown';
   process.stderr.write('Native prebuilt inventory rejected: ' + message + '\n');
   process.exitCode = 1;
 });
