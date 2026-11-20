@@ -39,6 +39,7 @@ jobs:
             apps/api/test/worktree-code-read.spec.ts
             apps/api/test/worktree-mount-probe.spec.ts
             apps/web/src/app/workspace/worktree-code-read-panel.tsx
+            apps/web/src/app/workspace/worktree-code-read-panel.test.tsx
           )
           pnpm exec prettier --write "${files[@]}"
           for file in "${files[@]}"; do
