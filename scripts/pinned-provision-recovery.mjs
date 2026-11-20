@@ -16,7 +16,11 @@ import {
   PROVISIONING_CHECKOUT_LABEL,
   PROVISIONING_CHECKOUT,
 } from './provision-pinned-api-local.mjs';
-import { stageRecoveryReport, pruneVerifiedStages, pruneStaleRunLock } from './pinned-stage-ledger.mjs';
+import {
+  stageRecoveryReport,
+  pruneVerifiedStages,
+  pruneStaleRunLock,
+} from './pinned-stage-ledger.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LOCAL = join(ROOT, '.local', 'pinned-api-runner');
@@ -238,10 +242,12 @@ async function inventory() {
       reason: policy.reason,
     })),
     stagedDirectories: await stagedDirectories(now),
-    ownedStageRecords: await stageRecoveryReport(LOCAL, PROVISIONING_CHECKOUT, now).catch((error) => {
-      if (error?.code === 'ENOENT') return [];
-      throw error;
-    }),
+    ownedStageRecords: await stageRecoveryReport(LOCAL, PROVISIONING_CHECKOUT, now).catch(
+      (error) => {
+        if (error?.code === 'ENOENT') return [];
+        throw error;
+      },
+    ),
     protectedPublishedBundles: true,
     unrelatedContainersTouched: false,
     stagedDirectoriesRemoved: false,
@@ -277,9 +283,9 @@ async function cleanup() {
   // Never try recursive stage deletion while any owned provisioning Docker
   // container is active; recheck after the non-forced container cleanup.
   const remaining = await ownedContainers(Date.now());
-  const hasActive = remaining.some(({ snapshot }) =>
-    snapshot.State?.Running !== false ||
-    !['exited', 'created'].includes(snapshot.State?.Status),
+  const hasActive = remaining.some(
+    ({ snapshot }) =>
+      snapshot.State?.Running !== false || !['exited', 'created'].includes(snapshot.State?.Status),
   );
   let stageCleanup = { removed: [], skipped: [] };
   let staleLockRemoved = false;
