@@ -1711,3 +1711,80 @@ strong {
     align-items: stretch;
   }
 }
+
+/* Worktree manifest approval is a recorded intent, not an execution capability. */
+.ws-plan-panel {
+  padding: 22px 27px;
+  border-top: 1px solid #314863;
+  border-bottom: 1px solid #314863;
+  background: #142033;
+}
+.ws-plan-panel h3 {
+  font:
+    800 16px Manrope,
+    system-ui,
+    sans-serif;
+  margin: 6px 0 0;
+}
+.ws-plan-panel > p {
+  font-size: 12px;
+  color: #a7bad3;
+  line-height: 1.7;
+}
+.ws-plan-detail {
+  display: grid;
+  gap: 10px;
+  padding: 15px;
+  margin: 17px 0;
+  background: #111a28;
+  border: 1px solid #304460;
+  border-radius: 9px;
+}
+.ws-plan-detail > div:not(.ws-plan-locked) {
+  display: grid;
+  grid-template-columns: 165px minmax(0, 1fr);
+  gap: 14px;
+  font-size: 11px;
+  align-items: start;
+}
+.ws-plan-detail span {
+  color: #a1b5d1;
+}
+.ws-plan-detail code {
+  font-size: 10px;
+  color: #c7dbff;
+  overflow-wrap: anywhere;
+}
+.ws-plan-locked {
+  font-size: 11px;
+  color: #f1cfa5;
+}
+.ws-plan-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 15px 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #d0def3;
+}
+.ws-plan-confirm input {
+  margin-top: 4px;
+  accent-color: #7496e7;
+}
+.ws-plan-note {
+  margin-top: 14px;
+  display: block;
+  line-height: 1.6;
+  font-size: 10px;
+  color: #9aaecb;
+}
+@media (max-width: 700px) {
+  .ws-plan-panel {
+    padding: 20px 17px;
+  }
+  .ws-plan-detail > div:not(.ws-plan-locked) {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}

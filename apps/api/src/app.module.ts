@@ -13,6 +13,8 @@ import { BoundaryController } from './boundary/boundary.controller.js';
 import { BoundaryService } from './boundary/boundary.service.js';
 import { WorkerController } from './worker/worker.controller.js';
 import { WorkerService } from './worker/worker.service.js';
+import { WorktreePlanService } from './worktree/worktree-plan.service.js';
+import { WorktreePlanController } from './worktree/worktree-plan.controller.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -23,6 +25,7 @@ import { WorkerService } from './worker/worker.service.js';
     CodexController,
     BoundaryController,
     WorkerController,
+    WorktreePlanController,
   ],
   providers: [
     GitHubService,
@@ -32,6 +35,7 @@ import { WorkerService } from './worker/worker.service.js';
     CodexChatService,
     BoundaryService,
     WorkerService,
+    WorktreePlanService,
   ],
 })
 export class AppModule {}

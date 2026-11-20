@@ -34,6 +34,10 @@ The Workspace now includes a [Docker isolation preflight](docs/execution-boundar
 
 The Workspace can now start, ping and stop a [fixed-protocol Docker worker](docs/isolated-worker.md) built locally from `packages/worker`. It does not execute AI or shell commands, and it receives no host mounts. Build the local image before running its controls; the Docker Safety Preflight must pass first.
 
+### Worktree Plans & Review (PR #9)
+
+The Workspace can preview immutable, repository-scoped [worktree plans](docs/worktree-plans.md), compare SHA-256 fingerprints, record time-limited acknowledgements, and revoke them. Plans do **not** create Git branches, mounts or execution permissions.
+
 ### Codex Adapter (opt-in)
 
 The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. PR #6 adds a separate text-only [Codex Agent Chat](docs/agent-chat.md) using these threads, while keeping worktree and PR mutation disabled. See [Codex Adapter setup and security](docs/codex-adapter.md).
@@ -44,7 +48,7 @@ The Workspace can now connect to a locally installed Codex CLI and create or res
 pnpm check
 ```
 
-The monorepo includes Next.js, NestJS, shared TypeScript/contract packages, and GitHub Actions CI. Agent chat and local session storage are now available. AI-controlled code writes, Git worktrees, approval gates and production databases are **not** included.
+The monorepo includes Next.js, NestJS, shared TypeScript/contract packages, and GitHub Actions CI. Agent chat and local session storage are now available. AI-controlled code writes, actual Git worktrees, authenticated approval gates and production databases are **not** included. Plan acknowledgement is informational only.
 
 ## Safety and governance
 

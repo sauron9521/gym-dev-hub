@@ -13,7 +13,8 @@ This repository owns the orchestration tooling. Target repositories (including `
 - Read-only text chat via Codex app-server, streaming SSE and local chat history: implemented in PR #6
 - Docker execution isolation preflight: fixed diagnostic container with pinned image, no network or host mounts, non-root, read-only root and strict limits (PR #7)
 - Docker worker foundation: local pinned-base image with static HELLO/PING/SHUTDOWN protocol, no host mounts/network or agent commands; safe launch lifecycle in NestJS (PR #8)
-- Moving Codex into an isolated worker, user approval UI and Git worktrees: planned as separate, permission-gated slices
+- Worktree plan foundation: validated repository source and Git origin, immutable planned path/branch, fingerprinted 15-minute acknowledgement and audit trail; **no actual worktree creation** (PR #9)
+- Moving Codex into an isolated worker, authenticated approval gates and actual Git worktrees: planned as separate, permission-gated slices
 - Persistence and worker queues: planned, separate from target repositories
 
 ## Invariants
