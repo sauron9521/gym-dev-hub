@@ -77,4 +77,3 @@ This still never loads or executes native packages and does not expose API_TYPEC
 The separate native-runtime-smoke.mjs fixed entrypoint checks the real pinned offline API graph, validates all four native ELF artifacts, copies **only reviewed native package directories** from the private noexec project to a dedicated executable /native tmpfs, then intentionally loads bcrypt and sharp to run tiny fixed fixtures and probes the pinned Prisma schema engine. The original source, /workspace, /results and /tmp remain protected. An unsafe or missing executable scratch mount fails before install; execution is networkless, non-root and bounded.
 
 This is **not** general task execution or API_TYPECHECK. The default runner protocol and Hub HTTP endpoints remain unchanged. See docs/alpine-native-runtime-smoke.md for boundaries and controls.
-
