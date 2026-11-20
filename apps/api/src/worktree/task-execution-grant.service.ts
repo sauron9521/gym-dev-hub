@@ -122,12 +122,14 @@ export class TaskExecutionGrantService {
   // Grants live only in memory; restarting the API revokes ALL outstanding
   // capabilities rather than attempting unsafe replay recovery from disk.
   private readonly grants = new Map<string, Grant>();
+  private configuredSecretDigest: Buffer | null = null;
 
   constructor(private readonly policy: TaskRunnerPolicyService) {}
 
   private configuredSecret(): string {
     if (process.env.DEV_HUB_ENABLE_TASK_GRANTS !== 'true') {
       this.grants.clear();
+      this.configuredSecretDigest = null;
       throw new ServiceUnavailableException('Видача дозволів для задач вимкнена.');
     }
     const secret = process.env.DEV_HUB_TASK_GRANT_OPERATOR_SECRET;
@@ -137,8 +139,17 @@ export class TaskExecutionGrantService {
       Buffer.byteLength(secret, 'utf8') > 256
     ) {
       this.grants.clear();
+      this.configuredSecretDigest = null;
       throw new ServiceUnavailableException('Потрібен окремий сильний секрет дозволів задач.');
     }
+    const digest = hashSecret(secret);
+    if (
+      this.configuredSecretDigest &&
+      !timingSafeEqual(this.configuredSecretDigest, digest)
+    ) {
+      this.grants.clear(); // Rotation invalidates every bearer token, even if feature remains on.
+    }
+    this.configuredSecretDigest = digest;
     return secret;
   }
 
@@ -167,6 +178,13 @@ export class TaskExecutionGrantService {
       if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
         throw new Error('Unsafe audit directory');
       }
+      const prior = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      });
+      if (prior && (!prior.isFile() || prior.isSymbolicLink() || prior.nlink !== 1)) {
+        throw new Error('Audit output is not a safe regular file');
+      }
       const fd = await open(
         path,
         constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0),
@@ -176,6 +194,7 @@ export class TaskExecutionGrantService {
         const info = await fd.stat();
         if (
           !info.isFile() ||
+          info.nlink !== 1 ||
           info.size > MAX_AUDIT_BYTES ||
           (process.platform !== 'win32' && (info.mode & 0o077) !== 0)
         ) {
@@ -192,6 +211,7 @@ export class TaskExecutionGrantService {
           sourceTree: grant.sourceTree,
           sourceManifestSha256: grant.sourceManifestSha256,
           fingerprint: grant.fingerprint,
+          expiresAt: new Date(grant.expiresAt).toISOString(),
           // No bearer token, operator secret, environment, argv or local path.
         });
         if (Buffer.byteLength(record) > 1200) throw new Error('Audit entry too large');
