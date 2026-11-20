@@ -13,7 +13,7 @@ The production `gym-platform` mono-repository currently uses `pnpm@12.18.0`, a l
 3. Validates regular non-symlink fixture inputs, strict paths, total byte bounds, the expected fixture package names, `pnpm@12.18.0`, workspace dependency and lockfile version 9.
 4. Copies only those four files into `/workspace`, exclusively creating each staged file. Executes the *fixed, non-user-configurable* argv:
    ```text
-   /usr/bin/pnpm install --offline --frozen-lockfile --ignore-scripts
+   /usr/bin/devhub-pnpm install --offline --frozen-lockfile --ignore-scripts
    ```
    with `shell:false`, a minimal environment, the Docker network disabled, and a fixed timeout / output cap.
 5. Confirms one local workspace package was installed/linked, the staged lockfile hash is unchanged, and both deliberately hostile root and package lifecycle hooks **did not execute**.
