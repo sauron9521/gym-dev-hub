@@ -267,6 +267,7 @@ jobs:
             and .operatorGrantConsumed == false and .sourceReadOnly == true
             and .networkEnabled == false
           '
+          printf '%s\n' "$reply" | jq -c '{bcrypt: .bcrypt.status, sharp: .sharp.status, libvips: .libvips.status, prisma: .prismaSchemaEngine.status, allExpectedHeadersPresent, runtimeCompatibilityCertified}'
           echo 'Static native inventory only. Missing musl packages block readiness; no runtime execution certified.'
 
       - name: Reject tampered Prisma schema and incomplete pnpm cache
