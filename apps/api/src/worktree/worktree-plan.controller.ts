@@ -5,6 +5,8 @@ import { WorktreeAuthorizationService } from './worktree-authorization.service.j
 import { WorktreeInspectionService } from './worktree-inspection.service.js';
 import type { WorktreeCreationGrant, WorktreeHydrationGrant } from '@gym-dev-hub/contracts';
 import { WorktreeHydrationService } from './worktree-hydration.service.js';
+import { WorktreeIntegrityService } from './worktree-integrity.service.js';
+import type { WorktreeIntegrityReport } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
 export class WorktreePlanController {
@@ -13,6 +15,7 @@ export class WorktreePlanController {
     private readonly authorization: WorktreeAuthorizationService,
     private readonly inspection: WorktreeInspectionService,
     private readonly hydration: WorktreeHydrationService,
+    private readonly integrity: WorktreeIntegrityService,
   ) {}
 
   @Get()
@@ -61,6 +64,14 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreePlan> {
     return this.authorization.create(sessionId, planId, body);
+  }
+
+  @Get(':planId/integrity')
+  verifyIntegrity(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+  ): Promise<WorktreeIntegrityReport> {
+    return this.integrity.verify(sessionId, planId);
   }
 
   @Post(':planId/hydration-authorize')
