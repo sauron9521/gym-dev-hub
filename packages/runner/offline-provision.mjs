@@ -76,8 +76,8 @@ async function main() {
   }
 
   const result = spawnSync(
-    '/usr/bin/devhub-pnpm',
-    ['install', '--offline', '--frozen-lockfile', '--ignore-scripts'],
+    '/bin/sh',
+    ['/usr/bin/devhub-pnpm', 'install', '--offline', '--frozen-lockfile', '--ignore-scripts'],
     {
       cwd: OUTPUT,
       shell: false,
