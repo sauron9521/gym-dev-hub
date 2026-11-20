@@ -32,7 +32,7 @@ The Workspace now includes a [Docker isolation preflight](docs/execution-boundar
 
 ### Fixed API_TYPECHECK: operator-only local provisioning
 
-A narrowly scoped [one-use, operator-approved API typecheck](docs/operator-api-typecheck.md) is available for **one reviewed Gym Platform commit only**, with no generic commands or agent-triggered execution. To prepare its offline inputs explicitly on Windows or Linux with local Docker, use `pnpm provision:pinned-api`. This invokes a separate networked _staging_ container without host credentials, verifies immutable source/dependencies, and runs a final typecheck in a **networkless** container before publishing a secret-free local bundle. It does not enable execution flags or write secrets. See [local pinned provisioning](docs/local-pinned-provisioning.md).
+A narrowly scoped [one-use, operator-approved API typecheck](docs/operator-api-typecheck.md) is available for **one reviewed Gym Platform commit only**, with no generic commands or agent-triggered execution. To prepare its offline inputs explicitly on Windows or Linux with local Docker, use `pnpm provision:pinned-api`. This invokes a separate networked _staging_ container without host credentials, verifies immutable source/dependencies, and runs a final typecheck in a **networkless** container before publishing a secret-free local bundle. It does not enable execution flags or write secrets. See [local pinned provisioning](docs/local-pinned-provisioning.md). Inspect leftovers without changing Docker via `pnpm provision:status`; explicitly remove only verified stopped/stale Hub containers via `pnpm provision:cleanup-stale` (never removes partial staging directories or other projects).
 
 ### Isolated Worker Foundation
 
