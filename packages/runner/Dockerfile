@@ -1,0 +1,20 @@
+# Dedicated diagnostic image for the FUTURE task runner.
+# No repository source, credentials, Docker socket, or arbitrary task execution.
+# Same reviewed Alpine 3.23 digest as the existing fixed-protocol worker.
+FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+
+LABEL org.gym-dev-hub.runner.protocol="1" \
+      org.gym-dev-hub.runner.execution="disabled" \
+      org.gym-dev-hub.runner.toolchain="node24-pnpm12.18.0"
+
+# Build-time network only: install a trusted runtime, NEVER project packages.
+# --ignore-scripts disables package lifecycle scripts while provisioning pnpm.
+RUN apk add --no-cache nodejs npm \
+    && test "$(node -p 'process.versions.node.split(".")[0]')" = "24" \
+    && npm install --global --ignore-scripts --no-audit --no-fund pnpm@12.18.0 \
+    && test "$(pnpm --version)" = "12.18.0" \
+    && npm cache clean --force
+
+COPY --chown=65534:65534 runner.mjs /opt/gym-dev-hub/runner.mjs
+USER 65534:65534
+ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]

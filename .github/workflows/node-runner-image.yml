@@ -1,0 +1,118 @@
+name: Node Runner Image (non-executing)
+
+on:
+  pull_request:
+    paths:
+      - 'packages/runner/**'
+      - 'apps/api/src/runner/**'
+      - 'apps/api/test/runner-policy.spec.ts'
+      - '.github/workflows/node-runner-image.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/node-runner-image.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: node-runner-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image-smoke:
+    name: Node 24 pnpm 12 image / no source execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build trusted toolchain image (network only at build time)
+        run: |
+          docker build --pull=false \
+            --tag gym-dev-hub-node-runner:v1 \
+            --file packages/runner/Dockerfile packages/runner
+
+      - name: Verify immutable image identity and installed binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          image='gym-dev-hub-node-runner:v1'
+          test "$(docker image inspect "$image" --format '{{.Config.User}}')" = '65534:65534'
+          docker image inspect "$image" --format '{{json .Config}}' | jq -e '
+            .Entrypoint == ["/usr/bin/node","/opt/gym-dev-hub/runner.mjs"]
+            and .Labels["org.gym-dev-hub.runner.protocol"] == "1"
+            and .Labels["org.gym-dev-hub.runner.execution"] == "disabled"
+            and .Labels["org.gym-dev-hub.runner.toolchain"] == "node24-pnpm12.18.0"
+          '
+          version="$(docker run --rm --pull=never --network=none --entrypoint /usr/bin/node "$image" -p 'process.versions.node.split(".")[0]')"
+          test "$version" = '24'
+          pnpm_version="$(docker run --rm --pull=never --network=none --entrypoint /bin/sh "$image" -c 'pnpm --version')"
+          test "$pnpm_version" = '12.18.0'
+
+      - name: Verify runtime has no mounts, network, privileges or writable rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="gym-dev-hub-runner-ci-${{ github.run_id }}"
+          cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          docker run -d -i --pull=never --rm --name "$name" \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --user=65534:65534 --ipc=none \
+            --pids-limit=128 --memory=2048m --cpus=2 \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777' \
+            --stop-timeout=3 \
+            gym-dev-hub-node-runner:v1 >/dev/null
+          docker inspect "$name" --format '{{json .HostConfig}}' | jq '{
+            NetworkMode, ReadonlyRootfs, Privileged, CapDrop,
+            Memory, NanoCpus, PidsLimit, IpcMode, Binds, Mounts
+          }'
+          docker inspect "$name" --format '{{json .HostConfig}}' | jq -e '
+            .NetworkMode == "none" and .ReadonlyRootfs == true
+            and .Privileged == false and (.CapDrop | any(.[]; ascii_downcase == "all"))
+            and .Memory == 2147483648 and .NanoCpus == 2000000000
+            and .PidsLimit == 128 and .IpcMode == "none"
+            and (.Binds == null or .Binds == [])
+            and (.Mounts == null or .Mounts == [])
+          '
+          docker inspect "$name" --format '{{json .Mounts}}' | jq -e 'length == 0'
+          test "$(docker inspect "$name" --format '{{.Config.User}}')" = '65534:65534'
+          docker exec "$name" /bin/sh -c 'test ! -e /workspace && ! touch /should-fail'
+          test "$(docker inspect "$name" --format '{{.HostConfig.NetworkMode}}')" = 'none'
+          docker rm -f "$name"
+          test -z "$(docker ps -aq --filter "name=^$name$")"
+
+      - name: Verify fixed protocol and refuse arbitrary commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          flags=(
+            --rm -i --pull never
+            --network none --read-only --cap-drop ALL
+            --security-opt no-new-privileges
+            --user 65534:65534 --ipc none
+            --pids-limit 128 --memory 2048m --cpus 2
+            --tmpfs '/tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777'
+            --stop-timeout 3
+          )
+          reply="$(
+            printf 'HELLO/1\nPING/1\nTOOLCHAIN/1\nRUN/1 pnpm test\nINSTALL/1 pnpm install\nSHUTDOWN/1\n' |
+              docker run "${flags[@]}" gym-dev-hub-node-runner:v1
+          )"
+          printf '%s\n' "$reply" | jq -s -e '
+            length == 6
+            and .[0] == {"protocol":1,"event":"ready","executionEnabled":false}
+            and .[1] == {"protocol":1,"event":"pong","executionEnabled":false}
+            and .[2].event == "toolchain" and .[2].nodeMajor == 24
+            and .[2].pnpmVersion == "12.18.0"
+            and .[2].repositoryMounted == false and .[2].scriptsEnabled == false
+            and .[2].executionEnabled == false
+            and .[3].event == "rejected" and .[3].code == "UNSUPPORTED_REQUEST"
+            and .[4].event == "rejected" and .[4].code == "UNSUPPORTED_REQUEST"
+            and .[5] == {"protocol":1,"event":"stopped","executionEnabled":false}
+          '
+          test -z "$(docker ps -aq --filter "ancestor=gym-dev-hub-node-runner:v1")"
+          echo 'Diagnostic Node/pnpm runner passes: no source code, no arbitrary commands.'
