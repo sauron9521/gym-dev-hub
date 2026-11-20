@@ -57,4 +57,4 @@ The two endpoints are allowlisted explicitly; there is no generic Git command, G
 
 Unit tests build **temporary Git repositories** only, not the user's real `gym-platform`. They verify exact commit pinning, one-time token use, disabled-by-default behavior, forbidden origin/path drift, target collisions, audit and state transition. Manual HTTP tests use an isolated fixture and assert no code execution endpoint exists.
 
-**Next:** explicit safe file checkout / worktree hydration and separately scoped permissions, followed by moving Codex into an actual isolated agent worker. Keep every merge manual.
+**Next:** PR #11 adds [separately authorized, bounded hydration and non-destructive recovery inspection](worktree-hydration.md). Docker mounts and agent execution still require separate, reviewed permissions. Keep every merge manual.

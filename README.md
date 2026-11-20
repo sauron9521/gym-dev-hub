@@ -42,6 +42,10 @@ The Workspace can preview immutable, repository-scoped [worktree plans](docs/wor
 
 An acknowledged [worktree plan](docs/worktree-plans.md) can now be turned into a real, **metadata-only** Git worktree after two separate approvals: a configured local operator secret and a short-lived single-use token. The feature is disabled unless explicitly configured. No project files are checked out and agent execution remains disabled. See [safe worktree creation and setup](docs/safe-worktree-creation.md).
 
+### Safe Worktree Hydration (PR #11)
+
+A created metadata-only worktree can now be [inspected and hydrated](docs/worktree-hydration.md) using a **separate**, short-lived operator authorization. Only bounded raw Git blobs are written; symlinks, submodules and unsafe paths are rejected. This feature is disabled by default. Agent code execution and Docker mounts remain unavailable.
+
 ### Codex Adapter (opt-in)
 
 The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. PR #6 adds a separate text-only [Codex Agent Chat](docs/agent-chat.md) using these threads, while keeping worktree and PR mutation disabled. See [Codex Adapter setup and security](docs/codex-adapter.md).
@@ -52,7 +56,7 @@ The Workspace can now connect to a locally installed Codex CLI and create or res
 pnpm check
 ```
 
-The monorepo includes Next.js, NestJS, shared TypeScript/contract packages, and GitHub Actions CI. Agent chat and local session storage are now available. AI-controlled code writes, checkout of source files into worktrees, production authentication and databases are **not** included. Worktree creation is a separate operator-authorized action, never triggered by plan acknowledgement alone.
+The monorepo includes Next.js, NestJS, shared TypeScript/contract packages, and GitHub Actions CI. Agent chat and local session storage are now available. AI-controlled file edits, production authentication and databases are **not** included. A separate opt-in, bounded worktree hydration now prepares existing Git files without launching agent tools. Worktree creation is a separate operator-authorized action, never triggered by plan acknowledgement alone.
 
 ## Safety and governance
 

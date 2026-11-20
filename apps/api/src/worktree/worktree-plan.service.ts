@@ -24,6 +24,9 @@ const auditSchema = z.strictObject({
     'creation-started',
     'worktree-created',
     'creation-failed',
+    'hydration-started',
+    'hydration-completed',
+    'hydration-failed',
   ]),
   timestamp: z.iso.datetime(),
 });
@@ -35,12 +38,15 @@ const planSchema = z.strictObject({
   targetPath: z.string(),
   proposedBranch: z.string(),
   fingerprint: z.string().regex(/^sha256:[0-9a-f]{64}$/),
-  state: z.enum(['pending', 'acknowledged', 'revoked', 'creating', 'created', 'failed']),
+  state: z.enum(['pending', 'acknowledged', 'revoked', 'creating', 'created', 'failed', 'hydrating', 'hydrated', 'hydrate-failed']),
   createdAt: z.iso.datetime(),
   expiresAt: z.iso.datetime().nullable(),
   history: z.array(auditSchema),
   executionEnabled: z.literal(false),
   worktreeCreated: z.boolean(),
+  treeFingerprint: z.string().regex(/^sha256:[0-9a-f]{64}$/).optional(),
+  hydratedFileCount: z.number().int().min(0).optional(),
+  hydratedBytes: z.number().int().min(0).optional(),
   baseHeadSha: z
     .string()
     .regex(/^[0-9a-f]{40,64}$/)
@@ -273,7 +279,7 @@ export class WorktreePlanService {
         store.plans.some(
           (item) =>
             item.sessionId === sessionId &&
-            ['pending', 'acknowledged', 'creating', 'created'].includes(planState(item)),
+            ['pending', 'acknowledged', 'creating', 'created', 'hydrating', 'hydrated', 'hydrate-failed'].includes(planState(item)),
         )
       ) {
         throw new ConflictException('Для цієї сесії вже існує активний план.');
@@ -405,6 +411,61 @@ export class WorktreePlanService {
       plan.worktreeCreated = result === 'created';
       plan.history.push({
         event: result === 'created' ? 'worktree-created' : 'creation-failed',
+        timestamp: new Date().toISOString(),
+      });
+      return publicPlan(plan);
+    }, true);
+  }
+
+
+  async ownedPlan(sessionId: string, planId: string): Promise<WorktreePlan> {
+    const session = await this.workspace.get(sessionId);
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (plan.repository !== session.repository ||
+          !this.github.listAllowedRepositories().includes(plan.repository)) {
+        throw new ConflictException('Репозиторій плану більше не дозволений.');
+      }
+      return publicPlan(plan);
+    });
+  }
+
+  async reserveHydration(sessionId: string, planId: string, fingerprint: string): Promise<WorktreePlan> {
+    const session = await this.workspace.get(sessionId);
+    if (session.status === 'completed') {
+      throw new ConflictException('Завершена сесія не дозволяє наповнення worktree.');
+    }
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (plan.repository !== session.repository ||
+          !this.github.listAllowedRepositories().includes(plan.repository) ||
+          plan.state !== 'created' || !plan.worktreeCreated ||
+          !/^sha256:[0-9a-f]{64}$/.test(fingerprint)) {
+        throw new ConflictException('Немає доступного погодженого worktree.');
+      }
+      plan.state = 'hydrating';
+      plan.treeFingerprint = fingerprint;
+      plan.history.push({ event: 'hydration-started', timestamp: new Date().toISOString() });
+      return publicPlan(plan);
+    }, true);
+  }
+
+  async finishHydration(
+    sessionId: string, planId: string, state: 'hydrated' | 'hydrate-failed',
+    fileCount: number, bytes: number,
+  ): Promise<WorktreePlan> {
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (plan.state !== 'hydrating') {
+        throw new ConflictException('Стан worktree змінився. Операцію не завершено.');
+      }
+      plan.state = state;
+      if (state === 'hydrated') {
+        plan.hydratedFileCount = fileCount;
+        plan.hydratedBytes = bytes;
+      }
+      plan.history.push({
+        event: state === 'hydrated' ? 'hydration-completed' : 'hydration-failed',
         timestamp: new Date().toISOString(),
       });
       return publicPlan(plan);

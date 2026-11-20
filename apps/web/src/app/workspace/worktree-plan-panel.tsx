@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { WorktreeHydrationPanel } from './worktree-hydration-panel';
 import type {
   WorktreePlan,
   WorktreePlanState,
@@ -15,6 +16,9 @@ const labels: Record<WorktreePlanState, string> = {
   creating: 'Створення Git worktree',
   created: 'Worktree створено',
   failed: 'Потребує перевірки Git',
+  hydrating: 'Наповнення файлів',
+  hydrated: 'Файли підготовлені',
+  'hydrate-failed': 'Потрібна ручна перевірка',
 };
 
 type Props = {
@@ -76,7 +80,7 @@ export function WorktreePlanPanel({ sessionId, repository, completed }: Props) {
 
   const latest = plans[0] ?? null;
   const active = plans.some((item) =>
-    ['pending', 'acknowledged', 'creating', 'created'].includes(item.state),
+    ['pending', 'acknowledged', 'creating', 'created', 'hydrating', 'hydrated', 'hydrate-failed'].includes(item.state),
   );
 
   async function perform(action: 'create' | 'acknowledge' | 'revoke') {
@@ -156,7 +160,7 @@ export function WorktreePlanPanel({ sessionId, repository, completed }: Props) {
     <section className="ws-plan-panel" aria-label="Worktree manifest and approval">
       <div className="ws-boundary-heading">
         <div>
-          <div className="overline">WORKTREE AUTHORIZATION · PR #10</div>
+          <div className="overline">WORKTREE LIFECYCLE · PR #11</div>
           <h3>План окремої робочої області</h3>
         </div>
         {latest && <span className="ws-boundary-state">{labels[latest.state]}</span>}
@@ -259,6 +263,14 @@ export function WorktreePlanPanel({ sessionId, repository, completed }: Props) {
             </div>
           )}
         </div>
+      )}
+      {latest && ['created', 'hydrating', 'hydrated', 'hydrate-failed'].includes(latest.state) && (
+        <WorktreeHydrationPanel
+          key={latest.id}
+          sessionId={sessionId}
+          plan={latest}
+          onUpdate={async () => { setPlans(await fetchPlans(base(sessionId))); }}
+        />
       )}
       {error && (
         <p className="ws-chat-error" role="alert">

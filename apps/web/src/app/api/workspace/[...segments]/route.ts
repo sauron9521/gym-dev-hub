@@ -64,6 +64,21 @@ function allowedPath(segments: string[], method: string): string | null {
   ) {
     return `/workspace/sessions/${id}/worktree-plans/${segments[3]}/${segments[4]}`;
   }
+  if (
+    segments.length === 5 && segments[2] === 'worktree-plans' &&
+    segments[4] === 'hydration' && method === 'GET' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(segments[3] ?? '')
+  ) {
+    return `/workspace/sessions/${id}/worktree-plans/${segments[3]}/hydration`;
+  }
+  if (
+    segments.length === 6 && segments[2] === 'worktree-plans' &&
+    segments[4] === 'hydration' && method === 'POST' &&
+    ['authorize', 'apply'].includes(segments[5] ?? '') &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(segments[3] ?? '')
+  ) {
+    return `/workspace/sessions/${id}/worktree-plans/${segments[3]}/hydration/${segments[5]}`;
+  }
   if (segments.length === 3 && segments[2] === 'codex' && method === 'POST') {
     return `/workspace/sessions/${id}/codex`;
   }

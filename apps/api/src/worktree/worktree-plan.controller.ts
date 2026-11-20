@@ -2,13 +2,15 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import type { WorktreePlan } from '@gym-dev-hub/contracts';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeAuthorizationService } from './worktree-authorization.service.js';
-import type { WorktreeCreationGrant } from '@gym-dev-hub/contracts';
+import type { WorktreeCreationGrant, WorktreeHydrationGrant, WorktreeHydrationInspection } from '@gym-dev-hub/contracts';
+import { WorktreeHydrationService } from './worktree-hydration.service.js';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
 export class WorktreePlanController {
   constructor(
     private readonly plans: WorktreePlanService,
     private readonly authorization: WorktreeAuthorizationService,
+    private readonly hydration: WorktreeHydrationService,
   ) {}
 
   @Get()
@@ -46,6 +48,32 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreePlan> {
     return this.authorization.create(sessionId, planId, body);
+  }
+
+  @Get(':planId/hydration')
+  inspectHydration(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+  ): Promise<WorktreeHydrationInspection> {
+    return this.hydration.inspect(sessionId, planId);
+  }
+
+  @Post(':planId/hydration/authorize')
+  authorizeHydration(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeHydrationGrant> {
+    return this.hydration.authorize(sessionId, planId, body);
+  }
+
+  @Post(':planId/hydration/apply')
+  hydrateWorktree(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePlan> {
+    return this.hydration.hydrate(sessionId, planId, body);
   }
 
   @Post(':planId/revoke')
