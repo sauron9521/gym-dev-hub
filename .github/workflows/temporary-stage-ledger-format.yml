@@ -1,0 +1,48 @@
+name: Temporary reviewed stage ledger formatter
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/pinned-stage-ledger*'
+      - 'scripts/provision-pinned-api-local.mjs'
+      - 'scripts/pinned-provision-recovery.mjs'
+      - '.github/workflows/temporary-stage-ledger-format.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Capture source and documentation formatting without Git write permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --write scripts/pinned-stage-ledger.mjs scripts/pinned-stage-ledger.test.mjs scripts/provision-pinned-api-local.mjs scripts/pinned-provision-recovery.mjs docs/local-pinned-provisioning.md docs/roadmap.md README.md
+          for entry in             scripts/pinned-stage-ledger.mjs             scripts/pinned-stage-ledger.test.mjs             scripts/provision-pinned-api-local.mjs             scripts/pinned-provision-recovery.mjs             docs/local-pinned-provisioning.md             docs/roadmap.md             README.md; do
+            case "$entry" in
+              scripts/pinned-stage-ledger.mjs) tag=A ;;
+              scripts/pinned-stage-ledger.test.mjs) tag=B ;;
+              scripts/provision-pinned-api-local.mjs) tag=C ;;
+              scripts/pinned-provision-recovery.mjs) tag=D ;;
+              docs/local-pinned-provisioning.md) tag=E ;;
+              docs/roadmap.md) tag=F ;;
+              README.md) tag=G ;;
+            esac
+            printf 'STAGE_LEDGER_FMT_%s=' "$tag"
+            base64 -w0 "$entry"
+            printf '\n'
+          done
+          printf 'STAGE_LEDGER_END\n'
+      - name: Run ledger filesystem tests on the formatted files
+        run: node --test scripts/pinned-stage-ledger.test.mjs scripts/pinned-provision-recovery.test.mjs
