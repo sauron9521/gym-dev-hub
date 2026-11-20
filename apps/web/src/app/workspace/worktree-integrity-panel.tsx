@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import type { WorktreeIntegrityReport } from '@gym-dev-hub/contracts';
+import { WorktreeMountPanel } from './worktree-mount-panel';
 
-type Props = { sessionId: string; planId: string };
+type Props = { sessionId: string; planId: string; fingerprint?: string };
 
 const labels: Record<WorktreeIntegrityReport['status'], string> = {
   verified: 'Усі файли збігаються з Git',
@@ -11,7 +12,7 @@ const labels: Record<WorktreeIntegrityReport['status'], string> = {
   'not-ready': 'Worktree ще не готовий до перевірки',
 };
 
-export function WorktreeIntegrityPanel({ sessionId, planId }: Props) {
+export function WorktreeIntegrityPanel({ sessionId, planId, fingerprint }: Props) {
   const [report, setReport] = useState<WorktreeIntegrityReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +86,10 @@ export function WorktreeIntegrityPanel({ sessionId, planId }: Props) {
               <strong>вимкнено</strong>
             </div>
           </div>
+          {report.status === 'verified' && fingerprint && (
+            <WorktreeMountPanel key={report.checkedAt} sessionId={sessionId}
+              report={report} fingerprint={fingerprint} />
+          )}
           <small>
             Підсумок є одноразовим знімком стану. Навіть успішна перевірка не дозволяє mount або
             запуск агента.
