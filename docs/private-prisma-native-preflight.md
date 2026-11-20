@@ -11,10 +11,10 @@ Trusted CI fetches the full real API dependency closure into a short-lived store
 The new fixed CI-only `prisma-native-preflight.mjs` calls the reviewed `offline-api-cache.mjs`, which validates the exact full source, copies source + cache into private tmpfs, installs the real API package graph **offline and without lifecycle scripts**, and rechecks the locked versions. Only after all these checks pass does it invoke the **single fixed** Prisma CLI:
 
 ```text
-/bin/sh /usr/bin/devhub-pnpm --dir /workspace/project/apps/api exec prisma generate --config prisma7.config.ts --no-hints
+/usr/bin/node /workspace/project/node_modules/prisma/build/index.js generate --config prisma7.config.ts --no-hints
 ```
 
-This command intentionally runs reviewed, pinned Prisma 7 CLI JavaScript and reads the exact pinned, reviewed `apps/api/prisma7.config.ts` and Prisma schema source. Neither command name, arguments, working directory nor source snapshot is provided by an HTTP caller, Codex agent, or user-editable task field. The output is pinned to `/workspace/project/apps/api/src/infra/database/generated/prisma`. The script validates expected Prisma 7 `client.ts`, `browser.ts`, `enums.ts`, bounded generated file counts and byte sizes, disallows output symlinks, and re-checks that the immutable source mount never got a generated client. It also confirms the pnpm lockfile digest did not change.
+The script resolves the pinned `prisma@7.10.1` package through the reviewed root/API package locations and confirms its `bin.prisma` mapping before launching Node. This command intentionally runs reviewed, pinned Prisma 7 CLI JavaScript and reads the exact pinned, reviewed `apps/api/prisma7.config.ts` and Prisma schema source. Neither command name, arguments, working directory nor source snapshot is provided by an HTTP caller, Codex agent, or user-editable task field. The output is pinned to `/workspace/project/apps/api/src/infra/database/generated/prisma`. The script validates expected Prisma 7 `client.ts`, `browser.ts`, `enums.ts`, bounded generated file counts and byte sizes, disallows output symlinks, and re-checks that the immutable source mount never got a generated client. It also confirms the pnpm lockfile digest did not change.
 
 ## Isolation boundary
 
