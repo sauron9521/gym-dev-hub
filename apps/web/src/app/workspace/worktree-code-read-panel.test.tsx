@@ -24,7 +24,11 @@ const report: WorktreeIntegrityReport = {
 describe('one-file read-only Docker consent panel', () => {
   it('is disabled until file, separate confirmation and secret are provided', () => {
     const html = renderToStaticMarkup(
-      <WorktreeCodeReadPanel sessionId={report.sessionId} report={report} fingerprint={'sha256:' + 'b'.repeat(64)} />,
+      <WorktreeCodeReadPanel
+        sessionId={report.sessionId}
+        report={report}
+        fingerprint={'sha256:' + 'b'.repeat(64)}
+      />,
     );
     expect(html).toContain('Прочитати один файл у Docker');
     expect(html).toContain('type="password"');

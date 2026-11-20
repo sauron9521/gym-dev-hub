@@ -26,28 +26,6 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      # Temporary PR16 format snapshot. Removed before merge.
-      - name: Temporary PR16 formatter output
-        shell: bash
-        run: |
-          set -euo pipefail
-          files=(
-            .github/workflows/worker-mount.yml
-            apps/api/src/worktree/worktree-code-read.service.ts
-            apps/api/src/worktree/worktree-mount-probe.ts
-            apps/api/src/worktree/worktree-plan.service.ts
-            apps/api/test/worktree-code-read.spec.ts
-            apps/api/test/worktree-mount-probe.spec.ts
-            apps/web/src/app/workspace/worktree-code-read-panel.tsx
-            apps/web/src/app/workspace/worktree-code-read-panel.test.tsx
-          )
-          pnpm exec prettier --write "${files[@]}"
-          for file in "${files[@]}"; do
-            echo "DHFMTSTART:$file"
-            base64 -w0 "$file"
-            echo
-            echo "DHFMTEND:$file"
-          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint
