@@ -17,3 +17,9 @@ docker build --pull=false --tag gym-dev-hub-node-runner:v1 --file packages/runne
 The image is **not** invoked by the web app or the API. A future, separately reviewed PR must add an explicit opt-in and permission gates before any execution. No Docker worker policy is loosened here.
 
 See `docs/node-runner-foundation.md` for the security/rollout plan.
+
+## Offline package provisioning proof (PR #21)
+
+The separate `offline-provision.mjs` is a **CI-only fixed fixture** command. It is unreachable via the normal `runner.mjs` protocol. A dedicated workflow runs `pnpm install --offline --frozen-lockfile --ignore-scripts` against a tiny, reviewed, local-only workspace, with a read-only fixture input and ephemeral tmpfs output, no network, non-root UID and resource limits. Malicious fixture lifecycle scripts must **not** run.
+
+This is **not** a way to install `gym-platform` packages yet. Its actual Prisma/native dependency builds require a separately approved isolated build strategy. There is no API endpoint, package download at runtime or task-execution permission in this PR.
