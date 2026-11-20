@@ -72,6 +72,33 @@ async function verifyGeneratedFiles(path, depth, tally) {
   }
 }
 
+async function pinnedPrismaCli() {
+  for (const candidate of [
+    join(PROJECT, 'node_modules', 'prisma'),
+    join(API, 'node_modules', 'prisma'),
+  ]) {
+    try {
+      const pkg = JSON.parse(await readFile(join(candidate, 'package.json'), 'utf8'));
+      if (
+        pkg.name !== 'prisma' ||
+        pkg.version !== '7.10.1' ||
+        pkg.bin?.prisma !== 'build/index.js'
+      ) {
+        throw new Error('Unexpected Prisma CLI executable mapping');
+      }
+      const cli = join(candidate, 'build', 'index.js');
+      const info = await lstat(cli);
+      if (!info.isFile() || info.isSymbolicLink()) {
+        throw new Error('Unsafe Prisma CLI entrypoint');
+      }
+      return cli;
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  throw new Error('Reviewed Prisma 7 executable not installed');
+}
+
 async function mustNotExist(path) {
   try {
     await lstat(path);
@@ -128,13 +155,9 @@ async function main() {
   await mustNotExist(GENERATED);
 
   const cli = run(
-    '/bin/sh',
+    '/usr/bin/node',
     [
-      '/usr/bin/devhub-pnpm',
-      '--dir',
-      API,
-      'exec',
-      'prisma',
+      await pinnedPrismaCli(),
       'generate',
       '--config',
       'prisma7.config.ts',
