@@ -14,6 +14,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readFile,
   readdir,
   realpath,
   rename,
@@ -578,6 +579,83 @@ function generatedEnvironment(bundle, imageId) {
   ].join('\n');
 }
 
+/** A published bundle is never trusted merely because a local receipt exists. */
+export function verifyPublishedReceipt(receipt) {
+  if (
+    !receipt ||
+    receipt.protocol !== 1 ||
+    receipt.event !== 'local-pinned-api-runner-provisioned' ||
+    receipt.sourceCommit !== FIXED.commit ||
+    receipt.sourceTree !== FIXED.tree ||
+    receipt.sourceManifestSha256 !== FIXED.manifest ||
+    receipt.prismaEngineSha256 !== FIXED.engine ||
+    !SHA_IMAGE.test(receipt.runnerImageId ?? '') ||
+    !SHA_IMAGE.test(receipt.provisionerImageId ?? '') ||
+    receipt.typecheckVerified !== true ||
+    receipt.containerRemoved !== true ||
+    receipt.operatorGrantConsumed !== false ||
+    receipt.taskExecutionEnabled !== false ||
+    !Number.isFinite(Date.parse(receipt.createdAt ?? ''))
+  ) {
+    throw new Error('Published pinned bundle provenance receipt is not trusted');
+  }
+  return receipt.runnerImageId;
+}
+
+/**
+ * Fast operator-invoked RE-verification. No downloads, git fetch, package
+ * installation, image builds, operator grants, credentials or config writes.
+ * Docker performs exactly the same networkless fixed compiler smoke as CI.
+ */
+async function verifyExisting() {
+  await checkLocalDocker();
+  const root = join(ROOT, '.local', 'pinned-api-runner');
+  await ensureNoSymlinkAncestors(root);
+  const lock = join(root, '.pinned-provision.lock');
+  try {
+    await lstat(lock);
+    throw new Error('Provisioning is active or has an unresolved crash lock');
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  const bundle = join(root, 'pinned-' + FIXED.commit.slice(0, 12));
+  await ensureNoSymlinkAncestors(bundle);
+  const receiptPath = join(bundle, 'provisioning.json');
+  const receiptStat = await lstat(receiptPath);
+  if (!receiptStat.isFile() || receiptStat.isSymbolicLink() || receiptStat.size > 4096) {
+    throw new Error('Unsafe pinned provisioning receipt');
+  }
+  const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
+  const imageId = verifyPublishedReceipt(receipt);
+  const examplePath = join(bundle, 'task-typecheck.env.example');
+  const exampleStat = await lstat(examplePath);
+  if (!exampleStat.isFile() || exampleStat.isSymbolicLink() || exampleStat.size > 4096) {
+    throw new Error('Unsafe pinned environment example');
+  }
+  if ((await readFile(examplePath, 'utf8')) !== generatedEnvironment(bundle, imageId)) {
+    throw new Error('Local configuration example differs from approved non-secret keys');
+  }
+  const actualId = await imageMetadata(FIXED.image, 'runner');
+  if (actualId !== imageId) throw new Error('Pinned runner image replaced since provisioning');
+  await verifyBundle(bundle);
+  const result = await smoke(bundle, imageId);
+  process.stdout.write(
+    JSON.stringify({
+      protocol: 1,
+      event: 'local-pinned-api-runner-reverified',
+      sourceCommit: FIXED.commit,
+      runnerImageId: imageId,
+      typecheckVerified: true,
+      containerRemoved: true,
+      stdoutBytes: result.stdoutBytes,
+      stderrBytes: result.stderrBytes,
+      networkEnabled: false,
+      taskExecutionEnabled: false,
+      operatorGrantConsumed: false,
+    }) + '\n',
+  );
+}
+
 async function prepare() {
   await checkLocalDocker();
   const root = join(ROOT, '.local', 'pinned-api-runner');
@@ -656,11 +734,14 @@ async function prepare() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv.length !== 3 || process.argv[2] !== '--prepare') {
-    process.stderr.write('Usage: node scripts/provision-pinned-api-local.mjs --prepare\n');
+  const mode = process.argv[2];
+  if (process.argv.length !== 3 || !['--prepare', '--verify'].includes(mode)) {
+    process.stderr.write(
+      'Usage: node scripts/provision-pinned-api-local.mjs --prepare | --verify\n',
+    );
     process.exitCode = 2;
   } else {
-    prepare().catch((error) => {
+    (mode === '--prepare' ? prepare() : verifyExisting()).catch((error) => {
       process.stderr.write(
         'Pinned local provisioning refused: ' +
           (error instanceof Error ? error.message.slice(0, 1000) : 'unknown') +
