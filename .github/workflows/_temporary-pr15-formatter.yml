@@ -1,0 +1,34 @@
+name: Temporary PR15 final test formatting - remove before review
+on:
+  push:
+    branches: [feat/ephemeral-worker-readonly-mount]
+    paths:
+      - '.github/workflows/_temporary-pr15-formatter.yml'
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/ephemeral-worker-readonly-mount
+          persist-credentials: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format only exact file
+        run: pnpm exec prettier --write apps/api/test/worktree-mount.service.spec.ts
+      - name: Stage exactly the formatted file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- apps/api/test/worktree-mount.service.spec.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style: format mount approval test'
+            git push origin HEAD:refs/heads/feat/ephemeral-worker-readonly-mount
+          fi
