@@ -26,6 +26,23 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      # Temporary PR25 formatting snapshot; removed from final PR.
+      - name: Temporary PR25 Prettier snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            docs/real-offline-dependency-install.md
+            packages/runner/offline-real-pair.mjs
+            packages/runner/README.md
+          )
+          pnpm exec prettier --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "DHFMTSTART:$file"
+            base64 -w0 "$file"
+            echo
+            echo "DHFMTEND:$file"
+          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint
