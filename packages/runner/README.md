@@ -29,3 +29,7 @@ This is **not** a way to install `gym-platform` packages yet. Its actual Prisma/
 The dedicated `cache-verify.mjs` is a **CI-only** tool. It validates a reviewed, tiny npm tarball against an **independent image-pinned SHA-512 SRI**, not merely the untrusted input manifest. It stages the verified compressed archive under its SHA-512 digest in an ephemeral, non-executable tmpfs, re-reads and compares it, and rejects a modified archive, a forged manifest, and symlink inputs. It **never** extracts the archive, runs package hooks, installs external packages, or mounts `gym-platform`.
 
 The normal `runner.mjs` protocol still rejects arbitrary execution. See `docs/dependency-cache-integrity.md` for the trust model, tests and real-dependency limitations.
+
+## One real pinned npm artifact (PR #24)
+
+GitHub Actions fetches **one exact public `is-number@7.0.0` tarball** from npm's HTTPS registry in a separate, credential-free networked CI step, first confirms that the source `gym-platform` lockfile matches a reviewed Git commit/blob and the independently pinned SHA-512 SRI, and then gives only the verified tarball to a `--network=none`, non-root, read-only Docker container. The CI-only `real-artifact-verify.mjs` revalidates the SRI and stages compressed bytes in an ephemeral noexec, content-addressed `/cache` tmpfs. Modified bytes and symlink inputs are rejected. The archive is **not extracted or installed** and no project script executes; see `docs/real-npm-artifact-provenance.md`.
