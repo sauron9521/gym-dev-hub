@@ -264,8 +264,9 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
     const integrity = new WorktreeIntegrityService(plans, inspection);
     const report = await integrity.verify(sessionId, plan.id);
     expect(report.status).toBe('mismatch');
-    expect(await readFile(join(plan.targetPath, 'untracked', 'keep.txt'), 'utf8'))
-      .toBe('do not delete');
+    expect(await readFile(join(plan.targetPath, 'untracked', 'keep.txt'), 'utf8')).toBe(
+      'do not delete',
+    );
   });
 
   it('detects missing files and incorrect hydration progress metadata', async () => {
@@ -283,5 +284,4 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
       integrity.verify('00000000-0000-4000-8000-000000000999', plan.id),
     ).rejects.toThrow();
   });
-
 });

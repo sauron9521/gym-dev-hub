@@ -39,26 +39,56 @@ export function WorktreeIntegrityPanel({ sessionId, planId }: Props) {
     <section className="ws-worktree-inspection" aria-label="Перевірка цілісності worktree">
       <div className="overline">POST-HYDRATION INTEGRITY · PR #14</div>
       <h4>Перевірка файлів і майбутнього mount</h4>
-      <p>Read-only перевірка файлів за Git hash. Вона не запускає Docker,
-        не монтує каталоги та не надає Codex дозволів.</p>
+      <p>
+        Read-only перевірка файлів за Git hash. Вона не запускає Docker, не монтує каталоги та не
+        надає Codex дозволів.
+      </p>
       <button type="button" className="refresh" disabled={busy} onClick={() => void verify()}>
         {busy ? 'Звіряємо файли…' : 'Звірити з Git'}
       </button>
-      {error && <p role="alert" className="ws-chat-error">{error}</p>}
+      {error && (
+        <p role="alert" className="ws-chat-error">
+          {error}
+        </p>
+      )}
       {report && (
         <div className="ws-worktree-inspection-result" role="status">
           <strong>{labels[report.status]}</strong>
-          <p>Перевірено: {report.fileCount} файлів, {report.verifiedBytes.toLocaleString('uk-UA')} байтів.</p>
+          <p>
+            Перевірено: {report.fileCount} файлів, {report.verifiedBytes.toLocaleString('uk-UA')}{' '}
+            байтів.
+          </p>
           {report.findings.length > 0 && (
-            <ul>{report.findings.map((finding) => <li key={finding}>{finding}</li>)}</ul>
+            <ul>
+              {report.findings.map((finding) => (
+                <li key={finding}>{finding}</li>
+              ))}
+            </ul>
           )}
           <div className="ws-plan-detail">
-            <div><span>Майбутній read-only mount</span><code>{report.mount.sourcePath} → {report.mount.targetPath}</code></div>
-            <div><span>Доступ до мережі</span><strong>вимкнено</strong></div>
-            <div><span>Реальне монтування</span><strong>вимкнено</strong></div>
-            <div><span>Виконання команд агента</span><strong>вимкнено</strong></div>
+            <div>
+              <span>Майбутній read-only mount</span>
+              <code>
+                {report.mount.sourcePath} → {report.mount.targetPath}
+              </code>
+            </div>
+            <div>
+              <span>Доступ до мережі</span>
+              <strong>вимкнено</strong>
+            </div>
+            <div>
+              <span>Реальне монтування</span>
+              <strong>вимкнено</strong>
+            </div>
+            <div>
+              <span>Виконання команд агента</span>
+              <strong>вимкнено</strong>
+            </div>
           </div>
-          <small>Підсумок є одноразовим знімком стану. Навіть успішна перевірка не дозволяє mount або запуск агента.</small>
+          <small>
+            Підсумок є одноразовим знімком стану. Навіть успішна перевірка не дозволяє mount або
+            запуск агента.
+          </small>
         </div>
       )}
     </section>

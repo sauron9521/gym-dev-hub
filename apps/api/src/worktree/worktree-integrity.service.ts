@@ -17,7 +17,16 @@ type GitEntry = { name: string; oid: string; size: number };
 
 function gitEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
-  for (const key of ['PATH', 'Path', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'HOME', 'USERPROFILE']) {
+  for (const key of [
+    'PATH',
+    'Path',
+    'SystemRoot',
+    'WINDIR',
+    'TEMP',
+    'TMP',
+    'HOME',
+    'USERPROFILE',
+  ]) {
     if (process.env[key]) env[key] = process.env[key];
   }
   env.GIT_CONFIG_NOSYSTEM = '1';
@@ -31,17 +40,36 @@ function gitEnv(): NodeJS.ProcessEnv {
 
 function gitTree(cwd: string, commit: string): Promise<Buffer> {
   return new Promise((resolveOutput, reject) => {
-    execFile('git', [
-      '--no-optional-locks', '-c', 'core.fsmonitor=false',
-      '-c', 'core.hooksPath=.devhub-disabled-hooks', '-C', cwd,
-      'ls-tree', '-r', '-l', '-z', '--full-tree', commit,
-    ], {
-      shell: false, windowsHide: true, encoding: 'buffer',
-      maxBuffer: 2 * 1024 * 1024, timeout: 12_000, env: gitEnv(),
-    }, (error, output) => {
-      if (error) reject(new Error('Git tree not available'));
-      else resolveOutput(Buffer.isBuffer(output) ? output : Buffer.from(output));
-    });
+    execFile(
+      'git',
+      [
+        '--no-optional-locks',
+        '-c',
+        'core.fsmonitor=false',
+        '-c',
+        'core.hooksPath=.devhub-disabled-hooks',
+        '-C',
+        cwd,
+        'ls-tree',
+        '-r',
+        '-l',
+        '-z',
+        '--full-tree',
+        commit,
+      ],
+      {
+        shell: false,
+        windowsHide: true,
+        encoding: 'buffer',
+        maxBuffer: 2 * 1024 * 1024,
+        timeout: 12_000,
+        env: gitEnv(),
+      },
+      (error, output) => {
+        if (error) reject(new Error('Git tree not available'));
+        else resolveOutput(Buffer.isBuffer(output) ? output : Buffer.from(output));
+      },
+    );
   });
 }
 
@@ -49,16 +77,22 @@ function gitTree(cwd: string, commit: string): Promise<Buffer> {
 function parseTree(buffer: Buffer): GitEntry[] {
   const decoded = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
   const validated = inspectTreeListing(decoded);
-  if (validated.violations.length || validated.fileCount > LIMIT_FILES ||
-      validated.totalBytes > LIMIT_TREE_BYTES) {
+  if (
+    validated.violations.length ||
+    validated.fileCount > LIMIT_FILES ||
+    validated.totalBytes > LIMIT_TREE_BYTES
+  ) {
     throw new Error('Unsafe Git tree');
   }
   if (!decoded) return [];
-  return decoded.split('\0').filter(Boolean).map((line) => {
-    const match = /^(100644|100755) blob ([0-9a-f]{40,64}) +([0-9]+)\t(.+)$/s.exec(line);
-    if (!match) throw new Error('Invalid Git record');
-    return { name: match[4]!, oid: match[2]!, size: Number(match[3]) };
-  });
+  return decoded
+    .split('\0')
+    .filter(Boolean)
+    .map((line) => {
+      const match = /^(100644|100755) blob ([0-9a-f]{40,64}) +([0-9]+)\t(.+)$/s.exec(line);
+      if (!match) throw new Error('Invalid Git record');
+      return { name: match[4]!, oid: match[2]!, size: Number(match[3]) };
+    });
 }
 
 /** Hash the actual file as an exact Git blob, without relying on Git filters/index. */
@@ -72,14 +106,23 @@ async function hashFile(path: string, size: number, oidLength: number): Promise<
     const chunk = Buffer.allocUnsafe(64 * 1024);
     let readTotal = 0;
     while (readTotal < size) {
-      const { bytesRead } = await file.read(chunk, 0, Math.min(chunk.length, size - readTotal), null);
+      const { bytesRead } = await file.read(
+        chunk,
+        0,
+        Math.min(chunk.length, size - readTotal),
+        null,
+      );
       if (bytesRead === 0) throw new Error('Unexpected end of file');
       hash.update(chunk.subarray(0, bytesRead));
       readTotal += bytesRead;
     }
     const after = await file.stat();
-    if (after.size !== before.size || after.mtimeMs !== before.mtimeMs ||
-        after.ino !== before.ino || after.dev !== before.dev) {
+    if (
+      after.size !== before.size ||
+      after.mtimeMs !== before.mtimeMs ||
+      after.ino !== before.ino ||
+      after.dev !== before.dev
+    ) {
       throw new Error('File changed during verification');
     }
     return hash.digest('hex');
@@ -128,9 +171,13 @@ export class WorktreeIntegrityService {
       mount: readOnlyMount(plan.targetPath),
     });
 
-    if (plan.state !== 'created' || !plan.worktreeCreated ||
-        plan.hydrationState !== 'completed' || !plan.baseHeadSha ||
-        !shaPattern.test(plan.baseHeadSha)) {
+    if (
+      plan.state !== 'created' ||
+      !plan.worktreeCreated ||
+      plan.hydrationState !== 'completed' ||
+      !plan.baseHeadSha ||
+      !shaPattern.test(plan.baseHeadSha)
+    ) {
       failures.push('Спочатку потрібне успішно завершене наповнення worktree.');
       return report('not-ready');
     }
@@ -178,13 +225,17 @@ export class WorktreeIntegrityService {
         }
       };
       await visit(plan.targetPath, '');
-      if (observed.size !== expected.size ||
-          fileCount !== plan.hydrationFiles ||
-          verifiedBytes !== plan.hydrationBytes) {
+      if (
+        observed.size !== expected.size ||
+        fileCount !== plan.hydrationFiles ||
+        verifiedBytes !== plan.hydrationBytes
+      ) {
         throw new Error('Missing Git file or manifest counter mismatch');
       }
     } catch {
-      failures.push('Файли або Git metadata змінилися, є зайві/відсутні об’єкти чи некоректні посилання.');
+      failures.push(
+        'Файли або Git metadata змінилися, є зайві/відсутні об’єкти чи некоректні посилання.',
+      );
       return report('mismatch');
     }
 

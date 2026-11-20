@@ -20,14 +20,14 @@ The report includes file count, verified byte count and a small sanitized list o
 
 The same report contains a **fixed proposed mount policy**:
 
-| Attribute | Value |
-| --- | --- |
-| Host source | Exact worktree target from the locally stored manifest |
-| Container target | `/workspace` |
-| Read-only | `true` |
-| Network enabled | `false` |
-| **Mount enabled** | **`false`** |
-| **Agent execution enabled** | **`false`** |
+| Attribute                   | Value                                                  |
+| --------------------------- | ------------------------------------------------------ |
+| Host source                 | Exact worktree target from the locally stored manifest |
+| Container target            | `/workspace`                                           |
+| Read-only                   | `true`                                                 |
+| Network enabled             | `false`                                                |
+| **Mount enabled**           | **`false`**                                            |
+| **Agent execution enabled** | **`false`**                                            |
 
 This is a structural preview, **not** verification that a Docker engine supports the mount. No Docker CLI commands are run, no container mounts are created and no approval token is issued. A successful integrity response **cannot** be passed to any new execution endpoint, because this PR does not add one. A future mount-enabled operation must check the current Docker boundary, revalidate the entire worktree at the moment of use, require a fresh independent operator approval and restrict the actual mount. Treat a green report as diagnostic only, never as an authorization.
 
