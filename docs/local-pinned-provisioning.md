@@ -67,7 +67,6 @@ The status command does not stop, create or remove containers. It shows Docker p
 
 On Windows, keeping Docker Desktop's Linux engine responsive and locating large workloads on a Linux/WSL2 filesystem may improve latency, but **the tool does not move or modify any other existing worktree or Docker volume**. GitHub Linux CI validates the recovery filters; a full Windows/Home-PC provisioning run still needs separate confirmation once that computer is available.
 
-
 ## Host-private staging ledger and explicit crash recovery (PR #57)
 
 Every new provisioning run creates an atomic `.pinned-provision.lock` under `.local/pinned-api-runner/`. Its private `.stage-ledgers/stage-XXXXXX.json` records the exact stage name, original filesystem device/inode, checkout, random run ID, PID and start time **before** the stage directory becomes writable to the Docker provisioning container. The ledger and lock are outside `/bundle` and invisible to that container. Concurrent provisioning from the same checkout is denied.
