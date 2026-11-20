@@ -80,9 +80,28 @@ jobs:
           echo "DEPENDENCY_STORE=$store" >> "$GITHUB_ENV"
           pnpm --dir packages/runner/fixtures/real-pair fetch \
             --frozen-lockfile --ignore-scripts --store-dir "$store"
+          # pnpm 12.18 records a project-index symlink back to the trusted
+          # CI checkout. Validate exactly that target and remove ONLY this
+          # host-specific bookkeeping before crossing into Docker.
+          projects="$store/v11/projects"
+          if [ -d "$projects" ]; then
+            for entry in "$projects"/*; do
+              if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then continue; fi
+              test -L "$entry"
+              [[ "$(basename "$entry")" =~ ^[a-f0-9]{32}$ ]]
+              test "$(readlink "$entry")" = "$(realpath packages/runner/fixtures/real-pair)"
+              rm -- "$entry"
+            done
+          fi
+          # pnpm fetch materializes a virtual node_modules in the trusted
+          # source fixture as well. Do not expose it as an input mount.
+          rm -rf packages/runner/fixtures/real-pair/node_modules
+          test -z "$(find packages/runner/fixtures/real-pair -type l -print -quit)"
+          git diff --exit-code -- packages/runner/fixtures/real-pair/package.json \
+            packages/runner/fixtures/real-pair/pnpm-lock.yaml \
+            packages/runner/fixtures/real-pair/pnpm-workspace.yaml
           if find "$store" -type l -print -quit | grep -q .; then
-            echo 'Unexpected pnpm store symlinks (relative paths only):'
-            find "$store" -type l -printf '%P -> %l\n' | head -n 30
+            echo 'Unexpected remaining symlink in pnpm store'
             exit 1
           fi
           count="$(find "$store" -type f | wc -l)"
