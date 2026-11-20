@@ -168,10 +168,10 @@ jobs:
               no-workspace) tmpfs_args=(--tmpfs='/results:rw,nosuid,nodev,noexec,size=16m,mode=1777') ;;
               no-results) tmpfs_args=(--tmpfs='/workspace:rw,nosuid,nodev,noexec,size=64m,mode=1777') ;;
               executable-workspace)
-                tmpfs_args[0]="--tmpfs=/workspace:rw,nosuid,nodev,size=64m,mode=1777"
+                tmpfs_args[0]="--tmpfs=/workspace:rw,nosuid,nodev,exec,size=64m,mode=1777"
                 ;;
               executable-results)
-                tmpfs_args[1]="--tmpfs=/results:rw,nosuid,nodev,size=16m,mode=1777"
+                tmpfs_args[1]="--tmpfs=/results:rw,nosuid,nodev,exec,size=16m,mode=1777"
                 ;;
               source-changed) input="$modified" ;;
               bad-manifest) index="$bad_manifest" ;;
