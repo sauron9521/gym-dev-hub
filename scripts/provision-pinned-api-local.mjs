@@ -14,7 +14,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
-  readFile,
+  readdir,
   realpath,
   rename,
   rm,
@@ -348,7 +348,7 @@ async function stageInDocker(stage, imageId) {
       binds[0]?.RW !== true
     )
       throw new Error('Provisioner writable bind is not exactly the temporary output folder');
-    const output = await command('docker', ['start', '--attach', name], 900000, 256 * 1024);
+    const output = await command('docker', ['start', '--attach', name], 1800000, 256 * 1024);
     const exit = await docker('inspect', '--format', '{{.State.ExitCode}}', name);
     staged = exit === '0' && output.includes('PINNED_LOCAL_API_BUNDLE_STAGED_V1');
   } finally {
@@ -432,6 +432,86 @@ async function smoke(bundle, imageId) {
   return result;
 }
 
+export function verifyStoreArchiveListing(raw, verbose) {
+  if (
+    typeof raw !== 'string' ||
+    raw.length > 16 * 1024 * 1024 ||
+    typeof verbose !== 'string' ||
+    verbose.length > 16 * 1024 * 1024
+  ) {
+    throw new Error('Unexpected pnpm store archive index');
+  }
+  const paths = raw.split(/\r?\n/).filter(Boolean);
+  const types = verbose.split(/\r?\n/).filter(Boolean);
+  if (paths.length < 50 || paths.length > 100000 || types.length !== paths.length) {
+    throw new Error('Unbounded or incomplete pnpm store archive');
+  }
+  for (let index = 0; index < paths.length; index++) {
+    const entry = paths[index];
+    const normalized = entry.endsWith('/') ? entry.slice(0, -1) : entry;
+    if (
+      (normalized !== '.' && !normalized.startsWith('./')) ||
+      normalized.includes('\\') ||
+      normalized.includes(':') ||
+      normalized.includes('\0') ||
+      normalized.includes('\r') ||
+      normalized.includes('\n') ||
+      normalized.length > 350 ||
+      normalized.split('/').some((part) => part === '..') ||
+      !['-', 'd'].includes(types[index]?.[0])
+    ) {
+      throw new Error('Unsafe path, symlink or special type in pnpm store archive');
+    }
+  }
+}
+
+async function inspectExtractedStore(path, tally, depth = 0) {
+  if (depth > 18) throw new Error('Store nesting exceeds reviewed limit');
+  const entry = await lstat(path);
+  if (entry.isSymbolicLink()) throw new Error('Redirected symlink in offline store');
+  if (entry.isDirectory()) {
+    tally.directories++;
+    if (tally.directories > 90000) throw new Error('Too many store directories');
+    for (const name of await readdir(path)) {
+      if (!name || name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
+        throw new Error('Unsafe offline store entry');
+      }
+      await inspectExtractedStore(join(path, name), tally, depth + 1);
+    }
+  } else if (entry.isFile()) {
+    tally.files++;
+    tally.bytes += entry.size;
+    if (tally.files > 90000 || tally.bytes > 1900 * 1024 * 1024) {
+      throw new Error('Offline store exceeded fixed file or size limit');
+    }
+  } else {
+    throw new Error('Special file in offline store');
+  }
+}
+
+async function unpackPinnedStore(bundle) {
+  const archive = join(bundle, 'pnpm-store.tar.gz');
+  const details = await lstat(archive);
+  if (
+    !details.isFile() ||
+    details.isSymbolicLink() ||
+    details.size < 1000 ||
+    details.size > 1900 * 1024 * 1024
+  ) {
+    throw new Error('Missing or oversized pinned pnpm store transport');
+  }
+  const listed = await command('tar', ['-tzf', archive], 180000, 16 * 1024 * 1024);
+  const verbose = await command('tar', ['-tvzf', archive], 180000, 16 * 1024 * 1024);
+  verifyStoreArchiveListing(listed, verbose);
+  const destination = join(bundle, 'store');
+  await mkdir(destination);
+  await command('tar', ['-xzf', archive, '-C', destination], 600000);
+  const tally = { files: 0, directories: 0, bytes: 0 };
+  await inspectExtractedStore(destination, tally);
+  if (tally.files < 50) throw new Error('Incomplete extracted pinned dependency store');
+  await rm(archive);
+}
+
 async function verifyBundle(bundle) {
   const paths = ['source', 'manifest', 'store', 'engine'];
   for (const dir of paths) await ensureNoSymlinkAncestors(join(bundle, dir));
@@ -504,6 +584,7 @@ async function prepare() {
     // No longer let the networked stage write to the bundle. Lock its parent
     // before host verification and the independent offline validation.
     await chmod(stage, 0o700);
+    await unpackPinnedStore(stage);
     await verifyBundle(stage);
     const runnerId = await build(
       FIXED.image,

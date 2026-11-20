@@ -5,6 +5,7 @@ import {
   verifyLocalProof,
   verifyImageMetadata,
   verifyProvisionerIsolation,
+  verifyStoreArchiveListing,
 } from './provision-pinned-api-local.mjs';
 
 const receipt = () => ({
@@ -99,6 +100,51 @@ describe('trusted network staging container boundary', () => {
     ]) {
       assert.throws(() => verifyProvisionerIsolation(candidate), /unsafe/);
     }
+  });
+});
+
+describe('offline pnpm store archive transport cannot escape destination', () => {
+  const safe = Array.from({ length: 60 }, (_, i) => './v11/files/' + String(i));
+  const regular = safe.map(() => '-rw-r--r-- owner owner 1 Nov 20 00:00 sample');
+  const listing = (files = safe) => files.join('\n') + '\n';
+  const detail = (types = regular) => types.join('\n') + '\n';
+  it('accepts only relative regular files from a bounded archive', () => {
+    assert.doesNotThrow(() => verifyStoreArchiveListing(listing(), detail()));
+  });
+  it('rejects paths with traversal, drive prefixes or backslashes', () => {
+    for (const dangerous of [
+      '/etc/passwd',
+      '../outside',
+      './v11/../../secret',
+      'C:/windows',
+      './v11\\file',
+    ]) {
+      assert.throws(
+        () => verifyStoreArchiveListing(listing([...safe.slice(0, -1), dangerous]), detail()),
+        /Unsafe/,
+      );
+    }
+  });
+  it('rejects symlinks, file-count mismatches and truncated stores', () => {
+    assert.throws(
+      () =>
+        verifyStoreArchiveListing(
+          listing(),
+          detail([
+            ...regular.slice(0, -1),
+            'lrwxrwxrwx owner owner 1 Nov 20 00:00 escape -> /etc/passwd',
+          ]),
+        ),
+      /Unsafe/,
+    );
+    assert.throws(
+      () => verifyStoreArchiveListing(listing(), detail(regular.slice(1))),
+      /Unbounded/,
+    );
+    assert.throws(
+      () => verifyStoreArchiveListing(listing(safe.slice(0, 3)), detail(regular.slice(0, 3))),
+      /Unbounded/,
+    );
   });
 });
 

@@ -33,7 +33,7 @@ git -C /tmp/pinned-git -c credential.helper= fetch --quiet --depth=1 --no-tags \
 test "$(git -C /tmp/pinned-git rev-parse FETCH_HEAD)" = "$commit"
 test "$(git -C /tmp/pinned-git rev-parse "$commit^{tree}")" = "$tree"
 
-mkdir -p /bundle/source /bundle/manifest /bundle/store /bundle/engine /tmp/project
+mkdir -p /bundle/source /bundle/manifest /bundle/engine /tmp/project /tmp/store
 git -C /tmp/pinned-git ls-tree -r --long -z "$commit" > /bundle/manifest/tracked-files.bin
 test "$(sha256sum /bundle/manifest/tracked-files.bin | cut -d' ' -f1)" = "$manifest_sha"
 git -C /tmp/pinned-git archive --format=tar "$commit" -o /tmp/tracked-source.tar
@@ -71,7 +71,7 @@ YAML
 (
   cd /tmp/project
   pnpm --filter @gym/api install --frozen-lockfile --ignore-scripts \
-    --trust-lockfile --store-dir /bundle/store
+    --trust-lockfile --store-dir /tmp/store
 )
 for file in \
  '@img/sharp-linuxmusl-x64/lib/sharp-linuxmusl-x64-0.35.5.node' \
@@ -82,7 +82,7 @@ done
 
 # pnpm 12 may link store/v11/projects back to its temporary checkout.
 # Delete only known 32-digit index symlinks with exact pinned destinations.
-projects=/bundle/store/v11/projects
+projects=/tmp/store/v11/projects
 if [ -d "$projects" ]; then
   for entry in "$projects"/*; do
     if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then continue; fi
@@ -95,9 +95,9 @@ if [ -d "$projects" ]; then
     esac
   done
 fi
-test -z "$(find /bundle/store -type l -print -quit)"
-files="$(find /bundle/store -type f | wc -l)"
-bytes="$(du -sb /bundle/store | cut -f1)"
+test -z "$(find /tmp/store -type l -print -quit)"
+files="$(find /tmp/store -type f | wc -l)"
+bytes="$(du -sb /tmp/store | cut -f1)"
 test "$files" -ge 50
 test "$files" -lt 90000
 test "$bytes" -lt 1992294400
@@ -126,6 +126,11 @@ test "$(sha256sum /bundle/engine/schema-engine | cut -d' ' -f1)" = \
  'c583d08ce5150fe39ff1d4a981c790e3eee8e1fbb432b80dba7606d74c1e56cf'
 
 # World-readable only for nonroot RO mounts. No live source is changed.
-chmod -R a+rX /bundle/source /bundle/manifest /bundle/store /bundle/engine
+chmod -R a+rX /bundle/source /bundle/manifest /bundle/engine
+chmod -R a+rX /tmp/store
+# One transport file across Docker Desktop's Windows bind: pnpm operations
+# stay on fast private Linux tmpfs, and the host extracts after validation.
+tar -czf /bundle/pnpm-store.tar.gz -C /tmp/store .
+test "$(stat -c%s /bundle/pnpm-store.tar.gz)" -ge 1000
 chmod 555 /bundle/engine/schema-engine
 printf '%s\n' 'PINNED_LOCAL_API_BUNDLE_STAGED_V1'
