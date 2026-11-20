@@ -15,6 +15,8 @@ import { WorkerController } from './worker/worker.controller.js';
 import { WorkerService } from './worker/worker.service.js';
 import { WorktreePlanService } from './worktree/worktree-plan.service.js';
 import { WorktreePlanController } from './worktree/worktree-plan.controller.js';
+import { WorktreeGitService } from './worktree/worktree-git.service.js';
+import { WorktreeAuthorizationService } from './worktree/worktree-authorization.service.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -36,6 +38,8 @@ import { WorktreePlanController } from './worktree/worktree-plan.controller.js';
     BoundaryService,
     WorkerService,
     WorktreePlanService,
+    WorktreeGitService,
+    WorktreeAuthorizationService,
   ],
 })
 export class AppModule {}

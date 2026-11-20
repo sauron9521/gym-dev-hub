@@ -1,9 +1,23 @@
-export type WorktreePlanState = 'pending' | 'acknowledged' | 'revoked' | 'expired';
-export type WorktreeAuditEvent = 'created' | 'acknowledged' | 'revoked';
+export type WorktreePlanState =
+  'pending' | 'acknowledged' | 'revoked' | 'expired' | 'creating' | 'created' | 'failed';
+export type WorktreeAuditEvent =
+  | 'created'
+  | 'acknowledged'
+  | 'revoked'
+  | 'creation-started'
+  | 'worktree-created'
+  | 'creation-failed';
 
 export interface WorktreeAuditEntry {
   event: WorktreeAuditEvent;
   timestamp: string;
+}
+
+export interface WorktreeCreationGrant {
+  grantToken: string;
+  expiresAt: string;
+  baseHeadSha: string;
+  purpose: 'CREATE_METADATA_ONLY';
 }
 
 export interface WorktreePlan {
@@ -18,6 +32,7 @@ export interface WorktreePlan {
   createdAt: string;
   expiresAt: string | null;
   history: WorktreeAuditEntry[];
+  baseHeadSha?: string;
   executionEnabled: false;
-  worktreeCreated: false;
+  worktreeCreated: boolean;
 }

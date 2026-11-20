@@ -14,8 +14,8 @@ describe('WorktreePlanPanel', () => {
     expect(markup).toContain('План окремої робочої області');
     expect(markup).toContain('Створити план');
     expect(markup).toContain('Погодити план');
-    expect(markup).toContain('Git-гілки й папки не змінюються');
-    expect(markup).toContain('Для реального створення worktree');
+    expect(markup).toContain('не завантажує файли проєкту');
+    expect(markup).toContain('одноразовий дозвіл');
   });
 
   it('disables creation for a completed session', () => {

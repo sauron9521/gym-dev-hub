@@ -1788,3 +1788,45 @@ strong {
     gap: 3px;
   }
 }
+
+/* One-time operator authorization; never persist secrets in browser storage. */
+.ws-worktree-authorization {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px;
+  margin: 18px 0;
+  border: 1px solid #4e5e7d;
+  border-radius: 10px;
+  background: #1b2c42;
+}
+.ws-worktree-authorization label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d4e4fa;
+}
+.ws-worktree-authorization input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  color: #edf3ff;
+  border-radius: 7px;
+  border: 1px solid #455a79;
+  background: #0e1d2e;
+}
+.ws-worktree-grant {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #3d765c;
+  border-radius: 6px;
+}
+.ws-worktree-grant small {
+  font-size: 11px;
+  color: #b9dec9;
+  line-height: 1.6;
+}
+.ws-worktree-grant code {
+  overflow-wrap: anywhere;
+}
