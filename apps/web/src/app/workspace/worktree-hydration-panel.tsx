@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { WorktreeHydrationGrant, WorktreePlan } from '@gym-dev-hub/contracts';
+import { WorktreeIntegrityPanel } from './worktree-integrity-panel';
 
 interface Props {
   sessionId: string;
@@ -144,6 +145,9 @@ export function WorktreeHydrationPanel({ sessionId, plan, completed, onRefresh }
             </div>
           )}
         </>
+      )}
+      {plan.hydrationState === 'completed' && (
+        <WorktreeIntegrityPanel key={plan.id} sessionId={sessionId} planId={plan.id} />
       )}
       {error && (
         <p className="ws-chat-error" role="alert">
