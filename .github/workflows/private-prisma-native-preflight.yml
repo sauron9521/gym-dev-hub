@@ -133,22 +133,11 @@ jobs:
           cp "$original" "$config"
           trap - EXIT
 
-          # CI diagnostics for pinned optional package layout (no bytes dumped).
-          for dir in \
-            '.audit/gym-platform/node_modules/@img/sharp-linuxmusl-x64' \
-            '.audit/gym-platform/node_modules/@img/sharp-libvips-linuxmusl-x64' \
-            '.audit/gym-platform/apps/api/node_modules/@img/sharp-linuxmusl-x64' \
-            '.audit/gym-platform/apps/api/node_modules/@img/sharp-libvips-linuxmusl-x64'; do
-            if [ -d "$dir" ]; then
-              echo "MUSL_LAYOUT=$dir"
-              find "$dir" -maxdepth 3 -type f -printf '%P\n' | head -n 18
-            fi
-          done
           # The trusted host must physically have both matching optional packages;
           # an unchanged lock alone does not show that their bytes were fetched.
           for artifact in \
-            '@img/sharp-linuxmusl-x64/lib/sharp-linuxmusl-x64.node' \
-            '@img/sharp-libvips-linuxmusl-x64/lib/libvips-cpp.so.42'; do
+            '@img/sharp-linuxmusl-x64/lib/sharp-linuxmusl-x64-0.35.5.node' \
+            '@img/sharp-libvips-linuxmusl-x64/lib/libvips-cpp.so.8.18.7'; do
             test -f ".audit/gym-platform/node_modules/$artifact" || \
               test -f ".audit/gym-platform/apps/api/node_modules/$artifact"
           done
