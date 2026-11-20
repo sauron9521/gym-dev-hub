@@ -14,6 +14,8 @@ import type {
 import { WorktreeMountService } from './worktree-mount.service.js';
 import { WorktreeCodeReadService } from './worktree-code-read.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
+import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
+import type { TaskRunnerPreview } from '@gym-dev-hub/contracts';
 import type { WorktreeToolGrant, WorktreeToolResult } from '@gym-dev-hub/contracts';
 import type { WorktreeCodeReadGrant, WorktreeCodeReadResult } from '@gym-dev-hub/contracts';
 
@@ -28,6 +30,7 @@ export class WorktreePlanController {
     private readonly mount: WorktreeMountService,
     private readonly codeRead: WorktreeCodeReadService,
     private readonly tools: WorktreeToolService,
+    private readonly taskRunner: TaskRunnerPolicyService,
   ) {}
 
   @Get()
@@ -138,6 +141,15 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreeToolResult> {
     return this.tools.execute(sessionId, planId, body);
+  }
+
+  @Post(':planId/task-preview')
+  taskPreview(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<TaskRunnerPreview> {
+    return this.taskRunner.preview(sessionId, planId, body);
   }
 
   @Post(':planId/hydration-authorize')
