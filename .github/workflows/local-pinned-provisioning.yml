@@ -15,6 +15,7 @@ on:
     paths:
       - 'packages/local-provisioner/**'
       - 'scripts/provision-pinned-api-local*'
+      - 'scripts/pinned-provision-recovery*'
       - 'packages/runner/Dockerfile'
       - 'packages/runner/api-typecheck-local.mjs'
       - '.github/workflows/local-pinned-provisioning.yml'
