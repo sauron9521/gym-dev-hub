@@ -1,0 +1,8 @@
+{
+  "name": "@devhub/offline-lib",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install": "node -e \"require('node:fs').writeFileSync('/workspace/local-script-executed', 'bad')\""
+  }
+}
