@@ -73,7 +73,7 @@ export function inspectTreeListing(listing: string): TreeSummary {
           part.endsWith('.') ||
           part.endsWith(' ') ||
           FORBIDDEN.test(part) ||
-      [...part].some((character) => character.charCodeAt(0) < 32) ||
+          [...part].some((character) => character.charCodeAt(0) < 32) ||
           WINDOWS_DEVICE.test(part),
       )
     ) {
