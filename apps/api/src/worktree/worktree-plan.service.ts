@@ -27,6 +27,9 @@ const auditSchema = z.strictObject({
     'hydration-started',
     'hydration-completed',
     'hydration-failed',
+    'mount-probe-started',
+    'mount-probe-verified',
+    'mount-probe-failed',
   ]),
   timestamp: z.iso.datetime(),
 });
