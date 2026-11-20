@@ -65,3 +65,10 @@ The CI-only `prisma-native-preflight.mjs` invokes the already reviewed, **script
 ## Static musl native binary inventory (PR #34)
 
 The separate CI-only `native-compatibility-preflight.mjs` rehydrates the verified API dependency cache offline and inspects **only ELF file headers**, without loading Prisma engines, `bcrypt`, `sharp` or libvips. It records whether matching Alpine/musl x86_64 candidates are absent, and never claims runtime readiness from a matching header. The Hub API, operator grants and regular runner remain non-executing. See `docs/native-binary-static-audit.md` for negative tests and the remaining dynamic-link/runtime gate.
+
+## Exact Alpine-musl optional dependency provisioning (PR #35)
+
+The trusted GitHub Actions stage validates independently reviewed lockfile SHA-512 records for sharp 0.35.5 and libvips 1.3.4 musl x64 optional packages, then temporarily configures pnpm to fetch both linux-x64 (glibc) and linux-x64-musl packages with scripts disabled. The original pinned workspace config is restored before source cleanliness checks. The isolated Docker static inventory now **fails if either musl binary is missing**.
+
+This still never loads or executes native packages and does not expose API_TYPECHECK or arbitrary commands. Native runtime compatibility remains gated behind an independent, narrowly scoped follow-up.
+
