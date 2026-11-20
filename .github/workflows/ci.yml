@@ -26,6 +26,22 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      # Temporary PR28 exact formatter capture; removed from final diff.
+      - name: Temporary PR28 Prettier snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            docs/full-source-snapshot-audit.md
+            packages/runner/full-source-audit.mjs
+          )
+          pnpm exec prettier --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "DHFMTSTART:$file"
+            base64 -w0 "$file"
+            echo
+            echo "DHFMTEND:$file"
+          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint
