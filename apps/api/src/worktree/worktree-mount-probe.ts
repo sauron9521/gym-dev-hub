@@ -108,6 +108,8 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
     });
     child = running;
     running.stderr.resume(); // Docker stderr may expose private host paths.
+    running.stdin.on('error', () => fail(new Error('Docker worker stdin unavailable')));
+    running.stdout.on('error', () => fail(new Error('Docker worker stdout unavailable')));
     running.stdout.setEncoding('utf8');
     running.stdout.on('data', (part: string) => {
       buffer += part;
@@ -175,6 +177,23 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
         segments[3] !== 'false' || segments[4] !== 'true' ||
         segments[5] !== 'none') {
       throw new Error('Unsafe Docker container configuration');
+    }
+    const constraints = await callDocker(
+      ['inspect', '--format',
+        '{{json .HostConfig.CapDrop}}|{{json .HostConfig.SecurityOpt}}|{{.HostConfig.PidsLimit}}|{{.HostConfig.Memory}}|{{.HostConfig.NanoCpus}}',
+        name], 8_000,
+    );
+    const flags = constraints.split('|');
+    const capabilities = JSON.parse(flags[0] ?? 'null') as unknown;
+    const security = JSON.parse(flags[1] ?? 'null') as unknown;
+    if (flags.length !== 5 ||
+        !Array.isArray(capabilities) || capabilities.length !== 1 ||
+        String(capabilities[0]).toUpperCase() !== 'ALL' ||
+        !Array.isArray(security) ||
+        !security.some((entry) => String(entry).startsWith('no-new-privileges')) ||
+        flags[2] !== '32' || flags[3] !== '134217728' ||
+        flags[4] !== '500000000') {
+      throw new Error('Docker capability or resource boundaries changed');
     }
     await exchange('PING/1', 'pong');
     await exchange('SHUTDOWN/1', 'stopped');
