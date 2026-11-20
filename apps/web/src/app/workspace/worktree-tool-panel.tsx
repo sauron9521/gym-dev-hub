@@ -57,7 +57,9 @@ export function WorktreeToolPanel({ sessionId, report, fingerprint }: Props) {
         cache: 'no-store',
       });
       if (!response.ok) {
-        throw new Error('Інструмент відхилено. Перевір Docker, pinned Git snapshot і очищення staging.');
+        throw new Error(
+          'Інструмент відхилено. Перевір Docker, pinned Git snapshot і очищення staging.',
+        );
       }
       setResult((await response.json()) as WorktreeToolResult);
     } catch (cause) {

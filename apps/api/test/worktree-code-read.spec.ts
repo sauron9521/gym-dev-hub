@@ -82,7 +82,14 @@ describe('explicit scoped code-reading authorization', () => {
     };
     service = new WorktreeCodeReadService(plans as never, integrity as never, boundary as never);
     vi.mocked(runMountedWorkerProbe).mockResolvedValue('export const ready = true;\n');
-    vi.mocked(withPinnedFileStage).mockImplementation(async (_plan, _path, action) => action({ sourcePath: join(root, 'single-use-stage'), fileName: 'main.ts', bytes: Buffer.from('export const ready = true;\n'), sha256: 'a'.repeat(64) }));
+    vi.mocked(withPinnedFileStage).mockImplementation(async (_plan, _path, action) =>
+      action({
+        sourcePath: join(root, 'single-use-stage'),
+        fileName: 'main.ts',
+        bytes: Buffer.from('export const ready = true;\n'),
+        sha256: 'a'.repeat(64),
+      }),
+    );
   });
 
   afterEach(async () => {

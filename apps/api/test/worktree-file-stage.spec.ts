@@ -22,7 +22,18 @@ describe('single-use pinned Git blob staging for non-root Docker', () => {
       execFileSync('git', args, { cwd: root, encoding: 'utf8', timeout: 12_000 }).trim();
     git('init', '--quiet');
     git('add', '--', 'src/sample.ts');
-    git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'fixture');
+    git(
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      'fixture',
+    );
     const commit = git('rev-parse', 'HEAD');
     plan = {
       id: '00000000-0000-4000-8000-000000000123',
@@ -57,7 +68,9 @@ describe('single-use pinned Git blob staging for non-root Docker', () => {
       expect(dirname(stage.sourcePath)).toBe(dirname(root));
       expect(await readdir(stage.sourcePath)).toEqual(['sample.ts']);
       expect(stage.bytes.toString('utf8')).toBe('export const pinned = 1;\n');
-      expect(await readFile(join(stage.sourcePath, stage.fileName), 'utf8')).toBe('export const pinned = 1;\n');
+      expect(await readFile(join(stage.sourcePath, stage.fileName), 'utf8')).toBe(
+        'export const pinned = 1;\n',
+      );
       expect(stage.sha256).toBe(createHash('sha256').update(stage.bytes).digest('hex'));
       const stageDirStat = await lstat(stage.sourcePath);
       const stagedFileStat = await lstat(join(stage.sourcePath, stage.fileName));
@@ -87,13 +100,17 @@ describe('single-use pinned Git blob staging for non-root Docker', () => {
 
   it('stages the immutable pinned blob even if the original is concurrently modified', async () => {
     await writeFile(file, 'export const pinned = 2;\n');
-    const data = await withPinnedFileStage(plan, 'src/sample.ts', async (stage) => stage.bytes.toString('utf8'));
+    const data = await withPinnedFileStage(plan, 'src/sample.ts', async (stage) =>
+      stage.bytes.toString('utf8'),
+    );
     expect(data).toBe('export const pinned = 1;\n');
   });
 
   it('rejects missing opt-in, traversal and oversized sources', async () => {
     delete process.env.DEV_HUB_ENABLE_PINNED_FILE_STAGE;
-    await expect(withPinnedFileStage(plan, 'src/sample.ts', async () => 1)).rejects.toThrow('not enabled');
+    await expect(withPinnedFileStage(plan, 'src/sample.ts', async () => 1)).rejects.toThrow(
+      'not enabled',
+    );
     process.env.DEV_HUB_ENABLE_PINNED_FILE_STAGE = 'true';
     await expect(withPinnedFileStage(plan, '../sample.ts', async () => 1)).rejects.toThrow();
     await expect(withPinnedFileStage(plan, '.git/config.json', async () => 1)).rejects.toThrow();

@@ -11,7 +11,16 @@ const GIT_SHA = /^[0-9a-f]{40,64}$/;
 
 function isolatedGitEnvironment(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
-  for (const key of ['PATH', 'Path', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'HOME', 'USERPROFILE']) {
+  for (const key of [
+    'PATH',
+    'Path',
+    'SystemRoot',
+    'WINDIR',
+    'TEMP',
+    'TMP',
+    'HOME',
+    'USERPROFILE',
+  ]) {
     if (process.env[key]) env[key] = process.env[key];
   }
   env.GIT_CONFIG_NOSYSTEM = '1';
