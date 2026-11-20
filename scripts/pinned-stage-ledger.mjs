@@ -4,8 +4,8 @@
  * there. No agent/API endpoint can create or clean these records.
  */
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { join, basename } from 'node:path';
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { join, basename, dirname, resolve } from 'node:path';
 
 const PROTOCOL = 1;
 const SCOPE = 'pinned-api-v1';
@@ -18,9 +18,17 @@ const MAX_FILES = 90000;
 const MAX_BYTES = 1900 * 1024 * 1024;
 
 async function folder(path) {
-  const s = await lstat(path);
-  if (!s.isDirectory() || s.isSymbolicLink()) throw new Error('Unsafe staging ownership folder');
-  return s;
+  let cursor = resolve(path);
+  let result;
+  while (true) {
+    const s = await lstat(cursor);
+    if (!s.isDirectory() || s.isSymbolicLink()) throw new Error('Unsafe staging ownership folder');
+    if (cursor === resolve(path)) result = s;
+    const parent = dirname(cursor);
+    if (parent === cursor) break;
+    cursor = parent;
+  }
+  return result;
 }
 
 function identity(stat) {
@@ -172,18 +180,18 @@ export async function stageRecoveryReport(root, checkout, now = Date.now()) {
     }
     const owned = isOwned(record, name, now, checkout);
     const live = isLivePid(record.pid);
-    let stage;
     let matched = false;
+    let missing = false;
     try {
-      stage = await folder(join(root, name));
-      matched = sameIdentity(record, stage);
-    } catch {
-      matched = false;
+      matched = sameIdentity(record, await folder(join(root, name)));
+    } catch (error) {
+      missing = error?.code === 'ENOENT';
     }
     entries.push({
-      name, removable: owned && !live && matched,
+      name, removable: owned && !live && (matched || missing),
+      recordOnly: missing,
       reason: !owned ? 'unverified-or-recent' : live ? 'process-still-alive' :
-        !matched ? 'missing-or-replaced-stage' : 'verified-stale',
+        matched ? 'verified-stale' : missing ? 'verified-missing-stage' : 'replaced-or-unsafe-stage',
     });
   }
   return entries;
@@ -206,13 +214,25 @@ export async function pruneVerifiedStages(root, checkout, hasActiveContainers, n
     const path = join(root, candidate.name);
     const recordPath = join(root, JOURNAL, candidate.name + '.json');
     const record = (await readBoundedJson(recordPath)).value;
-    const current = await folder(path);
-    if (
-      !isOwned(record, candidate.name, Date.now(), checkout) ||
-      isLivePid(record.pid) ||
-      !sameIdentity(record, current)
-    ) {
+    if (!isOwned(record, candidate.name, Date.now(), checkout) || isLivePid(record.pid)) {
       skipped.push({ name: candidate.name, reason: 'changed-since-preview' });
+      continue;
+    }
+    if (candidate.recordOnly) {
+      try {
+        await lstat(path);
+        skipped.push({ name: candidate.name, reason: 'stage-reappeared' });
+        continue;
+      } catch (error) {
+        if (error?.code !== 'ENOENT') throw error;
+      }
+      await rm(recordPath);
+      removed.push(candidate.name);
+      continue;
+    }
+    const current = await folder(path);
+    if (!sameIdentity(record, current)) {
+      skipped.push({ name: candidate.name, reason: 'stage-replaced' });
       continue;
     }
     await noLinksOrSpecialFiles(path, { files: 0, dirs: 0, bytes: 0 });
