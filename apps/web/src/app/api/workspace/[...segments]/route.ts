@@ -71,6 +71,8 @@ function allowedPath(segments: string[], method: string): string | null {
       'mount-probe',
       'code-read-authorize',
       'code-read',
+      'tool-authorize',
+      'tool-execute',
     ].includes(segments[4] ?? '')
   ) {
     return `/workspace/sessions/${id}/worktree-plans/${segments[3]}/${segments[4]}`;
@@ -139,7 +141,9 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
       signal: isEventStream
         ? request.signal
         : AbortSignal.timeout(
-            path.endsWith('/mount-probe') || path.endsWith('/code-read')
+            path.endsWith('/mount-probe') ||
+            path.endsWith('/code-read') ||
+            path.endsWith('/tool-execute')
               ? 45_000
               : path.endsWith('/boundary/preflight')
                 ? 45_000
