@@ -7,4 +7,5 @@
 !offline-real-pair.mjs
 !offline-typescript-smoke.mjs
 !pinned-source-typecheck.mjs
+!full-source-audit.mjs
 !.dockerignore
