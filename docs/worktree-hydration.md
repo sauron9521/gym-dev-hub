@@ -51,4 +51,4 @@ All routes are restricted to their existing authenticated-by-operator-secret _ac
 
 The API test suite creates disposable Git repositories containing text, binary bytes, and an intentionally configured smudge filter; it verifies byte-for-byte copies without invoking the filter, unique grants, disabled-by-default configuration, secret mismatch, TTL, changed target, state transitions, failure recovery and no writes into the source checkout. Both GitHub Linux CI and a dedicated Windows runner check these tests. The user's Home-PC remains unavailable for a direct local integration run; hosted Windows CI must not be presented as a local device test.
 
-**Next:** post-hydration integrity and audit verification, safe scoped runner mounts and explicit permission gating, then Codex execution in the isolated worker. GitHub PR merging remains manual.
+PR #14 adds [read-only post-hydration blob integrity verification](worktree-integrity.md) and a **non-executing mount preview**. Actual mounts, permission gates and Codex execution remain independent future steps. GitHub PR merging remains manual.

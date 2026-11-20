@@ -50,6 +50,10 @@ The Workspace can run a [read-only Git worktree inspection](docs/worktree-inspec
 
 A created, inspected worktree can be populated from pinned **raw Git blobs** after a second, independent operator-secret approval. [Safe hydration setup, limits, and recovery](docs/worktree-hydration.md). Disabled by default; the process does not execute Git hooks, checkout filters, Codex, or arbitrary commands. Incomplete hydration never auto-cleans or retries.
 
+### Post-Hydration Integrity & Mount Preview (PR #14)
+
+The Workspace can now [verify every copied Git blob against the pinned commit](docs/worktree-integrity.md), detect unexpected files and preview a fixed read-only Docker mount policy. **No actual mounts, Docker actions or Codex permissions are enabled**; the report is diagnostic only.
+
 ### Codex Adapter (opt-in)
 
 The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. PR #6 adds a separate text-only [Codex Agent Chat](docs/agent-chat.md) using these threads, while keeping worktree and PR mutation disabled. See [Codex Adapter setup and security](docs/codex-adapter.md).

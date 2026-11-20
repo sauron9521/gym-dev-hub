@@ -11,6 +11,7 @@ import { WorktreeGitService } from '../src/worktree/worktree-git.service.js';
 import { WorktreeInspectionService } from '../src/worktree/worktree-inspection.service.js';
 import { WorktreeAuthorizationService } from '../src/worktree/worktree-authorization.service.js';
 import { WorktreeHydrationService } from '../src/worktree/worktree-hydration.service.js';
+import { WorktreeIntegrityService } from '../src/worktree/worktree-integrity.service.js';
 import type { WorktreePlan } from '@gym-dev-hub/contracts';
 
 const TEST_SECRET = 'fixture-operator-secret-0123456789-abcdefghijklmnopqrstuvwxyz';
@@ -210,5 +211,77 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
     expect(await lstat(join(plan.targetPath, 'binary.dat'))).toBeDefined();
     await expect(issueGrant()).rejects.toThrow('Worktree уже наповнений');
     expect((await readdir(plan.targetPath)).length).toBeGreaterThan(1);
+  });
+  async function completedHydration() {
+    const grant = await issueGrant();
+    return hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken });
+  }
+
+  it('verifies post-hydration Git hashes and returns an inert mount preflight', async () => {
+    const completed = await completedHydration();
+    const integrity = new WorktreeIntegrityService(plans, inspection);
+    const report = await integrity.verify(sessionId, completed.id);
+    expect(report).toMatchObject({
+      status: 'verified',
+      fileCount: 3,
+      mount: {
+        sourcePath: plan.targetPath,
+        targetPath: '/workspace',
+        readOnly: true,
+        networkEnabled: false,
+        mountEnabled: false,
+        executionEnabled: false,
+      },
+    });
+    expect(report.verifiedBytes).toBeGreaterThan(0);
+    expect(report.findings).toEqual([]);
+    expect(git('status', '--porcelain')).toBe('');
+  });
+
+  it('refuses mount-readiness before hydration completes', async () => {
+    const integrity = new WorktreeIntegrityService(plans, inspection);
+    const report = await integrity.verify(sessionId, plan.id);
+    expect(report.status).toBe('not-ready');
+    expect(report.mount.mountEnabled).toBe(false);
+    expect(report.findings.join(' ')).toContain('успішно завершене');
+  });
+
+  it('detects byte-level tampering and never overwrites a modified file', async () => {
+    await completedHydration();
+    const changed = join(plan.targetPath, 'src', 'hello.txt');
+    await writeFile(changed, 'Modified! blob content\n', 'utf8');
+    const integrity = new WorktreeIntegrityService(plans, inspection);
+    const report = await integrity.verify(sessionId, plan.id);
+    expect(report.status).toBe('mismatch');
+    expect(report.mount.mountEnabled).toBe(false);
+    expect(await readFile(changed, 'utf8')).toBe('Modified! blob content\n');
+  });
+
+  it('detects added files and extra directories without deleting data', async () => {
+    await completedHydration();
+    await mkdir(join(plan.targetPath, 'untracked'));
+    await writeFile(join(plan.targetPath, 'untracked', 'keep.txt'), 'do not delete');
+    const integrity = new WorktreeIntegrityService(plans, inspection);
+    const report = await integrity.verify(sessionId, plan.id);
+    expect(report.status).toBe('mismatch');
+    expect(await readFile(join(plan.targetPath, 'untracked', 'keep.txt'), 'utf8')).toBe(
+      'do not delete',
+    );
+  });
+
+  it('detects missing files and incorrect hydration progress metadata', async () => {
+    await completedHydration();
+    const integrity = new WorktreeIntegrityService(plans, inspection);
+    const missing = join(plan.targetPath, 'binary.dat');
+    await rm(missing);
+    expect((await integrity.verify(sessionId, plan.id)).status).toBe('mismatch');
+  });
+
+  it('never exposes another session plan through the integrity endpoint', async () => {
+    await completedHydration();
+    const integrity = new WorktreeIntegrityService(plans, inspection);
+    await expect(
+      integrity.verify('00000000-0000-4000-8000-000000000999', plan.id),
+    ).rejects.toThrow();
   });
 });
