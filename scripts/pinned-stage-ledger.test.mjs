@@ -2,9 +2,7 @@ import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile,
-} from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import {
   beginPinnedStage,
   finishPinnedStage,
