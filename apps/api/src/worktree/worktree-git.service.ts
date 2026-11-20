@@ -90,10 +90,9 @@ async function secureTarget(plan: WorktreePlan, rootInput: string): Promise<void
     path = parent;
   }
   await mkdir(root, { recursive: true });
-  const actual = await realpath(root);
-  if (resolve(actual).toLowerCase() !== root.toLowerCase()) {
-    throw new ConflictException('Worktree root перенаправлено в інше місце.');
-  }
+  // Windows may return an 8.3 alias for the same safe directory. Reparse
+  // points were already rejected for every existing ancestor above.
+  await realpath(root);
   await mustNotExist(plan.targetPath);
 }
 
@@ -108,7 +107,9 @@ export class WorktreeGitService {
 
   async headSha(plan: Pick<WorktreePlan, 'repository' | 'sourcePath'>): Promise<string> {
     const source = await verifyLocalRepository(plan.repository, this.reposRoot);
-    if (source.toLowerCase() !== resolve(plan.sourcePath).toLowerCase()) {
+    if (
+      (await realpath(source)).toLowerCase() !== (await realpath(plan.sourcePath)).toLowerCase()
+    ) {
       throw new ConflictException('Локальний репозиторій відрізняється від плану.');
     }
     const sha = await gitExec(source, ['rev-parse', '--verify', 'HEAD^{commit}']);

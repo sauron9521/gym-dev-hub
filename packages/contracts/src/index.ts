@@ -49,4 +49,6 @@ export type {
   WorktreeAuditEntry,
   WorktreePlan,
   WorktreeCreationGrant,
+  WorktreeInspection,
+  WorktreeInspectionState,
 } from './worktree.js';

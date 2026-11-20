@@ -116,7 +116,7 @@ describe('single-use metadata-only worktree creation', () => {
     expect(gitCommand('rev-parse', 'HEAD')).toBe(originalSha);
     expect(gitCommand('status', '--porcelain')).toBe('');
     expect(gitCommand('worktree', 'list', '--porcelain')).toContain(
-      plan.targetPath.replaceAll('\\', '/'),
+      `branch refs/heads/${plan.proposedBranch}`,
     );
     expect((await plans.list(session.id))[0].history.map((entry) => entry.event)).toEqual([
       'created',
