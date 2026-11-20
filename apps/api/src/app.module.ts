@@ -20,6 +20,7 @@ import { WorktreeAuthorizationService } from './worktree/worktree-authorization.
 import { WorktreeInspectionService } from './worktree/worktree-inspection.service.js';
 import { WorktreeHydrationService } from './worktree/worktree-hydration.service.js';
 import { WorktreeIntegrityService } from './worktree/worktree-integrity.service.js';
+import { WorktreeMountService } from './worktree/worktree-mount.service.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -46,6 +47,7 @@ import { WorktreeIntegrityService } from './worktree/worktree-integrity.service.
     WorktreeInspectionService,
     WorktreeHydrationService,
     WorktreeIntegrityService,
+    WorktreeMountService,
   ],
 })
 export class AppModule {}
