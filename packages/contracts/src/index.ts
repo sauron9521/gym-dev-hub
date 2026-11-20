@@ -43,3 +43,9 @@ export type {
 
 export type { ExecutionBoundaryStatus, BoundaryState } from './boundary.js';
 export type { WorkerState, IsolatedWorkerStatus } from './worker.js';
+export type {
+  WorktreePlanState,
+  WorktreeAuditEvent,
+  WorktreeAuditEntry,
+  WorktreePlan,
+} from './worktree.js';

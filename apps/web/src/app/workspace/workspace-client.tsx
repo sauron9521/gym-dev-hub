@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { CodexChatPanel } from './codex-chat-panel';
 import { BoundaryStatusPanel } from './boundary-status-panel';
 import { WorkerStatusPanel } from './worker-status-panel';
+import { WorktreePlanPanel } from './worktree-plan-panel';
 import { useEffect, useState, type FormEvent } from 'react';
 import type {
   AgentSession,
@@ -266,7 +267,7 @@ export function WorkspaceClient({ initial, initialError }: Props) {
         <div className="topbar-right">
           <span className="mode-dot" />
           <span>Локальні робочі сесії</span>
-          <span className="topbar-badge">Worker Foundation / PR #8</span>
+          <span className="topbar-badge">Worktree Plans / PR #9</span>
         </div>
       </header>
 
@@ -529,6 +530,13 @@ export function WorkspaceClient({ initial, initialError }: Props) {
                   Один PR · одна задача · ручний merge після review
                 </div>
               </section>
+
+              <WorktreePlanPanel
+                key={active.id}
+                sessionId={active.id}
+                repository={active.repository}
+                completed={active.status === 'completed'}
+              />
 
               <CodexChatPanel
                 sessionId={active.id}
