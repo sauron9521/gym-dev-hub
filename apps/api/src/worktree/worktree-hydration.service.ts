@@ -8,7 +8,7 @@ import {
 import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
 import { lstat, mkdir, open, realpath } from 'node:fs/promises';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import type { WorktreeHydrationGrant, WorktreePlan } from '@gym-dev-hub/contracts';
