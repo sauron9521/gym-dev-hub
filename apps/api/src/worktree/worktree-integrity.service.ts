@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
 import { open, lstat, readdir } from 'node:fs/promises';
@@ -109,11 +109,7 @@ export class WorktreeIntegrityService {
   async verify(sessionId: string, planId: string): Promise<WorktreeIntegrityReport> {
     const plans = await this.plans.list(sessionId);
     const plan = plans.find((item) => item.id === planId);
-    if (!plan) {
-      // Use the existing strict ID / ownership semantics, never leak other sessions.
-      await this.plans.getHydrationPlan(sessionId, planId);
-      throw new Error('Plan not found');
-    }
+    if (!plan) throw new NotFoundException('План worktree не знайдено.');
     return this.inspectPlan(plan);
   }
 
