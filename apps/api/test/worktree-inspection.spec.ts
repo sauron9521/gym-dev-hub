@@ -113,7 +113,7 @@ describe('read-only worktree recovery inspection (real Git fixture)', () => {
       plan.repository,
       process.env.DEV_HUB_REPOS_ROOT!,
     );
-    expect(resolvedRepository.toLowerCase()).toBe(source.toLowerCase());
+    expect(resolvedRepository.toLowerCase()).toBe((await realpath(source)).toLowerCase());
     const before = await readdir(target);
     const result = await inspector.inspect(plan);
     expect(result.state, result.findings.join(' | ')).toBe('ready-for-hydration');
