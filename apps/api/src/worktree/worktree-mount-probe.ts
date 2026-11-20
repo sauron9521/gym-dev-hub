@@ -59,6 +59,7 @@ export function equivalentMountSource(
   const wanted = normalized(win32.normalize(expected));
   let observed: string;
   if (/^[a-z]:[\\/]/i.test(actual)) {
+    if (actual.split(/[\\/]/).some((part) => part === '.' || part === '..')) return false;
     observed = normalized(win32.normalize(actual));
   } else {
     const mapped = /^\/(?:run\/desktop\/mnt\/host|host_mnt)\/([a-z])\/(.+)$/i.exec(actual);
@@ -209,7 +210,7 @@ export async function runMountedWorkerProbe(
         if (waiter.expected === 'file') {
           const encoded = reply.contentBase64;
           if (
-            !encoded ||
+            encoded === undefined ||
             !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)
           ) {
             fail(new Error('Invalid worker file encoding'));
