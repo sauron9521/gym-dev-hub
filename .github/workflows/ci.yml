@@ -26,6 +26,24 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      # Temporary PR26 exact Prettier capture; remove before review.
+      - name: Temporary PR26 formatter snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            docs/typescript-toolchain-smoke.md
+            packages/runner/fixtures/typescript-toolchain/tsconfig.json
+            packages/runner/fixtures/typescript-toolchain/tsconfig.reject.json
+            packages/runner/offline-typescript-smoke.mjs
+          )
+          pnpm exec prettier --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "DHFMTSTART:$file"
+            base64 -w0 "$file"
+            echo
+            echo "DHFMTEND:$file"
+          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint
