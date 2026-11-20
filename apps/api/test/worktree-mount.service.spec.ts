@@ -33,26 +33,43 @@ describe('ephemeral read-only mount approval', () => {
       targetPath: '/fixture/worktrees/' + PLAN,
       proposedBranch: 'devhub/task-' + PLAN.replaceAll('-', ''),
       fingerprint: 'sha256:' + 'b'.repeat(64),
-      state: 'created', createdAt: new Date().toISOString(),
-      expiresAt: null, history: [], executionEnabled: false,
-      worktreeCreated: true, hydrationState: 'completed', baseHeadSha: 'a'.repeat(40),
+      state: 'created',
+      createdAt: new Date().toISOString(),
+      expiresAt: null,
+      history: [],
+      executionEnabled: false,
+      worktreeCreated: true,
+      hydrationState: 'completed',
+      baseHeadSha: 'a'.repeat(40),
     };
     plans = {
       availableForMountProbe: vi.fn().mockResolvedValue(plan),
       recordMountProbe: vi.fn().mockResolvedValue(undefined),
     };
     const report: WorktreeIntegrityReport = {
-      sessionId: SESSION, planId: PLAN, checkedAt: new Date().toISOString(),
-      status: 'verified', fileCount: 4, verifiedBytes: 120, findings: [],
+      sessionId: SESSION,
+      planId: PLAN,
+      checkedAt: new Date().toISOString(),
+      status: 'verified',
+      fileCount: 4,
+      verifiedBytes: 120,
+      findings: [],
       mount: {
-        sourcePath: plan.targetPath, targetPath: '/workspace', readOnly: true,
-        networkEnabled: false, mountEnabled: false, executionEnabled: false,
+        sourcePath: plan.targetPath,
+        targetPath: '/workspace',
+        readOnly: true,
+        networkEnabled: false,
+        mountEnabled: false,
+        executionEnabled: false,
       },
     };
     integrity = { verify: vi.fn().mockResolvedValue(report) };
-    boundary = { status: vi.fn().mockReturnValue({
-      state: 'passed', checkedAt: new Date().toISOString(),
-    }) };
+    boundary = {
+      status: vi.fn().mockReturnValue({
+        state: 'passed',
+        checkedAt: new Date().toISOString(),
+      }),
+    };
     service = new WorktreeMountService(plans as never, integrity as never, boundary as never);
     vi.mocked(runMountedWorkerProbe).mockResolvedValue(undefined);
   });
@@ -71,7 +88,7 @@ describe('ephemeral read-only mount approval', () => {
       purpose: 'EPHEMERAL_READ_ONLY_WORKER_MOUNT',
       baseHeadSha: plan.baseHeadSha,
     });
-    const [a,b] = await Promise.allSettled([
+    const [a, b] = await Promise.allSettled([
       service.probe(SESSION, PLAN, { grantToken: grant.grantToken }),
       service.probe(SESSION, PLAN, { grantToken: grant.grantToken }),
     ]);
@@ -79,15 +96,21 @@ describe('ephemeral read-only mount approval', () => {
     expect(b.status).toBe('rejected');
     if (a.status === 'fulfilled') {
       expect(a.value).toMatchObject({
-        state: 'verified', sourcePath: plan.targetPath, targetPath: '/workspace',
-        readOnly: true, networkEnabled: false, containerRemoved: true,
+        state: 'verified',
+        sourcePath: plan.targetPath,
+        targetPath: '/workspace',
+        readOnly: true,
+        networkEnabled: false,
+        containerRemoved: true,
         agentExecutionEnabled: false,
       });
     }
     expect(runMountedWorkerProbe).toHaveBeenCalledOnce();
     expect(runMountedWorkerProbe).toHaveBeenCalledWith(plan.targetPath);
-    expect(plans.recordMountProbe.mock.calls.map(([,,stage]) => stage))
-      .toEqual(['started', 'verified']);
+    expect(plans.recordMountProbe.mock.calls.map(([, , stage]) => stage)).toEqual([
+      'started',
+      'verified',
+    ]);
   });
 
   it('fails closed without explicit opt-in or strong secret', async () => {
@@ -100,11 +123,15 @@ describe('ephemeral read-only mount approval', () => {
   });
 
   it('denies the wrong operator secret and stale boundary before issuing a grant', async () => {
-    await expect(service.authorize(SESSION, PLAN, {
-      fingerprint: plan.fingerprint, operatorSecret: 'wrong-long-operator-secret-12345678901234567890',
-    })).rejects.toThrow('Невірний секрет');
+    await expect(
+      service.authorize(SESSION, PLAN, {
+        fingerprint: plan.fingerprint,
+        operatorSecret: 'wrong-long-operator-secret-12345678901234567890',
+      }),
+    ).rejects.toThrow('Невірний секрет');
     boundary.status.mockReturnValue({
-      state: 'passed', checkedAt: new Date(Date.now() - 6 * 60_000).toISOString(),
+      state: 'passed',
+      checkedAt: new Date(Date.now() - 6 * 60_000).toISOString(),
     });
     await expect(service.authorize(SESSION, PLAN, request())).rejects.toThrow('Docker Safety');
     expect(integrity.verify).not.toHaveBeenCalled();
@@ -113,50 +140,66 @@ describe('ephemeral read-only mount approval', () => {
   it('rejects a changed manifest or integrity report', async () => {
     const grant = await service.authorize(SESSION, PLAN, request());
     integrity.verify.mockResolvedValueOnce({
-      status: 'mismatch', mount: { sourcePath: plan.targetPath },
+      status: 'mismatch',
+      mount: { sourcePath: plan.targetPath },
     });
-    await expect(service.probe(SESSION, PLAN, { grantToken: grant.grantToken }))
-      .rejects.toThrow('Docker mount probe');
+    await expect(service.probe(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow(
+      'Docker mount probe',
+    );
     expect(runMountedWorkerProbe).not.toHaveBeenCalled();
     expect(plans.recordMountProbe).not.toHaveBeenCalled();
   });
 
   it('consumes expired and cross-session grants even when probe does not start', async () => {
     const first = await service.authorize(SESSION, PLAN, request());
-    await expect(service.probe('00000000-0000-4000-8000-000000000999', PLAN, {
-      grantToken: first.grantToken,
-    })).rejects.toThrow('Дозвіл прострочено');
-    await expect(service.probe(SESSION, PLAN, {
-      grantToken: first.grantToken,
-    })).rejects.toThrow('Дозвіл прострочено');
+    await expect(
+      service.probe('00000000-0000-4000-8000-000000000999', PLAN, {
+        grantToken: first.grantToken,
+      }),
+    ).rejects.toThrow('Дозвіл прострочено');
+    await expect(
+      service.probe(SESSION, PLAN, {
+        grantToken: first.grantToken,
+      }),
+    ).rejects.toThrow('Дозвіл прострочено');
     const second = await service.authorize(SESSION, PLAN, request());
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now + 61_000);
-    await expect(service.probe(SESSION, PLAN, {
-      grantToken: second.grantToken,
-    })).rejects.toThrow('Дозвіл прострочено');
+    await expect(
+      service.probe(SESSION, PLAN, {
+        grantToken: second.grantToken,
+      }),
+    ).rejects.toThrow('Дозвіл прострочено');
     expect(runMountedWorkerProbe).not.toHaveBeenCalled();
   });
 
   it('records failure and never reports success when Docker rejects the mount', async () => {
     const grant = await service.authorize(SESSION, PLAN, request());
     vi.mocked(runMountedWorkerProbe).mockRejectedValueOnce(new Error('unsafe mount'));
-    await expect(service.probe(SESSION, PLAN, {
-      grantToken: grant.grantToken,
-    })).rejects.toThrow('Docker mount probe');
-    expect(plans.recordMountProbe.mock.calls.map(([,,stage]) => stage))
-      .toEqual(['started', 'failed']);
+    await expect(
+      service.probe(SESSION, PLAN, {
+        grantToken: grant.grantToken,
+      }),
+    ).rejects.toThrow('Docker mount probe');
+    expect(plans.recordMountProbe.mock.calls.map(([, , stage]) => stage)).toEqual([
+      'started',
+      'failed',
+    ]);
   });
 
   it('revokes previously issued tokens after the feature is disabled', async () => {
     const grant = await service.authorize(SESSION, PLAN, request());
     process.env.DEV_HUB_ENABLE_WORKTREE_MOUNT = 'false';
-    await expect(service.probe(SESSION, PLAN, {
-      grantToken: grant.grantToken,
-    })).rejects.toThrow('вимкнено');
+    await expect(
+      service.probe(SESSION, PLAN, {
+        grantToken: grant.grantToken,
+      }),
+    ).rejects.toThrow('вимкнено');
     process.env.DEV_HUB_ENABLE_WORKTREE_MOUNT = 'true';
-    await expect(service.probe(SESSION, PLAN, {
-      grantToken: grant.grantToken,
-    })).rejects.toThrow('Дозвіл прострочено');
+    await expect(
+      service.probe(SESSION, PLAN, {
+        grantToken: grant.grantToken,
+      }),
+    ).rejects.toThrow('Дозвіл прострочено');
   });
 });
