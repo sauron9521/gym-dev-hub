@@ -1,0 +1,32 @@
+name: Worktree Inspection (Windows)
+
+on:
+  pull_request:
+    paths:
+      - 'apps/api/src/worktree/**'
+      - 'apps/api/test/worktree-*.spec.ts'
+      - '.github/workflows/worktree-inspection-windows.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worktree-inspection-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inspect-fixtures:
+    name: Worktree Git fixtures / Windows
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Check Git worktree safety and parser
+        run: pnpm --filter @gym-dev-hub/api exec vitest run test/worktree-creation.spec.ts test/worktree-inspection.spec.ts
