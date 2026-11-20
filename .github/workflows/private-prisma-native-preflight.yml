@@ -88,11 +88,60 @@ jobs:
           store="$(mktemp -d)"
           echo "GYM_API_PNPM_STORE=$store" >> "$GITHUB_ENV"
           test "$(pnpm --version)" = '12.18.0'
+
+          # Only these two musl optional artifacts may extend the reviewed API closure.
+          # Their exact SHA-512 values are taken from the already Git-pinned lockfile.
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const lock = readFileSync('.audit/gym-platform/pnpm-lock.yaml', 'utf8');
+          const pins = new Map([
+            [
+              '@img/sharp-linuxmusl-x64@0.35.5',
+              'sha512-4KOphqB035HrVdqLZfCgMzzERrQkkzOwRhl4OAkRO1YCldbaFjySXMaK534Mo0V+LndnlJk+sbUyLeU0ULyD1A==',
+            ],
+            [
+              '@img/sharp-libvips-linuxmusl-x64@1.3.4',
+              'sha512-6zXKeE/p39I1AmA3cJG35eyBGNqNddLnUXjhwBnsGjFPWqf5VKkDBEqaEkPDoTEtkxwi2vv8Tcr2mDyP4So7Fg==',
+            ],
+          ]);
+          for (const [name, integrity] of pins) {
+            if (!lock.includes("  '" + name + "':\n    resolution: {integrity: " + integrity + "}")) {
+              throw new Error('Musl artifact is absent or unpinned: ' + name);
+            }
+          }
+          console.log('Two Alpine-musl optional artifacts have reviewed pinned SRI.');
+          NODE
+
+          # pnpm 12.18.0 supports cross-platform optional dependencies through
+          # supportedArchitectures. This override is temporary in credential-free
+          # trusted CI only; the Gym Platform source/lock are restored and checked.
+          config='.audit/gym-platform/pnpm-workspace.yaml'
+          original="$RUNNER_TEMP/pinned-pnpm-workspace.yaml"
+          cp "$config" "$original"
+          trap 'cp "$original" "$config"' EXIT
+          cat >> "$config" <<'YAML'
+
+          supportedArchitectures:
+            - linux-x64
+            - linux-x64-musl
+          YAML
           (
             cd .audit/gym-platform
             pnpm --filter @gym/api install \
               --frozen-lockfile --ignore-scripts --trust-lockfile --store-dir "$store"
           )
+          cp "$original" "$config"
+          trap - EXIT
+
+          # The trusted host must physically have both matching optional packages;
+          # an unchanged lock alone does not show that their bytes were fetched.
+          for artifact in \
+            '@img/sharp-linuxmusl-x64/lib/sharp-linuxmusl-x64-0.35.5.node' \
+            '@img/sharp-libvips-linuxmusl-x64/lib/libvips-cpp.so.8.18.7'; do
+            test -f ".audit/gym-platform/node_modules/$artifact" || \
+              test -f ".audit/gym-platform/apps/api/node_modules/$artifact"
+          done
+          echo 'Musl optional native packages staged with pinned SRI, scripts disabled.'
           test -z "$(git -C .audit/gym-platform status --porcelain --untracked-files=normal)"
           # pnpm 12 writes an index backlink to the trusted CI checkout.
           # Only known project-index symlinks may be deleted. Reject any others.
@@ -258,8 +307,8 @@ jobs:
             and .schemaEngineSha256 == "c583d08ce5150fe39ff1d4a981c790e3eee8e1fbb432b80dba7606d74c1e56cf"
             and .prismaSchemaEngine.status == "elf64-x86_64-header"
             and ([.bcrypt.status, .sharp.status, .libvips.status] |
-              all(. == "missing" or . == "elf64-x86_64-header"))
-            and (.allExpectedHeadersPresent | type == "boolean")
+              all(. == "elf64-x86_64-header"))
+            and .allExpectedHeadersPresent == true
             and .runtimeCompatibilityCertified == false
             and .nativeModulesLoaded == false and .targetCodeExecuted == false
             and .dependencyLifecycleScriptsExecuted == false
@@ -268,7 +317,7 @@ jobs:
             and .networkEnabled == false
           '
           printf '%s\n' "$reply" | jq -c '{bcrypt: .bcrypt.status, sharp: .sharp.status, libvips: .libvips.status, prisma: .prismaSchemaEngine.status, allExpectedHeadersPresent, runtimeCompatibilityCertified}'
-          echo 'Static native inventory only. Missing musl packages block readiness; no runtime execution certified.'
+          echo 'Static native musl artifact headers present; runtime loading still not certified.'
 
       - name: Reject tampered Prisma schema and incomplete pnpm cache
         shell: bash

@@ -34,8 +34,10 @@
 32. **Real API offline dependency cache proof**: trusted CI installs pinned API dependencies with scripts disabled into a disposable store, then checks the same graph installs in isolated networkless Docker with immutable read-only source and private tmpfs (PR #32).
 33. **Isolated Prisma Client generation proof**: use the full pinned offline API dependency cache to run one reviewed fixed Prisma 7 code-generation step in a private, non-networked Docker overlay, without touching the immutable source or enabling the Hub task runner (PR #33).
 34. **Native binary static inventory**: CI-only inspect pinned Prisma engine and potential bcrypt/sharp/libvips Alpine-musl ELF headers without loading native modules. Missing packages and unverified ABI/runtime are reported honestly; no task execution (PR #34).
-35. **Controlled execution (future)**: independently verify runtime ABI/loading, then isolated API_TYPECHECK with fresh operator consent, bounded logs and cleanup; no auto-merge.
-36. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-37. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+35. **Pinned Alpine-musl artifact provisioning**: fetch the exact lock/SRI-pinned sharp and libvips optional packages in credential-free trusted CI using temporary cross-platform pnpm configuration, then require all expected ELF64/x86_64 headers in the offline container (PR #35).
+36. **Native runtime smoke (future)**: separately prove musl loader, shared-library and Node native-addon compatibility in an isolated executable-only scratch mount, without enabling arbitrary task commands.
+37. **Controlled execution (future)**: require a fresh one-use operator grant for the fixed API_TYPECHECK recipe, bounded logs, and mandatory cleanup; no auto-merge.
+38. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+39. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

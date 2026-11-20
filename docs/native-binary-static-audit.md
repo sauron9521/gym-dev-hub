@@ -21,3 +21,16 @@ If a musl optional package is absent (for example because dependencies were orig
 - The existing Docker CI step asserts the immutable source/engine identity, network-disabled and script-free conditions, and a fixed JSON event with explicit **execution-disabled** fields.
 - Future separately reviewed work must provide/verify platform-correct prebuilt packages, inspect dynamic linker dependencies, and demonstrate bounded native runtime loading **inside an isolated sandbox** before approving the actual API typecheck.
 - The normal Hub HTTP API, runner.mjs fixed-protocol entrypoint, agent permissions and operator grants remain unchanged; GitHub merge is still manual.
+
+## PR #35 — Pinned musl dependency cache
+
+The previous CI proof correctly reported missing sharp and libvips musl binaries. The pinned Gym Platform lockfile already includes these **exact** optional packages and their SHA-512 records:
+
+- @img/sharp-linuxmusl-x64@0.35.5
+- @img/sharp-libvips-linuxmusl-x64@1.3.4
+
+In the trusted, network-enabled CI staging step, pnpm 12.18.0 temporarily receives supportedArchitectures for linux-x64 and linux-x64-musl, without touching the immutable source archive or the original lockfile. Git-pinned lock SRI is checked before fetching, scripts remain disabled, and the modified staging config is restored before checking git cleanliness. The resulting read-only pnpm store becomes available to the unchanged offline Docker install.
+
+The offline, non-root, networkless Docker **static inspector now requires all four native ELF64/x86_64 headers**, including bcrypt and the separately SHA-256-pinned Prisma schema-engine. If the musl optional packages are missing, this workflow must fail (rather than reporting an incomplete set as success).
+
+This is still **not** a certification of dynamic linking, exported symbols, runtime image processing or the actual API typecheck. No native module is loaded in this slice, no task execution or agent permission is activated. Actual runtime loading should be proved in a subsequent separately approved CI-only isolation design.
