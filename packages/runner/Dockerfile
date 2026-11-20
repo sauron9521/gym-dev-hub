@@ -41,5 +41,8 @@ COPY --chown=65534:65534 prisma-native-preflight.mjs /opt/gym-dev-hub/prisma-nat
 # CI-only metadata inventory for Alpine/musl native binaries; no dlopen or API execution.
 COPY --chown=65534:65534 native-binary-inspect.mjs /opt/gym-dev-hub/native-binary-inspect.mjs
 COPY --chown=65534:65534 native-compatibility-preflight.mjs /opt/gym-dev-hub/native-compatibility-preflight.mjs
+# CI-only fixed native runtime experiment; unreachable via the diagnostic runner protocol.
+COPY --chown=65534:65534 native-runtime-smoke.mjs /opt/gym-dev-hub/native-runtime-smoke.mjs
+COPY --chown=65534:65534 native-runtime-fixture.mjs /opt/gym-dev-hub/native-runtime-fixture.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]
