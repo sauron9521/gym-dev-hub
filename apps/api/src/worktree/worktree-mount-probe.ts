@@ -23,7 +23,7 @@ export function mountedWorkerArguments(
 ): string[] {
   if (!isAbsolute(sourcePath) || resolve(sourcePath) !== sourcePath ||
       /[,\r\n\0]/.test(sourcePath) ||
-      sourcePath.includes('docker.sock')) {
+      sourcePath.toLowerCase().includes('docker.sock')) {
     throw new Error('Unsafe bind mount source');
   }
   const args = workerArguments(name, imageId);
@@ -60,16 +60,6 @@ export function validateObservedMounts(raw: string, expectedSource: string): voi
   }
 }
 
-function validateHostConfig(raw: string): void {
-  const fields = raw.split('|');
-  if (fields.length !== 6 ||
-      fields[0] !== 'none' || fields[1] !== 'true' ||
-      fields[2] !== '65534:65534' || fields[3] !== 'false' ||
-      fields[4] !== 'false' || fields[5] !== 'rprivate') {
-    throw new Error('Docker isolation settings changed');
-  }
-}
-
 type Pending = {
   expected: 'ready' | 'pong' | 'stopped';
   resolve: () => void;
@@ -100,7 +90,6 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
   let child: ChildProcessWithoutNullStreams | null = null;
   let buffer = '';
   let pending: Pending | null = null;
-  let cleanExit = false;
 
   const fail = (error: Error) => {
     if (!pending) return;
@@ -153,8 +142,7 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
       }
     });
     running.on('error', () => fail(new Error('Docker worker transport failure')));
-    running.on('exit', (code) => {
-      cleanExit = code === 0;
+    running.on('exit', () => {
       fail(new Error('Docker worker exited unexpectedly'));
     });
     const exchange = (request: 'HELLO/1' | 'PING/1' | 'SHUTDOWN/1',
