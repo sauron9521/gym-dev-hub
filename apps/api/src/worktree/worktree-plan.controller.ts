@@ -12,6 +12,8 @@ import type {
   WorktreeMountProbeResult,
 } from '@gym-dev-hub/contracts';
 import { WorktreeMountService } from './worktree-mount.service.js';
+import { WorktreeCodeReadService } from './worktree-code-read.service.js';
+import type { WorktreeCodeReadGrant, WorktreeCodeReadResult } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
 export class WorktreePlanController {
@@ -22,6 +24,7 @@ export class WorktreePlanController {
     private readonly hydration: WorktreeHydrationService,
     private readonly integrity: WorktreeIntegrityService,
     private readonly mount: WorktreeMountService,
+    private readonly codeRead: WorktreeCodeReadService,
   ) {}
 
   @Get()
@@ -96,6 +99,24 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreeMountProbeResult> {
     return this.mount.probe(sessionId, planId, body);
+  }
+
+  @Post(':planId/code-read-authorize')
+  codeReadAuthorize(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeCodeReadGrant> {
+    return this.codeRead.authorize(sessionId, planId, body);
+  }
+
+  @Post(':planId/code-read')
+  codeReadFile(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeCodeReadResult> {
+    return this.codeRead.read(sessionId, planId, body);
   }
 
   @Post(':planId/hydration-authorize')

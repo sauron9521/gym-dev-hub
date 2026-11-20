@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   mountedWorkerArguments,
   validateObservedMounts,
+  equivalentMountSource,
+  validateScopedCodePath,
 } from '../src/worktree/worktree-mount-probe.js';
 
 const ID = 'sha256:' + 'a'.repeat(64);
@@ -59,5 +61,78 @@ describe('immutable mounted worker CLI policy', () => {
       validateObservedMounts(JSON.stringify([{ ...data[0], Target: '/root' }]), SOURCE),
     ).toThrow();
     expect(() => validateObservedMounts('not-json', SOURCE)).toThrow();
+  });
+});
+
+describe('scoped protocol path and actual Docker bind identity', () => {
+  it.each(['src/main.ts', 'apps/web/page.tsx', 'README.md', 'package.json'])(
+    'allows one plain source file: %s',
+    (path) => expect(() => validateScopedCodePath(path)).not.toThrow(),
+  );
+
+  it.each([
+    '../secret.ts',
+    '/etc/passwd',
+    '.env',
+    '.git/config.json',
+    'src/../../secrets.ts',
+    'src//main.ts',
+    'src/file.ts;whoami',
+    'src/a.txt',
+  ])('rejects traversal, hidden paths, commands and unsupported extensions: %s', (path) =>
+    expect(() => validateScopedCodePath(path)).toThrow(),
+  );
+
+  it('only accepts exact case-sensitive Linux bind sources', () => {
+    expect(equivalentMountSource('/tmp/project', '/tmp/project', 'linux')).toBe(true);
+    expect(equivalentMountSource('/TMP/project', '/tmp/project', 'linux')).toBe(false);
+    expect(equivalentMountSource('/other/project', '/tmp/project', 'linux')).toBe(false);
+  });
+
+  it('understands only known Docker Desktop drive translations', () => {
+    const windows = 'F:\\programer\\worktrees\\approved';
+    expect(equivalentMountSource('F:\\programer\\worktrees\\approved', windows, 'win32')).toBe(
+      true,
+    );
+    expect(
+      equivalentMountSource(
+        '/run/desktop/mnt/host/f/programer/worktrees/approved',
+        windows,
+        'win32',
+      ),
+    ).toBe(true);
+    expect(
+      equivalentMountSource('/host_mnt/f/programer/worktrees/approved', windows, 'win32'),
+    ).toBe(true);
+    expect(
+      equivalentMountSource(
+        '/run/desktop/mnt/host/c/programer/worktrees/approved',
+        windows,
+        'win32',
+      ),
+    ).toBe(false);
+    expect(
+      equivalentMountSource('/run/desktop/mnt/host/f/programer/../approved', windows, 'win32'),
+    ).toBe(false);
+    expect(
+      equivalentMountSource('/unknown/host/f/programer/worktrees/approved', windows, 'win32'),
+    ).toBe(false);
+    expect(equivalentMountSource('F:\\PROGRA~1\\worktrees\\approved', windows, 'win32')).toBe(
+      false,
+    );
+  });
+
+  it('checks real Docker .Mounts and refuses writable or extra binds', () => {
+    const effective = [{ Type: 'bind', Source: SOURCE, Destination: '/workspace', RW: false }];
+    expect(() => validateObservedMounts(JSON.stringify(effective), SOURCE)).not.toThrow();
+    expect(() =>
+      validateObservedMounts(JSON.stringify([{ ...effective[0], RW: true }]), SOURCE),
+    ).toThrow();
+    expect(() =>
+      validateObservedMounts(JSON.stringify([...effective, effective[0]]), SOURCE),
+    ).toThrow();
+    expect(() =>
+      validateObservedMounts(JSON.stringify([{ ...effective[0], Destination: '/tmp' }]), SOURCE),
+    ).toThrow();
   });
 });

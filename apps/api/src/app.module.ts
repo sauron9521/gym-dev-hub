@@ -21,6 +21,7 @@ import { WorktreeInspectionService } from './worktree/worktree-inspection.servic
 import { WorktreeHydrationService } from './worktree/worktree-hydration.service.js';
 import { WorktreeIntegrityService } from './worktree/worktree-integrity.service.js';
 import { WorktreeMountService } from './worktree/worktree-mount.service.js';
+import { WorktreeCodeReadService } from './worktree/worktree-code-read.service.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -48,6 +49,7 @@ import { WorktreeMountService } from './worktree/worktree-mount.service.js';
     WorktreeHydrationService,
     WorktreeIntegrityService,
     WorktreeMountService,
+    WorktreeCodeReadService,
   ],
 })
 export class AppModule {}

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { WorktreeIntegrityReport } from '@gym-dev-hub/contracts';
 import { WorktreeMountPanel } from './worktree-mount-panel';
+import { WorktreeCodeReadPanel } from './worktree-code-read-panel';
 
 type Props = { sessionId: string; planId: string; fingerprint?: string };
 
@@ -87,12 +88,20 @@ export function WorktreeIntegrityPanel({ sessionId, planId, fingerprint }: Props
             </div>
           </div>
           {report.status === 'verified' && fingerprint && (
-            <WorktreeMountPanel
-              key={report.checkedAt}
-              sessionId={sessionId}
-              report={report}
-              fingerprint={fingerprint}
-            />
+            <>
+              <WorktreeMountPanel
+                key={report.checkedAt}
+                sessionId={sessionId}
+                report={report}
+                fingerprint={fingerprint}
+              />
+              <WorktreeCodeReadPanel
+                key={report.checkedAt + '-read'}
+                sessionId={sessionId}
+                report={report}
+                fingerprint={fingerprint}
+              />
+            </>
           )}
           <small>
             Підсумок є одноразовим знімком стану. Навіть успішна перевірка не дозволяє mount або

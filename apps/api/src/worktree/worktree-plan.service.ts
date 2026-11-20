@@ -30,6 +30,9 @@ const auditSchema = z.strictObject({
     'mount-probe-started',
     'mount-probe-verified',
     'mount-probe-failed',
+    'code-read-started',
+    'code-read-completed',
+    'code-read-failed',
   ]),
   timestamp: z.iso.datetime(),
 });
@@ -593,6 +596,30 @@ export class WorktreePlanService {
       plan.expiresAt = null;
       plan.history.push({ event: 'revoked', timestamp: new Date().toISOString() });
       return publicPlan(plan);
+    }, true);
+  }
+  async recordCodeRead(
+    sessionId: string,
+    planId: string,
+    step: 'started' | 'completed' | 'failed',
+  ): Promise<void> {
+    await this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (plan.state !== 'created' || plan.hydrationState !== 'completed') {
+        throw new ConflictException('План не готовий до аудиту code read.');
+      }
+      if (plan.history.length >= 250) {
+        throw new ConflictException('Ліміт записів аудиту, створюй нову сесію.');
+      }
+      plan.history.push({
+        event:
+          step === 'started'
+            ? 'code-read-started'
+            : step === 'completed'
+              ? 'code-read-completed'
+              : 'code-read-failed',
+        timestamp: new Date().toISOString(),
+      });
     }, true);
   }
 }
