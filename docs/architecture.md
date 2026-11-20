@@ -14,7 +14,8 @@ This repository owns the orchestration tooling. Target repositories (including `
 - Docker execution isolation preflight: fixed diagnostic container with pinned image, no network or host mounts, non-root, read-only root and strict limits (PR #7)
 - Docker worker foundation: local pinned-base image with static HELLO/PING/SHUTDOWN protocol, no host mounts/network or agent commands; safe launch lifecycle in NestJS (PR #8)
 - Worktree plan foundation: validated repository source and Git origin, immutable planned path/branch, fingerprinted 15-minute acknowledgement and audit trail; **no actual worktree creation** (PR #9)
-- Moving Codex into an isolated worker, authenticated approval gates and actual Git worktrees: planned as separate, permission-gated slices
+- One-time, opt-in operator authorization for metadata-only Git worktree creation, SHA-pinned and fail-closed with durable audit (PR #10)
+- Moving Codex into a constrained isolated worker, full authenticated access control and safe checkout/mounts: separate permission-gated PRs
 - Persistence and worker queues: planned, separate from target repositories
 
 ## Invariants

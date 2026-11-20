@@ -10,8 +10,9 @@
 8. **Execution boundary preflight**: local Linux Docker status, pinned test image, read-only/no-network/no-mounts probe, fail-closed capabilities (PR #7).
 9. **Isolated worker foundation**: locally built dedicated worker image, fixed HELLO/PING/SHUTDOWN protocol, lifecycle and fail-closed Docker policies (PR #8).
 10. **Worktree manifest & acknowledgement**: allowlisted local source/repository validation, immutable planned worktree paths, fingerprinted review, TTL and revocation, without Git mutations (PR #9).
-11. **Isolated execution**: authenticated one-time approvals, per-task Git worktree creation and controlled agent command execution in separate safe PRs.
-12. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-13. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+11. **Metadata-only worktree creation**: explicit local operator secret, SHA-pinned single-use grant, safe Git worktree registration without checkout, state/audit recovery (PR #10).
+12. **Isolated execution**: safe file checkout, scoped worker mounts, and controlled agent command execution in separate safe PRs.
+13. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+14. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

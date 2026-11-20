@@ -65,4 +65,4 @@ The proxy validates UUID path segments and same-origin JSON writes. No arbitrary
 
 PR #9 modifies only the separate `gym-dev-hub` repository. It does not touch `gym-platform`, other local repositories, or GitHub write APIs.
 
-Next PR (#10) should implement an **authenticated, one-time approval gate and safe worktree creation** using the existing immutable manifest, with atomic consumption, path revalidation, audit and cleanup before connecting Codex. Split worktree creation and Docker mounts/AI execution into independently reviewed PRs.
+PR #10 adds an [operator-secret-gated, one-time metadata-only worktree creation](safe-worktree-creation.md) stage. It revalidates paths and commit SHA before running a fixed Git command, but it does **not** checkout files or give Codex any new permissions. Full authentication, safe checkout and Docker mounts remain future PRs.

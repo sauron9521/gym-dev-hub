@@ -38,6 +38,10 @@ The Workspace can now start, ping and stop a [fixed-protocol Docker worker](docs
 
 The Workspace can preview immutable, repository-scoped [worktree plans](docs/worktree-plans.md), compare SHA-256 fingerprints, record time-limited acknowledgements, and revoke them. Plans do **not** create Git branches, mounts or execution permissions.
 
+### Safe Metadata-only Worktree Creation (PR #10)
+
+An acknowledged [worktree plan](docs/worktree-plans.md) can now be turned into a real, **metadata-only** Git worktree after two separate approvals: a configured local operator secret and a short-lived single-use token. The feature is disabled unless explicitly configured. No project files are checked out and agent execution remains disabled. See [safe worktree creation and setup](docs/safe-worktree-creation.md).
+
 ### Codex Adapter (opt-in)
 
 The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. PR #6 adds a separate text-only [Codex Agent Chat](docs/agent-chat.md) using these threads, while keeping worktree and PR mutation disabled. See [Codex Adapter setup and security](docs/codex-adapter.md).
@@ -48,7 +52,7 @@ The Workspace can now connect to a locally installed Codex CLI and create or res
 pnpm check
 ```
 
-The monorepo includes Next.js, NestJS, shared TypeScript/contract packages, and GitHub Actions CI. Agent chat and local session storage are now available. AI-controlled code writes, actual Git worktrees, authenticated approval gates and production databases are **not** included. Plan acknowledgement is informational only.
+The monorepo includes Next.js, NestJS, shared TypeScript/contract packages, and GitHub Actions CI. Agent chat and local session storage are now available. AI-controlled code writes, checkout of source files into worktrees, production authentication and databases are **not** included. Worktree creation is a separate operator-authorized action, never triggered by plan acknowledgement alone.
 
 ## Safety and governance
 

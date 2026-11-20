@@ -17,7 +17,14 @@ const PLAN_TTL_MS = 15 * 60_000;
 const MAX_PLANS = 100;
 const uuidSchema = z.uuid();
 const auditSchema = z.strictObject({
-  event: z.enum(['created', 'acknowledged', 'revoked']),
+  event: z.enum([
+    'created',
+    'acknowledged',
+    'revoked',
+    'creation-started',
+    'worktree-created',
+    'creation-failed',
+  ]),
   timestamp: z.iso.datetime(),
 });
 const planSchema = z.strictObject({
@@ -28,12 +35,16 @@ const planSchema = z.strictObject({
   targetPath: z.string(),
   proposedBranch: z.string(),
   fingerprint: z.string().regex(/^sha256:[0-9a-f]{64}$/),
-  state: z.enum(['pending', 'acknowledged', 'revoked']),
+  state: z.enum(['pending', 'acknowledged', 'revoked', 'creating', 'created', 'failed']),
   createdAt: z.iso.datetime(),
   expiresAt: z.iso.datetime().nullable(),
   history: z.array(auditSchema),
   executionEnabled: z.literal(false),
-  worktreeCreated: z.literal(false),
+  worktreeCreated: z.boolean(),
+  baseHeadSha: z
+    .string()
+    .regex(/^[0-9a-f]{40,64}$/)
+    .optional(),
 });
 const storeSchema = z.strictObject({
   version: z.literal(1),
@@ -49,7 +60,11 @@ const acknowledgeSchema = z.strictObject({
 const noBodySchema = z.strictObject({}).optional();
 
 function planState(plan: StoredPlan): WorktreePlanState {
-  if (plan.state !== 'revoked' && plan.expiresAt && Date.parse(plan.expiresAt) <= Date.now()) {
+  if (
+    ['pending', 'acknowledged'].includes(plan.state) &&
+    plan.expiresAt &&
+    Date.parse(plan.expiresAt) <= Date.now()
+  ) {
     return 'expired';
   }
   return plan.state;
@@ -257,7 +272,8 @@ export class WorktreePlanService {
       if (
         store.plans.some(
           (item) =>
-            item.sessionId === sessionId && ['pending', 'acknowledged'].includes(planState(item)),
+            item.sessionId === sessionId &&
+            ['pending', 'acknowledged', 'creating', 'created'].includes(planState(item)),
         )
       ) {
         throw new ConflictException('Для цієї сесії вже існує активний план.');
@@ -322,6 +338,79 @@ export class WorktreePlanService {
     }, true);
   }
 
+  async approvedPlan(sessionId: string, planId: string): Promise<WorktreePlan> {
+    const session = await this.workspace.get(sessionId);
+    if (session.status === 'completed') {
+      throw new ConflictException('Завершена сесія не може створювати worktree.');
+    }
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (planState(plan) !== 'acknowledged' || plan.worktreeCreated) {
+        throw new ConflictException('Спочатку погодь непрострочений план.');
+      }
+      if (
+        !this.github.listAllowedRepositories().includes(plan.repository) ||
+        plan.repository !== session.repository
+      ) {
+        throw new ConflictException('Репозиторій плану більше не дозволений.');
+      }
+      return publicPlan(plan);
+    });
+  }
+
+  async reserveCreation(
+    sessionId: string,
+    planId: string,
+    fingerprint: string,
+    baseHeadSha: string,
+  ): Promise<WorktreePlan> {
+    // Every request is serialized and state is persisted before invoking Git.
+    const session = await this.workspace.get(sessionId);
+    if (session.status === 'completed') {
+      throw new ConflictException('Завершена сесія не може створювати worktree.');
+    }
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (
+        planState(plan) !== 'acknowledged' ||
+        plan.worktreeCreated ||
+        plan.fingerprint !== fingerprint ||
+        plan.repository !== session.repository ||
+        !this.github.listAllowedRepositories().includes(plan.repository)
+      ) {
+        throw new ConflictException('Погодження недійсне або вже використане.');
+      }
+      if (!/^[0-9a-f]{40,64}$/.test(baseHeadSha)) {
+        throw new BadRequestException('Некоректний Git commit.');
+      }
+      plan.state = 'creating';
+      plan.baseHeadSha = baseHeadSha;
+      plan.expiresAt = null;
+      plan.history.push({ event: 'creation-started', timestamp: new Date().toISOString() });
+      return publicPlan(plan);
+    }, true);
+  }
+
+  async finishCreation(
+    sessionId: string,
+    planId: string,
+    result: 'created' | 'failed',
+  ): Promise<WorktreePlan> {
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (plan.state !== 'creating') {
+        throw new ConflictException('Стан роботи змінився, неможливо завершити створення.');
+      }
+      plan.state = result;
+      plan.worktreeCreated = result === 'created';
+      plan.history.push({
+        event: result === 'created' ? 'worktree-created' : 'creation-failed',
+        timestamp: new Date().toISOString(),
+      });
+      return publicPlan(plan);
+    }, true);
+  }
+
   async revoke(sessionId: string, planId: string, input: unknown): Promise<WorktreePlan> {
     if (!noBodySchema.safeParse(input).success) {
       throw new BadRequestException('Некоректний запит відкликання.');
@@ -329,7 +418,8 @@ export class WorktreePlanService {
     await this.workspace.get(sessionId);
     return this.transact((store) => {
       const plan = this.find(store, sessionId, planId);
-      if (plan.state === 'revoked') throw new ConflictException('План уже відкликано.');
+      if (!['pending', 'acknowledged'].includes(planState(plan)))
+        throw new ConflictException('План не можна відкликати.');
       plan.state = 'revoked';
       plan.expiresAt = null;
       plan.history.push({ event: 'revoked', timestamp: new Date().toISOString() });
