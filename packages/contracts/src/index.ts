@@ -30,4 +30,13 @@ export type {
   WorkspaceOverview,
 } from './workspace.js';
 
-export type { CodexConnectionState, CodexConnectionStatus, CodexSessionBinding } from './codex.js';
+export type {
+  CodexConnectionState,
+  CodexConnectionStatus,
+  CodexSessionBinding,
+  CodexTurnState,
+  ChatMessage,
+  ChatSnapshot,
+  ChatTurnSnapshot,
+  ChatStreamEvent,
+} from './codex.js';

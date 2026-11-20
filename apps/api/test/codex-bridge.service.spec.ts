@@ -40,6 +40,30 @@ function mockAppServer(options: { resumeMissing?: boolean } = {}) {
             },
           }) + '\n',
         );
+      } else if (msg.method === 'turn/start') {
+        const threadId = String(msg.params?.threadId);
+        const turnId = 'test-turn-id';
+        stdout.write(JSON.stringify({ id: msg.id, result: { turn: { id: turnId } } }) + '\n');
+        queueMicrotask(() => {
+          stdout.write(
+            JSON.stringify({
+              method: 'item/agentMessage/delta',
+              params: { threadId, turnId, itemId: 'message-1', delta: 'Hello ' },
+            }) + '\n',
+          );
+          stdout.write(
+            JSON.stringify({
+              method: 'item/agentMessage/delta',
+              params: { threadId, turnId, itemId: 'message-1', delta: 'world' },
+            }) + '\n',
+          );
+          stdout.write(
+            JSON.stringify({
+              method: 'turn/completed',
+              params: { threadId, turn: { id: turnId, status: 'completed' } },
+            }) + '\n',
+          );
+        });
       } else if (msg.method === 'thread/start' || msg.method === 'thread/resume') {
         const id = msg.method === 'thread/resume' ? msg.params?.threadId : '019b4dc2-test-thread';
         stdout.write(JSON.stringify({ id: msg.id, result: { thread: { id } } }) + '\n');
@@ -84,6 +108,21 @@ describe('CodexBridgeService protocol', () => {
     );
   });
 
+  it('does not inherit Dev Hub secrets into the Codex child process', async () => {
+    const original = process.env.GITHUB_TOKEN;
+    process.env.GITHUB_TOKEN = 'secret-token-for-test';
+    try {
+      mockAppServer();
+      await service.connect();
+      const opts = vi.mocked(spawn).mock.calls[0]?.[2];
+      expect(opts?.env?.GITHUB_TOKEN).toBeUndefined();
+      expect(opts?.env?.DATABASE_URL).toBeUndefined();
+    } finally {
+      if (original === undefined) delete process.env.GITHUB_TOKEN;
+      else process.env.GITHUB_TOKEN = original;
+    }
+  });
+
   it('performs initialize handshake once and never starts an AI turn', async () => {
     const server = mockAppServer();
     const connected = await service.connect();
@@ -126,6 +165,24 @@ describe('CodexBridgeService protocol', () => {
     expect(server.requests.some((item) => item.method === 'thread/resume')).toBe(true);
     expect(server.requests.some((item) => item.method === 'thread/start')).toBe(true);
     expect(server.requests.some((item) => item.method === 'turn/start')).toBe(false);
+  });
+
+  it('streams a text response for the exact active thread without write permissions', async () => {
+    const fake = mockAppServer();
+    const started = await service.linkThread('00000000-0000-4000-8000-000000000055', null);
+    const progress: string[] = [];
+    const done = await service.startReadOnlyTurn(started.id, 'Say hello', (text) =>
+      progress.push(text),
+    );
+    expect(progress).toEqual(['Hello ', 'Hello world']);
+    expect(done).toEqual({ text: 'Hello world', status: 'completed' });
+    const request = fake.requests.find((message) => message.method === 'turn/start');
+    expect(request?.params).toMatchObject({
+      threadId: started.id,
+      approvalPolicy: 'never',
+      sandboxPolicy: { type: 'readOnly', networkAccess: false },
+    });
+    expect(fake.requests.some((item) => item.method === 'command/exec')).toBe(false);
   });
 
   it('refuses unsolicited server-side approval requests', async () => {

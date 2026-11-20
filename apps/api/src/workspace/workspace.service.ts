@@ -12,6 +12,7 @@ import type {
   AgentSessionSummary,
   WorkspaceOverview,
   CodexSessionBinding,
+  ChatMessage,
 } from '@gym-dev-hub/contracts';
 import { CodexBridgeService } from '../codex/codex-bridge.service.js';
 import { GitHubService } from '../github/github.service.js';
@@ -143,6 +144,7 @@ export class WorkspaceService {
         status: 'planned',
         codexThreadId: null,
         messages: [],
+        chatMessages: [],
         createdAt: now,
         updatedAt: now,
       };
@@ -194,6 +196,35 @@ export class WorkspaceService {
         reused: binding.reused,
         connection: this.codex.status(),
       };
+    }, true);
+  }
+
+  getChatMessages(id: string): Promise<ChatMessage[]> {
+    return this.transact((data) => [...(this.findSession(data, id).chatMessages ?? [])]);
+  }
+
+  appendChatMessage(
+    id: string,
+    role: ChatMessage['role'],
+    content: string,
+    state: ChatMessage['state'] = 'completed',
+  ): Promise<ChatMessage> {
+    return this.transact((data) => {
+      const session = this.findSession(data, id);
+      session.chatMessages ??= [];
+      if (session.chatMessages.length >= 100) {
+        throw new BadRequestException('Ліміт 100 chat-повідомлень у сесії.');
+      }
+      const entry: ChatMessage = {
+        id: randomUUID(),
+        role,
+        content,
+        state,
+        createdAt: new Date().toISOString(),
+      };
+      session.chatMessages.push(entry);
+      session.updatedAt = entry.createdAt;
+      return entry;
     }, true);
   }
 

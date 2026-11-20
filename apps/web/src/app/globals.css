@@ -1457,3 +1457,97 @@ strong {
     align-items: flex-start;
   }
 }
+
+/* Read-only Codex chat */
+.ws-chat-panel {
+  border-top: 1px solid #334a71;
+  border-bottom: 1px solid #334a71;
+}
+.ws-chat-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 22px 27px;
+}
+.ws-chat-heading h3 {
+  font:
+    800 17px Manrope,
+    sans-serif;
+  margin: 7px 0 0;
+}
+.ws-chat-live {
+  font-size: 11px;
+  color: #a7adba;
+  border: 1px solid #39465c;
+  padding: 6px 10px;
+  border-radius: 7px;
+}
+.ws-chat-live.is-live {
+  color: #97e4c4;
+  border-color: #28694f;
+  background: #1e392e;
+}
+.ws-chat-disclaimer {
+  padding: 12px 27px;
+  font-size: 11px;
+  color: #afbed3;
+  background: #1b273a;
+  line-height: 1.65;
+}
+.ws-chat-messages {
+  min-height: 220px;
+  max-height: 530px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 27px;
+}
+.ws-chat-bubble {
+  border: 1px solid #324763;
+  border-radius: 11px;
+  padding: 15px 17px;
+  max-width: 88%;
+  line-height: 1.6;
+}
+.ws-chat-bubble.ws-chat-user {
+  align-self: flex-end;
+  background: #263c60;
+  border-radius: 12px 12px 4px 12px;
+}
+.ws-chat-bubble.ws-chat-assistant {
+  align-self: flex-start;
+  background: #17263b;
+  border-radius: 12px 12px 12px 4px;
+}
+.ws-chat-bubble p {
+  font-size: 12px;
+  color: #e5eefb;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 10px 0 0;
+}
+.ws-chat-error {
+  font-size: 12px;
+  color: #f7a8a8;
+  padding: 0 27px 10px;
+}
+.ws-chat-compose {
+  background: #141f31;
+}
+.ws-chat-compose small {
+  color: #b2bfd3;
+  font-size: 10px;
+}
+@media (max-width: 720px) {
+  .ws-chat-heading,
+  .ws-chat-disclaimer,
+  .ws-chat-messages {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .ws-chat-bubble {
+    max-width: 100%;
+  }
+}
