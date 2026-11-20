@@ -16,4 +16,5 @@
 !native-runtime-smoke.mjs
 !native-runtime-fixture.mjs
 !api-typecheck-ci.mjs
+!api-typecheck-local.mjs
 !.dockerignore

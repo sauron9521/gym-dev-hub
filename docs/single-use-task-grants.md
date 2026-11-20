@@ -1,4 +1,4 @@
-# PR #29 — One-time operator grants for a future fixed API typecheck
+# PR #29 — One-time operator grants (authorization foundation)
 
 This is an **authorization foundation only**, not an executable Gym Platform task runner. It reuses the existing `TaskRunnerPolicyService.preview` from PR #19 (which already performs a fresh worktree integrity verification). It does **not** add Docker execution, package installs, source modification, push or merge endpoints.
 
@@ -78,3 +78,7 @@ Negative unit tests enforce: opt-in and strong operator secret, strict schema an
 This is a **single-process, localhost-only** authorization prototype, _not_ a distributed permission service. A new process cannot recover outstanding grants, and audit durability depends on the local filesystem. NestJS currently has no user login or per-session identity enforcement; the operator secret is a mandatory local control, **not** a substitute for proper authentication if the API is ever exposed to other machines. Avoid logging request bodies in proxies or development middleware.
 
 A future PR must implement an isolated fixed-command runner with a **private writable dependency overlay**, reviewed native/Prisma provisioning, a fresh operator consent and actual secure sandbox policy, bounded logs/timeouts and explicit cleanup. It must bind the new executor to a still-current, verified source snapshot and safely consume the intended grant **before** any side effect. Do not infer executor readiness from a green authorization test. Manual GitHub merge remains mandatory.
+
+## Follow-up #37b: strictly optional local execution
+
+The historical PR #29 guarantees above remain true for `consumeForPolicyCheck`; it still returns `consumed-no-execution`. PR #37b adds a **separate** `consumeForExecution` method reachable only through the opt-in local `task-execute` service. It independently requires `DEV_HUB_ENABLE_TASK_EXECUTION=true`, a fresh preview, source and operator secret revalidation, single-use atomic token removal and durable non-secret `execution-authorized` audit. The actual fixed Docker executor is single-flight and disabled without an explicit image SHA-256 and four preprovisioned pinned folders. The preview and grant issuance alone still execute nothing. See `docs/operator-api-typecheck.md` for complete configuration and restrictions.

@@ -84,7 +84,7 @@ export class TaskRunnerPolicyService {
         dockerSocket: false,
         environmentSecrets: false,
         maxDurationSeconds: 600,
-        maxMemoryMiB: 2048,
+        maxMemoryMiB: 5120,
         maxCpus: 2,
         maxPids: 128,
         maxOutputBytes: 65536,

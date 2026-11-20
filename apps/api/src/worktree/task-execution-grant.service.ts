@@ -61,7 +61,7 @@ type Grant = {
   expiresAt: number;
 };
 
-type EventType = 'issued' | 'revoked' | 'consumed' | 'consume-denied';
+type EventType = 'issued' | 'revoked' | 'consumed' | 'consume-denied' | 'execution-authorized';
 
 function hashSecret(value: string): Buffer {
   return createHash('sha256').update(value, 'utf8').digest();
@@ -106,7 +106,7 @@ function assertPinnedPreview(
     boundary.dockerSocket !== false ||
     boundary.environmentSecrets !== false ||
     boundary.maxDurationSeconds !== 600 ||
-    boundary.maxMemoryMiB !== 2048 ||
+    boundary.maxMemoryMiB !== 5120 ||
     boundary.maxCpus !== 2 ||
     boundary.maxPids !== 128 ||
     boundary.maxOutputBytes !== 65536
@@ -300,6 +300,69 @@ export class TaskExecutionGrantService {
     }
     await this.audit('revoked', grant);
     return { grantId: grant.id, status: 'revoked', executionEnabled: false };
+  }
+
+  /** Internal, single-use execution consent; NEVER a Docker command or route. */
+  async consumeForExecution(
+    sessionId: string,
+    planId: string,
+    input: unknown,
+  ): Promise<{ grantId: string; recipeId: 'API_TYPECHECK' }> {
+    if (process.env.DEV_HUB_ENABLE_TASK_EXECUTION !== 'true') {
+      throw new ServiceUnavailableException('Локальний запуск задач вимкнено.');
+    }
+    const parsed = consumeSchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException('Некоректний запит запуску задачі.');
+    const initialSecretDigest = hashSecret(this.configuredSecret());
+    const key = hashToken(parsed.data.grantToken);
+    const grant = this.grants.get(key);
+    this.grants.delete(key); // Burn atomically before asynchronous policy checks.
+    if (
+      !grant ||
+      grant.sessionId !== sessionId ||
+      grant.planId !== planId ||
+      grant.recipeId !== parsed.data.recipeId ||
+      grant.fingerprint !== parsed.data.fingerprint ||
+      grant.sourceCommit !== parsed.data.sourceCommit ||
+      grant.sourceManifestSha256 !== parsed.data.sourceManifestSha256 ||
+      grant.sourceTree !== TREE ||
+      Date.now() >= grant.expiresAt
+    ) {
+      throw new ForbiddenException('Одноразовий дозвіл недійсний або вже використаний.');
+    }
+    try {
+      const checked = await this.policy.preview(sessionId, planId, {
+        recipeId: RECIPE,
+        fingerprint: grant.fingerprint,
+      });
+      assertPinnedPreview(checked, sessionId, planId, grant.fingerprint);
+      // Re-check the same operator secret, not merely that a new secret exists.
+      if (!timingSafeEqual(initialSecretDigest, hashSecret(this.configuredSecret()))) {
+        throw new Error('Operator secret rotated during execution authorization');
+      }
+      if (process.env.DEV_HUB_ENABLE_TASK_EXECUTION !== 'true' || Date.now() >= grant.expiresAt) {
+        throw new Error('Task consent expired or execution was disabled');
+      }
+      await this.audit('execution-authorized', grant);
+      if (!timingSafeEqual(initialSecretDigest, hashSecret(this.configuredSecret()))) {
+        throw new Error('Operator secret rotated after audit');
+      }
+      if (process.env.DEV_HUB_ENABLE_TASK_EXECUTION !== 'true' || Date.now() >= grant.expiresAt) {
+        throw new Error('Task execution disabled or expired after audit');
+      }
+      return { grantId: grant.id, recipeId: RECIPE };
+    } catch {
+      await this.audit('consume-denied', grant).catch(() => undefined);
+      throw new ConflictException('Політика, worktree або дозвіл змінилися; запуск анульовано.');
+    }
+  }
+
+  /** Reuse the independently configured operator secret for explicit cancellation. */
+  authenticateForCancellation(operatorSecret: string): void {
+    if (process.env.DEV_HUB_ENABLE_TASK_EXECUTION !== 'true') {
+      throw new ServiceUnavailableException('Локальний запуск задач вимкнено.');
+    }
+    this.authenticate(operatorSecret);
   }
 
   /**

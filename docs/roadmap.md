@@ -37,8 +37,9 @@
 35. **Pinned Alpine-musl artifact provisioning**: fetch the exact lock/SRI-pinned sharp and libvips optional packages in credential-free trusted CI using temporary cross-platform pnpm configuration, then require all expected ELF64/x86_64 headers in the offline container (PR #35).
 36. **Fixed Alpine native runtime smoke**: CI-only load pinned bcrypt and sharp with a tiny image roundtrip and run the pinned Prisma schema-engine version probe from a bounded networkless Docker container. Keep /workspace noexec; copy only reviewed native packages to a separate ephemeral exec /native tmpfs (PR #36).
 37. **Isolated fixed API_TYPECHECK proof (CI-only)**: reuse pinned offline API dependency installation and Prisma Client generation, then execute exactly TypeScript 6.0.3 `tsc --noEmit -p tsconfig.build.json` on the reviewed immutable source in a restricted disposable Docker overlay. No Hub task endpoint or operator grant consumption (PR #37a).
-38. **Operator-controlled API_TYPECHECK (future)**: bind a freshly checked worktree and one-use grant to an isolated fixed recipe with bounded diagnostics and cleanup; no arbitrary commands or auto-merge (PR #37b).
-39. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-40. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+38. **Operator-controlled API_TYPECHECK**: explicitly opt-in local API endpoint consumes one use-only grant after fresh worktree verification and executes the CI-proven fixed recipe in pinned, networkless Docker with 64 KiB I/O bounds and cancellation. Requires trusted manual preprovisioning of the pinned offline bundle; no automatic merge or arbitrary commands (PR #37b).
+39. **Local runner provisioning and lifecycle improvements (future)**: safely stage pinned source/store/engine and image with provenance proofs, expose bounded diagnostics/status, recover orphaned containers after a crash.
+40. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+41. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
