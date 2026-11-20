@@ -49,6 +49,7 @@ jobs:
             --user=65534:65534 --ipc=none \
             --pids-limit=128 --memory=2048m --cpus=2 \
             --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=128m,mode=1777' \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777' \
             --mount "type=bind,source=$fixture,target=/input,readonly" \
             --stop-timeout=3 \
             --entrypoint /usr/bin/node \
@@ -64,6 +65,7 @@ jobs:
             and .Mounts[0].Type == "bind" and .Mounts[0].Target == "/input"
             and .Mounts[0].ReadOnly == true
             and (.Tmpfs["/workspace"] | contains("noexec"))
+            and (.Tmpfs["/tmp"] | contains("noexec"))
           '
           reply="$(docker start --attach "$name")"
           test "$(docker inspect "$name" --format '{{.State.ExitCode}}')" = '0'
@@ -97,6 +99,7 @@ jobs:
             --user=65534:65534 --ipc=none \
             --pids-limit=128 --memory=2048m --cpus=2 \
             --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=128m,mode=1777' \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777' \
             --mount "type=bind,source=$bad,target=/input,readonly" \
             --stop-timeout=3 \
             --entrypoint /usr/bin/node \
