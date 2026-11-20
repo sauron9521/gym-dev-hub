@@ -17,8 +17,9 @@
 15. **Ephemeral read-only worker mount**: distinct operator approval, pinned image, fixed protocol and read-only bind validation with mandatory container cleanup (PR #15).
 16. **Scoped code reading**: separate one-time operator consent for one bounded source file in a temporary read-only Docker worker; Docker Desktop mount identity checks, no arbitrary commands (PR #16).
 17. **Fixed controlled worker tool**: independently approved, one-shot SHA256_FILE capability in isolated Docker; no source code execution or arbitrary commands (PR #17).
-18. **Agent execution (future)**: separately design explicit command policy, writable overlays, output review and safe test runners; no auto-merge.
-19. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-20. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+18. **Safe worker file access**: independently enabled single-file, SHA-pinned temporary staging for non-root worker, no chmod on original worktree and mandatory cleanup (PR #18).
+19. **Agent execution (future)**: separately design explicit command policy, writable overlays, output review and safe test runners; no auto-merge.
+20. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+21. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

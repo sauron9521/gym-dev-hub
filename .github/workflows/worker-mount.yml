@@ -6,6 +6,8 @@ on:
       - 'apps/api/src/worktree/worktree-mount-*.ts'
       - 'apps/api/src/worktree/worktree-code-read.service.ts'
       - 'apps/api/src/worktree/worktree-tool.service.ts'
+      - 'apps/api/src/worktree/worktree-file-stage.ts'
+      - 'apps/api/test/worktree-file-stage.spec.ts'
       - 'apps/api/test/worktree-tool.spec.ts'
       - 'apps/api/test/worktree-code-read.spec.ts'
       - 'apps/api/test/worktree-mount-*.spec.ts'
@@ -109,3 +111,41 @@ jobs:
           test ! -e mount-fixture/secret.ts
           test -z "$(docker ps --all --quiet --filter "name=^gym-dev-hub-ci-check-${{ github.run_id }}$")"
           echo 'Fixed SHA256 tool passed; traversal and arbitrary RUN rejected.'
+      - name: Verify original mode 0600 stays untouched while non-root worker reads ephemeral stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          original="$PWD/mount-fixture/private.ts"
+          printf 'export const approved = 18;\n' > "$original"
+          chmod 0600 "$original"
+          staging="$(mktemp -d "$PWD/.gym-dev-hub-stage-ci-XXXXXXXX")"
+          cleanup() {
+            rm -f "$staging/private.ts"
+            rmdir "$staging"
+          }
+          trap cleanup EXIT
+          chmod 0711 "$staging"
+          cp "$original" "$staging/private.ts"
+          chmod 0644 "$staging/private.ts"
+          test "$(stat -c '%a' "$original")" = '600'
+          test "$(stat -c '%a' "$staging")" = '711'
+          test "$(stat -c '%a' "$staging/private.ts")" = '644'
+          test "$(find "$staging" -maxdepth 1 -type f | wc -l)" = '1'
+          expected="$(base64 -w0 "$original")"
+          sha="$(sha256sum "$original" | cut -d ' ' -f1)"
+          reply="$(
+            printf 'HELLO/1\nREAD/1 private.ts\nCHECK/1 SHA256 private.ts\nSHUTDOWN/1\n' |
+              docker run --rm -i --pull=never --name "gym-dev-hub-stage-ci-${{ github.run_id }}" \
+                --network=none --read-only --cap-drop=ALL \
+                --security-opt=no-new-privileges \
+                --pids-limit=32 --memory=128m --cpus=0.5 \
+                --user=65534:65534 --ipc=none \
+                --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+                --mount "type=bind,source=$staging,target=/workspace,readonly" \
+                gym-dev-hub-worker:v1
+          )"
+          printf '%s\n' "$reply" | jq -s -e --arg expected "$expected" --arg sha "$sha" \
+            'length == 4 and .[0].event == "ready" and .[1].event == "file" and .[1].contentBase64 == $expected and .[2].event == "digest" and .[2].sha256 == $sha and .[3].event == "stopped"'
+          test "$(stat -c '%a' "$original")" = '600'
+          test -z "$(docker ps --all --quiet --filter "name=^gym-dev-hub-stage-ci-${{ github.run_id }}$")"
+          echo 'Non-root worker read only the ephemeral file; original mode stayed 0600.'
