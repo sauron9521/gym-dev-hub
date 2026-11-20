@@ -29,4 +29,4 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Check Git worktree safety and parser
-        run: pnpm --filter @gym-dev-hub/api exec vitest run test/worktree-creation.spec.ts test/worktree-inspection.spec.ts test/worktree-hydration.spec.ts
+        run: pnpm --filter @gym-dev-hub/api exec vitest run test/worktree-creation.spec.ts test/worktree-inspection.spec.ts test/worktree-hydration.spec.ts test/worktree-mount.service.spec.ts test/worktree-mount-probe.spec.ts
