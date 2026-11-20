@@ -16,7 +16,10 @@
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "provision:pinned-api": "node scripts/provision-pinned-api-local.mjs --prepare",
-    "test:local-provisioner": "node --test scripts/provision-pinned-api-local.test.mjs"
+    "test:local-provisioner": "node --test scripts/provision-pinned-api-local.test.mjs",
+    "provision:status": "node scripts/pinned-provision-recovery.mjs --status",
+    "provision:cleanup-stale": "node scripts/pinned-provision-recovery.mjs --prune-stale",
+    "test:provision-recovery": "node --test scripts/pinned-provision-recovery.test.mjs"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
