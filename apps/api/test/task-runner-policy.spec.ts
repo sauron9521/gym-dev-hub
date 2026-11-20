@@ -112,17 +112,17 @@ describe('fixed task runner policy preview', () => {
 
   it('fails closed on integrity mismatch, changed mount and network request', async () => {
     integrity.verify.mockResolvedValueOnce({ ...report, status: 'mismatch' });
-    await expect(service.preview(SESSION, PLAN, request())).rejects.toThrow('цілісності');
+    await expect(service.preview(SESSION, PLAN, request())).rejects.toThrow('перевірка Git worktree');
     integrity.verify.mockResolvedValueOnce({
       ...report,
       mount: { ...report.mount, sourcePath: '/outside' },
     });
-    await expect(service.preview(SESSION, PLAN, request())).rejects.toThrow('цілісності');
+    await expect(service.preview(SESSION, PLAN, request())).rejects.toThrow('перевірка Git worktree');
     integrity.verify.mockResolvedValueOnce({
       ...report,
       mount: { ...report.mount, networkEnabled: true },
     });
-    await expect(service.preview(SESSION, PLAN, request())).rejects.toThrow('цілісності');
+    await expect(service.preview(SESSION, PLAN, request())).rejects.toThrow('перевірка Git worktree');
   });
 
   it('never generates approval tokens, process handles or executable state', async () => {
