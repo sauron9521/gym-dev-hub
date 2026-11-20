@@ -17,7 +17,7 @@ const COMMIT = '7104f723c4ee7b81e7b9b64e9c9483aea344ef7a';
 const TREE = '2c140e1e740b3dd8cc7582db726f46b54b73b334';
 const MANIFEST_SHA256 = 'dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b';
 const ENGINE_COMMIT = 'd1b3f377ca835d73fd50954a5e22128b9ebdd6b8';
-const ENGINE_SHA256 = 'PIN_ENGINE_SHA256_AFTER_CI';
+const ENGINE_SHA256 = 'c583d08ce5150fe39ff1d4a981c790e3eee8e1fbb432b80dba7606d74c1e56cf';
 const ENGINE_BINARY = '/engine/schema-engine';
 
 function run(command, args, cwd, timeout) {

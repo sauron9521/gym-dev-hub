@@ -144,6 +144,7 @@ jobs:
           checksum="$(printf '%s' "$raw_checksum" | grep -oE '[a-f0-9]{64}' | head -n 1)"
           [[ "$checksum" =~ ^[a-f0-9]{64}$ ]]
           test "$compressed_sha" = "$checksum"
+          test "$compressed_sha" = "9a3a5a44f16f1c78403ac4067f3b83c10a03af5e8d417d87e3ab89907eae9ace"
           gzip -t "$engine/schema-engine.gz"
           gzip -dc "$engine/schema-engine.gz" > "$engine/schema-engine"
           test "$(stat -c%s "$engine/schema-engine")" -ge 1000000
@@ -153,7 +154,7 @@ jobs:
           rm "$engine/schema-engine.gz" "$engine/schema-engine.gz.sha256"
           actual="$(sha256sum "$engine/schema-engine" | cut -d' ' -f1)"
           echo "GYPIN_PRISMA_ENGINE_SHA256=$actual"
-          test "$actual" = 'REPLACE_WITH_REVIEWED_MUSL_ENGINE_SHA256'
+          test "$actual" = 'c583d08ce5150fe39ff1d4a981c790e3eee8e1fbb432b80dba7606d74c1e56cf'
           chmod 755 "$engine"
 
       - name: Build verified CI-only Node runner image
