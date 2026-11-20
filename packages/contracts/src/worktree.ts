@@ -20,6 +20,22 @@ export interface WorktreeCreationGrant {
   purpose: 'CREATE_METADATA_ONLY';
 }
 
+export type WorktreeInspectionState = 'ready-for-hydration' | 'needs-review' | 'missing';
+
+export interface WorktreeInspection {
+  planId: string;
+  sessionId: string;
+  state: WorktreeInspectionState;
+  targetExists: boolean;
+  metadataOnly: boolean;
+  fileCount: number;
+  totalBytes: number;
+  findings: string[];
+  checkedAt: string;
+  hydrationEnabled: false;
+  recoveryIsReadOnly: true;
+}
+
 export interface WorktreePlan {
   id: string;
   sessionId: string;
