@@ -24,7 +24,9 @@ describe('non-executing Node task runner foundation', () => {
     expect(() => validateRunnerImage('latest|' + JSON.stringify(CONFIG))).toThrow();
     expect(() => validateRunnerImage('sha256:bad|' + JSON.stringify(CONFIG))).toThrow();
     expect(() => validateRunnerImage(IMAGE_ID + '|not-json')).toThrow();
-    expect(() => validateRunnerImage(IMAGE_ID + '|' + JSON.stringify({ ...CONFIG, User: '0:0' }))).toThrow();
+    expect(() =>
+      validateRunnerImage(IMAGE_ID + '|' + JSON.stringify({ ...CONFIG, User: '0:0' })),
+    ).toThrow();
     expect(() =>
       validateRunnerImage(
         IMAGE_ID + '|' + JSON.stringify({ ...CONFIG, Entrypoint: ['/bin/sh', '-c'] }),

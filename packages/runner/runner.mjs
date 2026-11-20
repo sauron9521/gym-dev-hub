@@ -1,5 +1,5 @@
 // Strictly diagnostic, bounded, fixed protocol.
- // DO NOT add child_process, eval, project dependency execution, or dynamic imports.
+// DO NOT add child_process, eval, project dependency execution, or dynamic imports.
 import { Buffer } from 'node:buffer';
 
 const MAX_BUFFER_BYTES = 4096;
@@ -8,7 +8,9 @@ let pending = Buffer.alloc(0);
 let shuttingDown = false;
 
 function respond(event, extra = {}) {
-  process.stdout.write(JSON.stringify({ protocol: 1, event, executionEnabled: false, ...extra }) + '\n');
+  process.stdout.write(
+    JSON.stringify({ protocol: 1, event, executionEnabled: false, ...extra }) + '\n',
+  );
 }
 function reject() {
   respond('rejected', { code: 'UNSUPPORTED_REQUEST' });
