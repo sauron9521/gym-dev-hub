@@ -12,21 +12,13 @@ export function inspectElfHeader(header) {
   if (!Buffer.isBuffer(header) || header.length < 64) {
     throw new Error('Truncated native ELF header');
   }
-  if (
-    header[0] !== 0x7f ||
-    header[1] !== 0x45 ||
-    header[2] !== 0x4c ||
-    header[3] !== 0x46
-  ) {
+  if (header[0] !== 0x7f || header[1] !== 0x45 || header[2] !== 0x4c || header[3] !== 0x46) {
     throw new Error('Not an ELF native artifact');
   }
   if (header[4] !== 2 || header[5] !== 1 || ![0, 3].includes(header[7])) {
     throw new Error('ELF is not supported little-endian 64-bit Linux');
   }
-  if (
-    ![2, 3].includes(header.readUInt16LE(16)) ||
-    header.readUInt16LE(18) !== 62
-  ) {
+  if (![2, 3].includes(header.readUInt16LE(16)) || header.readUInt16LE(18) !== 62) {
     throw new Error('ELF is not an x86_64 executable or shared object');
   }
   return { format: 'ELF64', architecture: 'x86_64', headerValidated: true };
@@ -82,13 +74,7 @@ async function firstCandidate(project, paths) {
 
 async function libvipsCandidate(project) {
   for (const prefix of ['node_modules', 'apps/api/node_modules']) {
-    const dir = join(
-      project,
-      prefix,
-      '@img',
-      'sharp-libvips-linuxmusl-x64',
-      'lib',
-    );
+    const dir = join(project, prefix, '@img', 'sharp-libvips-linuxmusl-x64', 'lib');
     let names;
     try {
       names = await readdir(dir);
@@ -96,9 +82,7 @@ async function libvipsCandidate(project) {
       if (error?.code === 'ENOENT') continue;
       throw error;
     }
-    const candidates = names.filter((name) =>
-      /^libvips-cpp\.so(?:\.[0-9.]+)?$/.test(name),
-    );
+    const candidates = names.filter((name) => /^libvips-cpp\.so(?:\.[0-9.]+)?$/.test(name));
     if (candidates.length > 4) {
       throw new Error('Unexpected number of libvips ELF files');
     }
