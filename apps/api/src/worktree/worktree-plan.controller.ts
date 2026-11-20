@@ -15,7 +15,12 @@ import { WorktreeMountService } from './worktree-mount.service.js';
 import { WorktreeCodeReadService } from './worktree-code-read.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
-import type { TaskRunnerPreview } from '@gym-dev-hub/contracts';
+import { TaskExecutionGrantService } from './task-execution-grant.service.js';
+import type {
+  TaskRunnerPreview,
+  TaskExecutionGrant,
+  TaskExecutionGrantRevocation,
+} from '@gym-dev-hub/contracts';
 import type { WorktreeToolGrant, WorktreeToolResult } from '@gym-dev-hub/contracts';
 import type { WorktreeCodeReadGrant, WorktreeCodeReadResult } from '@gym-dev-hub/contracts';
 
@@ -31,6 +36,7 @@ export class WorktreePlanController {
     private readonly codeRead: WorktreeCodeReadService,
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
+    private readonly taskGrants: TaskExecutionGrantService,
   ) {}
 
   @Get()
@@ -150,6 +156,26 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<TaskRunnerPreview> {
     return this.taskRunner.preview(sessionId, planId, body);
+  }
+
+  /** Issues a disabled-by-default, 45-second grant. Does not run any task. */
+  @Post(':planId/task-grant-authorize')
+  taskGrantAuthorize(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<TaskExecutionGrant> {
+    return this.taskGrants.authorize(sessionId, planId, body);
+  }
+
+  /** Revokes a single outstanding grant. No execution endpoint exists. */
+  @Post(':planId/task-grant-revoke')
+  taskGrantRevoke(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<TaskExecutionGrantRevocation> {
+    return this.taskGrants.revoke(sessionId, planId, body);
   }
 
   @Post(':planId/hydration-authorize')
