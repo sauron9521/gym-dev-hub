@@ -417,6 +417,101 @@ export class WorktreePlanService {
     }, true);
   }
 
+  async availableForHydration(sessionId: string, planId: string): Promise<WorktreePlan> {
+    const session = await this.workspace.get(sessionId);
+    if (session.status === 'completed') {
+      throw new ConflictException('Не можна змінювати worktree завершеної сесії.');
+    }
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (
+        plan.state !== 'created' ||
+        !plan.worktreeCreated ||
+        plan.hydrationState ||
+        plan.repository !== session.repository ||
+        !this.github.listAllowedRepositories().includes(plan.repository)
+      ) {
+        throw new ConflictException('Worktree уже наповнений, змінений або недоступний.');
+      }
+      return publicPlan(plan);
+    });
+  }
+
+  async reserveHydration(
+    sessionId: string, planId: string, fingerprint: string, commit: string,
+  ): Promise<WorktreePlan> {
+    const session = await this.workspace.get(sessionId);
+    if (session.status === 'completed') {
+      throw new ConflictException('Не можна змінювати worktree завершеної сесії.');
+    }
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (
+        plan.state !== 'created' ||
+        !plan.worktreeCreated ||
+        plan.hydrationState ||
+        plan.fingerprint !== fingerprint ||
+        plan.baseHeadSha !== commit ||
+        plan.repository !== session.repository ||
+        !this.github.listAllowedRepositories().includes(plan.repository)
+      ) {
+        throw new ConflictException('Hydration уже почато або дозвіл більше не чинний.');
+      }
+      plan.hydrationState = 'running';
+      plan.hydrationFiles = 0;
+      plan.hydrationBytes = 0;
+      plan.history.push({ event: 'hydration-started', timestamp: new Date().toISOString() });
+      return publicPlan(plan);
+    }, true);
+  }
+
+  async recordHydrationProgress(
+    sessionId: string, planId: string, files: number, bytes: number,
+  ): Promise<void> {
+    await this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (
+        plan.hydrationState !== 'running' ||
+        !Number.isSafeInteger(files) || !Number.isSafeInteger(bytes) ||
+        files < (plan.hydrationFiles ?? 0) || bytes < (plan.hydrationBytes ?? 0) ||
+        files > 5000 || bytes > 100 * 1024 * 1024
+      ) {
+        throw new ConflictException('Непослідовний стан hydration.');
+      }
+      plan.hydrationFiles = files;
+      plan.hydrationBytes = bytes;
+    }, true);
+  }
+
+  async finishHydration(
+    sessionId: string, planId: string, outcome: 'completed' | 'failed',
+    files?: number, bytes?: number,
+  ): Promise<WorktreePlan> {
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (plan.hydrationState !== 'running') {
+        throw new ConflictException('Hydration не перебуває у стані виконання.');
+      }
+      if (outcome === 'completed') {
+        if (
+          !Number.isSafeInteger(files) || !Number.isSafeInteger(bytes) ||
+          files! < (plan.hydrationFiles ?? 0) || bytes! < (plan.hydrationBytes ?? 0) ||
+          files! > 5000 || bytes! > 100 * 1024 * 1024
+        ) {
+          throw new ConflictException('Некоректний результат hydration.');
+        }
+        plan.hydrationFiles = files;
+        plan.hydrationBytes = bytes;
+      }
+      plan.hydrationState = outcome;
+      plan.history.push({
+        event: outcome === 'completed' ? 'hydration-completed' : 'hydration-failed',
+        timestamp: new Date().toISOString(),
+      });
+      return publicPlan(plan);
+    }, true);
+  }
+
   async revoke(sessionId: string, planId: string, input: unknown): Promise<WorktreePlan> {
     if (!noBodySchema.safeParse(input).success) {
       throw new BadRequestException('Некоректний запит відкликання.');
