@@ -12,6 +12,13 @@ const STORE = '/store';
 const OUTPUT = '/workspace';
 const TARGET_STORE = join(OUTPUT, '.pnpm-store');
 const FILES = ['package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml'];
+// Independently reviewed Git object pins for the exact three checked-in fixture
+// files. Only this immutable, tiny lockfile is allowed to skip metadata lookups.
+const TRUSTED_GIT_BLOBS = Object.freeze({
+  'package.json': 'c6a7cce7bf87466e4d6e5c4333a79f15ee42f8b6',
+  'pnpm-workspace.yaml': '77125aa68b16356bb413d241df61f535e8bad266',
+  'pnpm-lock.yaml': '8272c11d2b696f2fc1b14ff4cf93dbc43b2f5c50',
+});
 const PINS = Object.freeze({
   'is-number@7.0.0': 'sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==',
   'to-regex-range@5.0.1': 'sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==',
@@ -108,6 +115,15 @@ async function main() {
   }
   const source = new Map();
   for (const name of FILES) source.set(name, await readFixture(name));
+  for (const [name, data] of source) {
+    const gitBlobSha = createHash('sha1')
+      .update(Buffer.from('blob ' + data.length + '\\0'))
+      .update(data)
+      .digest('hex');
+    if (gitBlobSha !== TRUSTED_GIT_BLOBS[name]) {
+      throw new Error('Unreviewed fixture Git blob: ' + name);
+    }
+  }
   const lockSha256 = checkFixture(source);
   const tally = { files: 0, directories: 0, bytes: 0 };
   await inspectStore(STORE, 0, tally);
@@ -126,7 +142,7 @@ async function main() {
   const proc = spawnSync(
     '/bin/sh',
     ['/usr/bin/devhub-pnpm', 'install', '--offline', '--frozen-lockfile',
-      '--ignore-scripts', '--store-dir', TARGET_STORE],
+      '--ignore-scripts', '--trust-lockfile', '--store-dir', TARGET_STORE],
     {
       cwd: OUTPUT,
       shell: false,
