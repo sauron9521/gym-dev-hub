@@ -38,7 +38,7 @@ type Grant = {
   expiresAt: number;
 };
 
-async function assertRegularScopedFile(plan: WorktreePlan, filePath: string): Promise<void> {
+export async function assertRegularScopedFile(plan: WorktreePlan, filePath: string): Promise<void> {
   validateScopedCodePath(filePath);
   const root = await realpath(plan.targetPath);
   let candidate = root;
