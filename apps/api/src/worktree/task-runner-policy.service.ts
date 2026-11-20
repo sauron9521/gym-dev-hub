@@ -1,9 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { z } from 'zod';
-import type {
-  TaskRunnerPreview,
-  TaskRunnerRecipeId,
-} from '@gym-dev-hub/contracts';
+import type { TaskRunnerPreview, TaskRunnerRecipeId } from '@gym-dev-hub/contracts';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeIntegrityService } from './worktree-integrity.service.js';
 
@@ -15,10 +12,7 @@ const recipes = {
   WEB_TEST: { label: 'Web — unit tests', package: '@gym/web', script: 'test' },
   WEB_TYPECHECK: { label: 'Web — TypeScript', package: '@gym/web', script: 'typecheck' },
   WEB_LINT: { label: 'Web — lint', package: '@gym/web', script: 'lint' },
-} as const satisfies Record<
-  TaskRunnerRecipeId,
-  { label: string; package: string; script: string }
->;
+} as const satisfies Record<TaskRunnerRecipeId, { label: string; package: string; script: string }>;
 
 const schema = z.strictObject({
   recipeId: z.enum([

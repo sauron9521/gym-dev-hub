@@ -6,14 +6,14 @@ This milestone creates a **non-executing review surface**, not a test runner. It
 
 Only `sauron9521/gym-platform` is permitted. The following **fixed** commands are based on the repository's current root and app package scripts:
 
-| Recipe ID | Future argv |
-| --- | --- |
-| `API_TEST` | `["pnpm", "--filter", "@gym/api", "test"]` |
+| Recipe ID       | Future argv                                     |
+| --------------- | ----------------------------------------------- |
+| `API_TEST`      | `["pnpm", "--filter", "@gym/api", "test"]`      |
 | `API_TYPECHECK` | `["pnpm", "--filter", "@gym/api", "typecheck"]` |
-| `API_LINT` | `["pnpm", "--filter", "@gym/api", "lint"]` |
-| `WEB_TEST` | `["pnpm", "--filter", "@gym/web", "test"]` |
+| `API_LINT`      | `["pnpm", "--filter", "@gym/api", "lint"]`      |
+| `WEB_TEST`      | `["pnpm", "--filter", "@gym/web", "test"]`      |
 | `WEB_TYPECHECK` | `["pnpm", "--filter", "@gym/web", "typecheck"]` |
-| `WEB_LINT` | `["pnpm", "--filter", "@gym/web", "lint"]` |
+| `WEB_LINT`      | `["pnpm", "--filter", "@gym/web", "lint"]`      |
 
 The client can select one recipe ID and the worktree fingerprint only. It cannot provide `argv`, executable, flags, cwd, host paths, environment variables, or `shell`.
 

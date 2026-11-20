@@ -1,11 +1,6 @@
 /** A fixed set of recipes for gym-platform only. Client-provided commands are never accepted. */
 export type TaskRunnerRecipeId =
-  | 'API_TEST'
-  | 'API_TYPECHECK'
-  | 'API_LINT'
-  | 'WEB_TEST'
-  | 'WEB_TYPECHECK'
-  | 'WEB_LINT';
+  'API_TEST' | 'API_TYPECHECK' | 'API_LINT' | 'WEB_TEST' | 'WEB_TYPECHECK' | 'WEB_LINT';
 
 export interface TaskRunnerPreview {
   sessionId: string;

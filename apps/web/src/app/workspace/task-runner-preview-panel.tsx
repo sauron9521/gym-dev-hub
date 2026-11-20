@@ -55,8 +55,8 @@ export function TaskRunnerPreviewPanel({ sessionId, report, fingerprint }: Props
       <div className="overline">TASK RUNNER POLICY · PR #19</div>
       <h4>План перевірок Gym Platform</h4>
       <p>
-        Можна перевірити точну майбутню команду, Git commit і пропоновані обмеження.
-        Це не запускає тести, Docker або Codex і не видає дозволу на виконання.
+        Можна перевірити точну майбутню команду, Git commit і пропоновані обмеження. Це не запускає
+        тести, Docker або Codex і не видає дозволу на виконання.
       </p>
       <label htmlFor="task-runner-recipe">Дозволений рецепт</label>
       <select
@@ -75,7 +75,12 @@ export function TaskRunnerPreviewPanel({ sessionId, report, fingerprint }: Props
           </option>
         ))}
       </select>
-      <button type="button" className="refresh" disabled={busy} onClick={() => void inspectRecipe()}>
+      <button
+        type="button"
+        className="refresh"
+        disabled={busy}
+        onClick={() => void inspectRecipe()}
+      >
         {busy ? 'Перевіряємо…' : 'Переглянути команду й обмеження'}
       </button>
       {preview && (
@@ -107,7 +112,11 @@ export function TaskRunnerPreviewPanel({ sessionId, report, fingerprint }: Props
           </ul>
         </div>
       )}
-      {error && <p role="alert" className="ws-chat-error">{error}</p>}
+      {error && (
+        <p role="alert" className="ws-chat-error">
+          {error}
+        </p>
+      )}
       <small>
         Запуск реальних pnpm-скриптів виконує код репозиторію. Потрібні окремий Docker runner,
         обмеження ресурсів, захист секретів і дозвіл оператора в наступних PR.
