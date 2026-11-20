@@ -63,15 +63,19 @@ export function inspectTreeListing(listing: string): TreeSummary {
       continue;
     }
     const parts = name.split('/');
-    if (parts.some((part) =>
-      !part ||
-      part === '.' ||
-      part === '..' ||
-      part.toLowerCase() === '.git' ||
-      part.endsWith('.') ||
-      part.endsWith(' ') ||
-      FORBIDDEN.test(part) ||
-      WINDOWS_DEVICE.test(part))) {
+    if (
+      parts.some(
+        (part) =>
+          !part ||
+          part === '.' ||
+          part === '..' ||
+          part.toLowerCase() === '.git' ||
+          part.endsWith('.') ||
+          part.endsWith(' ') ||
+          FORBIDDEN.test(part) ||
+          WINDOWS_DEVICE.test(part),
+      )
+    ) {
       violations.push('Недозволений компонент шляху для Windows/Linux.');
       continue;
     }
@@ -99,7 +103,16 @@ export function inspectTreeListing(listing: string): TreeSummary {
 
 function gitEnvironment(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
-  for (const key of ['PATH', 'Path', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'HOME', 'USERPROFILE']) {
+  for (const key of [
+    'PATH',
+    'Path',
+    'SystemRoot',
+    'WINDIR',
+    'TEMP',
+    'TMP',
+    'HOME',
+    'USERPROFILE',
+  ]) {
     if (process.env[key]) env[key] = process.env[key];
   }
   env.GIT_CONFIG_NOSYSTEM = '1';
@@ -112,18 +125,30 @@ function gitEnvironment(): NodeJS.ProcessEnv {
 
 function gitRead(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolveOutput, reject) => {
-    execFile('git', [
-      '--no-optional-locks',
-      '-c', 'core.fsmonitor=false',
-      '-c', 'core.hooksPath=.devhub-disabled-hooks',
-      '-C', cwd, ...args,
-    ], {
-      env: gitEnvironment(), windowsHide: true, shell: false,
-      timeout: 12_000, maxBuffer: 2 * 1024 * 1024,
-    }, (error, output) => {
-      if (error) reject(new Error('Git read-only inspection failed'));
-      else resolveOutput(output.trim());
-    });
+    execFile(
+      'git',
+      [
+        '--no-optional-locks',
+        '-c',
+        'core.fsmonitor=false',
+        '-c',
+        'core.hooksPath=.devhub-disabled-hooks',
+        '-C',
+        cwd,
+        ...args,
+      ],
+      {
+        env: gitEnvironment(),
+        windowsHide: true,
+        shell: false,
+        timeout: 12_000,
+        maxBuffer: 2 * 1024 * 1024,
+      },
+      (error, output) => {
+        if (error) reject(new Error('Git read-only inspection failed'));
+        else resolveOutput(output.trim());
+      },
+    );
   });
 }
 
@@ -170,8 +195,10 @@ export class WorktreeInspectionService {
       if (resolve(source).toLowerCase() !== resolve(plan.sourcePath).toLowerCase()) {
         throw new Error('Source path drift');
       }
-      if (plan.targetPath !== resolve(this.worktreesRoot, plan.id) ||
-          relative(this.worktreesRoot, plan.targetPath) !== plan.id) {
+      if (
+        plan.targetPath !== resolve(this.worktreesRoot, plan.id) ||
+        relative(this.worktreesRoot, plan.targetPath) !== plan.id
+      ) {
         throw new Error('Target path drift');
       }
       await verifyRoot(plan.targetPath, this.worktreesRoot);
@@ -194,17 +221,25 @@ export class WorktreeInspectionService {
 
         const topLevel = await gitRead(plan.targetPath, ['rev-parse', '--show-toplevel']);
         const commonDir = await gitRead(plan.targetPath, [
-          'rev-parse', '--path-format=absolute', '--git-common-dir',
+          'rev-parse',
+          '--path-format=absolute',
+          '--git-common-dir',
         ]);
-        if ((await realpath(topLevel)).toLowerCase() !== (await realpath(plan.targetPath)).toLowerCase() ||
-            (await realpath(commonDir)).toLowerCase() !== (await realpath(join(source, '.git'))).toLowerCase()) {
+        if (
+          (await realpath(topLevel)).toLowerCase() !==
+            (await realpath(plan.targetPath)).toLowerCase() ||
+          (await realpath(commonDir)).toLowerCase() !==
+            (await realpath(join(source, '.git'))).toLowerCase()
+        ) {
           findings.push('Git worktree прив’язаний до іншого репозиторію.');
         }
         const branch = await gitRead(plan.targetPath, ['symbolic-ref', '--quiet', 'HEAD']);
         const sha = await gitRead(plan.targetPath, ['rev-parse', '--verify', 'HEAD^{commit}']);
-        if (branch.trim() !== 'refs/heads/' + plan.proposedBranch ||
-            !SHA.test(sha.trim()) ||
-            sha.trim() !== plan.baseHeadSha) {
+        if (
+          branch.trim() !== 'refs/heads/' + plan.proposedBranch ||
+          !SHA.test(sha.trim()) ||
+          sha.trim() !== plan.baseHeadSha
+        ) {
           findings.push('Git branch або commit не відповідає маніфесту.');
         }
       }
@@ -212,7 +247,12 @@ export class WorktreeInspectionService {
         findings.push('Немає зафіксованого Git commit.');
       } else {
         const listing = await gitRead(source, [
-          'ls-tree', '-r', '-l', '-z', '--full-tree', plan.baseHeadSha,
+          'ls-tree',
+          '-r',
+          '-l',
+          '-z',
+          '--full-tree',
+          plan.baseHeadSha,
         ]);
         const summary = inspectTreeListing(listing);
         fileCount = summary.fileCount;
@@ -226,12 +266,16 @@ export class WorktreeInspectionService {
     if (plan.state !== 'created' || !plan.worktreeCreated) {
       findings.push('Операція створення раніше завершилася неуспішно або була перервана.');
     }
-    const state = findings.length === 0 ? 'ready-for-hydration'
-      : targetExists ? 'needs-review' : 'missing';
+    const state =
+      findings.length === 0 ? 'ready-for-hydration' : targetExists ? 'needs-review' : 'missing';
     return {
-      planId: plan.id, sessionId: plan.sessionId, state,
-      targetExists, metadataOnly,
-      fileCount, totalBytes,
+      planId: plan.id,
+      sessionId: plan.sessionId,
+      state,
+      targetExists,
+      metadataOnly,
+      fileCount,
+      totalBytes,
       findings: [...new Set(findings)].slice(0, 10),
       checkedAt: new Date().toISOString(),
       hydrationEnabled: false,

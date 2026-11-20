@@ -15,8 +15,9 @@ function entry(path: string, mode = '100644', type = 'blob', size = '5') {
 
 describe('Git tree safety validation', () => {
   it('accepts regular files and accounts for sizes', () => {
-    expect(inspectTreeListing(entry('src/index.ts') + entry('README.md', '100755', 'blob', '12')))
-      .toEqual({ fileCount: 2, totalBytes: 17, violations: [] });
+    expect(
+      inspectTreeListing(entry('src/index.ts') + entry('README.md', '100755', 'blob', '12')),
+    ).toEqual({ fileCount: 2, totalBytes: 17, violations: [] });
   });
 
   it.each([
@@ -34,15 +35,18 @@ describe('Git tree safety validation', () => {
   });
 
   it('rejects case and Unicode conflicts on Windows', () => {
-    expect(inspectTreeListing(entry('Readme.md') + entry('README.md')).violations)
-      .toContain('Конфлікт шляхів у Git tree (регістр або Unicode).');
-    expect(inspectTreeListing(entry('A') + entry('a/file.txt')).violations)
-      .toContain('Файл конфліктує з батьківською папкою.');
+    expect(inspectTreeListing(entry('Readme.md') + entry('README.md')).violations).toContain(
+      'Конфлікт шляхів у Git tree (регістр або Unicode).',
+    );
+    expect(inspectTreeListing(entry('A') + entry('a/file.txt')).violations).toContain(
+      'Файл конфліктує з батьківською папкою.',
+    );
   });
 
   it('fails closed on incomplete NUL output', () => {
-    expect(inspectTreeListing(entry('README.md').slice(0, -1)).violations)
-      .toContain('Неповний вивід Git tree.');
+    expect(inspectTreeListing(entry('README.md').slice(0, -1)).violations).toContain(
+      'Неповний вивід Git tree.',
+    );
   });
 });
 

@@ -10,7 +10,7 @@ In `/workspace`, select a session with a plan in `creating`, `created`, or `fail
 
 The inspector does not mutate the source repository or target worktree. It returns:
 
-- `ready-for-hydration`: only when the manifest is `created`, the target folder contains *only* its `.git` pointer and all checks pass
+- `ready-for-hydration`: only when the manifest is `created`, the target folder contains _only_ its `.git` pointer and all checks pass
 - `needs-review`: the target exists but has unexpected content, incorrect Git metadata, unsafe tree objects, a failed/interrupted plan or another mismatch
 - `missing`: the target directory cannot be found or verified
 
