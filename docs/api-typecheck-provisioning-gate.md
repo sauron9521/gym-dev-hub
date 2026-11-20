@@ -14,22 +14,22 @@ The script rehashes those eight files itself, disallows symlinks and oversized f
 
 ## What is checked
 
-The gate resolves **every declared direct dependency and dev dependency of the actual `apps/api` importer** in the *application* document, not the pnpm-toolchain document. For each dependency it checks the manifest specifier, exact importer resolution, matching registry package entry and SHA-512 integrity. The output includes the resolved version and integrity for each package; the actual version may differ from the requested semver range.
+The gate resolves **every declared direct dependency and dev dependency of the actual `apps/api` importer** in the _application_ document, not the pnpm-toolchain document. For each dependency it checks the manifest specifier, exact importer resolution, matching registry package entry and SHA-512 integrity. The output includes the resolved version and integrity for each package; the actual version may differ from the requested semver range.
 
 Additional reviewed pins include:
 
-| Required package | Resolution |
-| --- | --- |
-| `typescript` | `6.0.3` |
-| `prisma`, `@prisma/client`, `@prisma/adapter-pg` | `7.10.1` |
-| Transitive `@prisma/engines` | `7.10.1` |
-| `bcrypt` | `6.0.0` |
-| `sharp` | `0.35.5` |
-| `@types/node` | `26.6.6` |
+| Required package                                 | Resolution |
+| ------------------------------------------------ | ---------- |
+| `typescript`                                     | `6.0.3`    |
+| `prisma`, `@prisma/client`, `@prisma/adapter-pg` | `7.10.1`   |
+| Transitive `@prisma/engines`                     | `7.10.1`   |
+| `bcrypt`                                         | `6.0.0`    |
+| `sharp`                                          | `0.35.5`   |
+| `@types/node`                                    | `26.6.6`   |
 
 The API recipe must remain **`tsc --noEmit -p tsconfig.build.json`**, not a caller-provided shell command. Its TypeScript config is checked for strict NodeNext resolution and the generated `#prisma/*` alias. The Prisma generator must remain `prisma-client`, output into `apps/api/src/infra/database/generated/prisma`, and use the reviewed `prisma/schemas/` location.
 
-Native build permissions in the *source repository* include `@prisma/engines`, `prisma`, `bcrypt`, `esbuild`, `@swc/core`. This describes existing policy; **the Hub does not execute those hooks**. Denied `@parcel/watcher` and `@scarf/scarf` builds remain denied. Some packages such as `sharp` may rely on platform-specific prebuilt binaries and require separate provisioning review even without a lifecycle script.
+Native build permissions in the _source repository_ include `@prisma/engines`, `prisma`, `bcrypt`, `esbuild`, `@swc/core`. This describes existing policy; **the Hub does not execute those hooks**. Denied `@parcel/watcher` and `@scarf/scarf` builds remain denied. Some packages such as `sharp` may rely on platform-specific prebuilt binaries and require separate provisioning review even without a lifecycle script.
 
 ## Fail-closed output
 

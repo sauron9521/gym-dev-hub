@@ -49,7 +49,10 @@ export function readImporterEntry(importer, group, name, specifier) {
   }
   const entry = '      ' + (name.startsWith('@') ? "'" + name + "'" : name) + ':';
   const index = groupLines.indexOf(entry);
-  requireSafe(index >= 0 && groupLines.indexOf(entry, index + 1) < 0, 'missing/duplicate API dependency ' + name);
+  requireSafe(
+    index >= 0 && groupLines.indexOf(entry, index + 1) < 0,
+    'missing/duplicate API dependency ' + name,
+  );
   const s = /^        specifier: (.*)$/.exec(groupLines[index + 1] ?? '');
   const v = /^        version: (.*)$/.exec(groupLines[index + 2] ?? '');
   requireSafe(s !== null && v !== null && s[1] === specifier, 'unexpected specifier for ' + name);
@@ -61,7 +64,10 @@ export function readImporterEntry(importer, group, name, specifier) {
 export function packageIntegrity(document, name, version) {
   const packageStart = document.indexOf('\npackages:\n');
   const snapshotStart = document.indexOf('\nsnapshots:\n', packageStart);
-  requireSafe(packageStart >= 0 && snapshotStart > packageStart, 'malformed registry package section');
+  requireSafe(
+    packageStart >= 0 && snapshotStart > packageStart,
+    'malformed registry package section',
+  );
   const packagesOnly = document.slice(packageStart, snapshotStart);
   const key = name + '@' + version;
   const line = '  ' + (name.startsWith('@') ? "'" + key + "'" : key) + ':\n';
@@ -75,21 +81,51 @@ export function packageIntegrity(document, name, version) {
 }
 
 export function inspectTypecheckLayout(root, api, ts, build, prismaConfig, schema) {
-  requireSafe(root.name === 'gym-platform' && root.packageManager === 'pnpm@12.18.0', 'unknown package manager');
-  requireSafe(api.name === '@gym/api' && api.scripts?.typecheck === 'tsc --noEmit -p tsconfig.build.json', 'unreviewed typecheck recipe');
-  requireSafe(api.scripts?.['db:generate'] === 'prisma generate --config prisma7.config.ts', 'unreviewed Prisma generator');
+  requireSafe(
+    root.name === 'gym-platform' && root.packageManager === 'pnpm@12.18.0',
+    'unknown package manager',
+  );
+  requireSafe(
+    api.name === '@gym/api' && api.scripts?.typecheck === 'tsc --noEmit -p tsconfig.build.json',
+    'unreviewed typecheck recipe',
+  );
+  requireSafe(
+    api.scripts?.['db:generate'] === 'prisma generate --config prisma7.config.ts',
+    'unreviewed Prisma generator',
+  );
   requireSafe(build.extends === './tsconfig.json', 'unreviewed build config');
-  requireSafe(build.compilerOptions?.rootDir === './src' && JSON.stringify(build.include) === '["src"]', 'unreviewed build scope');
-  requireSafe(Array.isArray(build.exclude) && build.exclude.includes('src/generated/**'), 'unreviewed build exclusions');
-  requireSafe(ts.compilerOptions?.strict === true && ts.compilerOptions?.module === 'nodenext', 'unreviewed TS module policy');
-  requireSafe(ts.compilerOptions?.paths?.['#prisma/*']?.[0] === './src/infra/database/generated/prisma/*', 'unreviewed generated Prisma import path');
-  requireSafe(/generator client\s*\{[\s\S]*?provider\s*=\s*"prisma-client"/.test(schema), 'Prisma generator missing');
-  requireSafe(/output\s*=\s*"\.\.\/\.\.\/src\/infra\/database\/generated\/prisma"/.test(schema), 'Prisma output changed');
+  requireSafe(
+    build.compilerOptions?.rootDir === './src' && JSON.stringify(build.include) === '["src"]',
+    'unreviewed build scope',
+  );
+  requireSafe(
+    Array.isArray(build.exclude) && build.exclude.includes('src/generated/**'),
+    'unreviewed build exclusions',
+  );
+  requireSafe(
+    ts.compilerOptions?.strict === true && ts.compilerOptions?.module === 'nodenext',
+    'unreviewed TS module policy',
+  );
+  requireSafe(
+    ts.compilerOptions?.paths?.['#prisma/*']?.[0] === './src/infra/database/generated/prisma/*',
+    'unreviewed generated Prisma import path',
+  );
+  requireSafe(
+    /generator client\s*\{[\s\S]*?provider\s*=\s*"prisma-client"/.test(schema),
+    'Prisma generator missing',
+  );
+  requireSafe(
+    /output\s*=\s*"\.\.\/\.\.\/src\/infra\/database\/generated\/prisma"/.test(schema),
+    'Prisma output changed',
+  );
   requireSafe(/schema:\s*'prisma\/schemas\/'/.test(prismaConfig), 'Prisma schema location changed');
 }
 
 export function inspectApiTypecheckProvisioning(files) {
-  requireSafe(files !== null && typeof files === 'object' && !Array.isArray(files), 'missing reviewed files');
+  requireSafe(
+    files !== null && typeof files === 'object' && !Array.isArray(files),
+    'missing reviewed files',
+  );
   for (const path of Object.keys(PINNED_API.blobs)) {
     requireSafe(typeof files[path] === 'string', 'missing pinned input: ' + path);
   }
@@ -97,11 +133,21 @@ export function inspectApiTypecheckProvisioning(files) {
   const api = JSON.parse(files['apps/api/package.json']);
   const ts = JSON.parse(files['apps/api/tsconfig.json']);
   const build = JSON.parse(files['apps/api/tsconfig.build.json']);
-  inspectTypecheckLayout(root, api, ts, build, files['apps/api/prisma7.config.ts'], files['apps/api/prisma/schemas/schema.prisma']);
+  inspectTypecheckLayout(
+    root,
+    api,
+    ts,
+    build,
+    files['apps/api/prisma7.config.ts'],
+    files['apps/api/prisma/schemas/schema.prisma'],
+  );
   const workspaceReport = auditWorkspaceText(files['pnpm-workspace.yaml']);
   const lockText = files['pnpm-lock.yaml'];
   const lockReport = auditLockText(lockText);
-  requireSafe(lockReport.yamlDocuments === 2 && lockReport.sha512Pins === 1631, 'full pinned lockfile drift');
+  requireSafe(
+    lockReport.yamlDocuments === 2 && lockReport.sha512Pins === 1631,
+    'full pinned lockfile drift',
+  );
   const docs = lockText.split('\n---\n');
   requireSafe(docs.length === 2, 'two pnpm 12 YAML documents required');
   const document = docs[1];
@@ -127,12 +173,21 @@ export function inspectApiTypecheckProvisioning(files) {
       });
     }
   }
-  requireSafe(resolutions.length >= 35 && resolutions.length < 80, 'API direct dependency graph drift');
+  requireSafe(
+    resolutions.length >= 35 && resolutions.length < 80,
+    'API direct dependency graph drift',
+  );
   for (const [name, version] of Object.entries(REQUIRED)) {
-    requireSafe(resolutions.some((item) => item.name === name && item.resolved === version), 'required package version drift: ' + name);
+    requireSafe(
+      resolutions.some((item) => item.name === name && item.resolved === version),
+      'required package version drift: ' + name,
+    );
   }
   for (const nativeName of ['@prisma/engines', 'prisma', 'bcrypt']) {
-    requireSafe(workspaceReport.buildScriptsAllowed.includes(nativeName), 'native build policy drift: ' + nativeName);
+    requireSafe(
+      workspaceReport.buildScriptsAllowed.includes(nativeName),
+      'native build policy drift: ' + nativeName,
+    );
   }
   const engines = packageIntegrity(document, '@prisma/engines', '7.10.1');
   return {
@@ -183,9 +238,15 @@ async function readPinnedFile(root, path, sha) {
   }
   const file = join(root, path);
   const stat = await lstat(file);
-  requireSafe(stat.isFile() && !stat.isSymbolicLink() && stat.size > 0 && stat.size <= 1500000, 'unsafe pinned file: ' + path);
+  requireSafe(
+    stat.isFile() && !stat.isSymbolicLink() && stat.size > 0 && stat.size <= 1500000,
+    'unsafe pinned file: ' + path,
+  );
   const bytes = await readFile(file);
-  requireSafe(bytes.length === stat.size && gitBlobSha(bytes) === sha, 'pinned Git blob changed: ' + path);
+  requireSafe(
+    bytes.length === stat.size && gitBlobSha(bytes) === sha,
+    'pinned Git blob changed: ' + path,
+  );
   return bytes.toString('utf8');
 }
 
@@ -209,7 +270,11 @@ async function main() {
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   main().catch((error) => {
-    process.stderr.write('API_TYPECHECK provisioning gate rejected: ' + (error instanceof Error ? error.message.slice(0, 450) : 'unknown') + '\n');
+    process.stderr.write(
+      'API_TYPECHECK provisioning gate rejected: ' +
+        (error instanceof Error ? error.message.slice(0, 450) : 'unknown') +
+        '\n',
+    );
     process.exitCode = 1;
   });
 }
