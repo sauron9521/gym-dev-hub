@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import type { WorktreePlan, WorktreeIntegrityReport } from '@gym-dev-hub/contracts';
 import { WorktreeToolService } from '../src/worktree/worktree-tool.service.js';
 import { runMountedWorkerProbe } from '../src/worktree/worktree-mount-probe.js';
+import { withPinnedFileStage } from '../src/worktree/worktree-file-stage.js';
+
+vi.mock('../src/worktree/worktree-file-stage.js', () => ({ withPinnedFileStage: vi.fn() }));
 
 vi.mock('../src/worktree/worktree-mount-probe.js', async (original) => ({
   ...(await original<typeof import('../src/worktree/worktree-mount-probe.js')>()),
@@ -80,6 +83,7 @@ describe('separate one-shot fixed worker tool approval', () => {
     };
     service = new WorktreeToolService(plans as never, integrity as never, boundary as never);
     vi.mocked(runMountedWorkerProbe).mockResolvedValue(DIGEST);
+    vi.mocked(withPinnedFileStage).mockImplementation(async (_plan, _path, action) => action({ sourcePath: join(root, 'single-use-stage'), fileName: 'test.ts', bytes: Buffer.from('export const value = 1;\n'), sha256: DIGEST }));
   });
 
   afterEach(async () => {
@@ -116,7 +120,7 @@ describe('separate one-shot fixed worker tool approval', () => {
       networkEnabled: false,
       containerRemoved: true,
     });
-    expect(runMountedWorkerProbe).toHaveBeenCalledWith(root, undefined, 'src/test.ts');
+    expect(runMountedWorkerProbe).toHaveBeenCalledWith(join(root, 'single-use-stage'), undefined, 'test.ts');
     expect(plans.recordToolRun.mock.calls.map(([, , step]) => step)).toEqual([
       'started',
       'completed',
