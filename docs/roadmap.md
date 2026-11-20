@@ -15,8 +15,9 @@
 13. **Gated raw Git blob hydration**: separate operator-secret grant, pinned blob read, exclusive bounded writes, durable progress and failure state (PR #13).
 14. **Post-hydration integrity & mount preview**: read-only Git blob hashing, extra-file detection and a non-executing scoped mount policy (PR #14).
 15. **Ephemeral read-only worker mount**: distinct operator approval, pinned image, fixed protocol and read-only bind validation with mandatory container cleanup (PR #15).
-16. **Isolated execution**: carefully gated code-reading access and controlled agent execution in later reviewed PRs.
-17. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-18. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+16. **Scoped code reading**: separate one-time operator consent for one bounded source file in a temporary read-only Docker worker; Docker Desktop mount identity checks, no arbitrary commands (PR #16).
+17. **Controlled execution (future)**: independently approved agent work, fixed capabilities and review gates; no auto-merge.
+18. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+19. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
