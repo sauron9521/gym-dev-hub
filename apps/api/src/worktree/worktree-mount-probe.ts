@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { resolve, isAbsolute } from 'node:path';
+import { resolve, isAbsolute, win32 } from 'node:path';
 import { callDocker, dockerEnvironment } from '../boundary/boundary.service.js';
 import { workerArguments, validateWorkerImage, WORKER_IMAGE } from '../worker/worker.service.js';
 
@@ -32,14 +32,62 @@ export function mountedWorkerArguments(
   return args;
 }
 
+
+const READ_FILE_LIMIT = 8_192;
+
+/** One regular source file, never a command, glob, directory or hidden path. */
+export function validateScopedCodePath(path: string): void {
+  if (
+    path.length < 1 ||
+    path.length > 160 ||
+    !/^[a-zA-Z0-9._/-]+$/.test(path) ||
+    !/\.(ts|tsx|js|jsx|json|md|css|html|yml|yaml)$/.test(path) ||
+    path.split('/').some((part) => !part || part.startsWith('.') || part.includes('..'))
+  ) {
+    throw new Error('Invalid scoped source file path');
+  }
+}
+
+/** Accept only native Windows paths or documented Docker Desktop drive mappings. */
+export function equivalentMountSource(
+  actual: string,
+  expected: string,
+  platform = process.platform,
+): boolean {
+  if (platform !== 'win32') return actual === expected;
+  if (!/^[a-z]:[\\/]/i.test(expected)) return false;
+  const normalized = (value: string) => value.replaceAll('\\', '/').toLowerCase();
+  const wanted = normalized(win32.normalize(expected));
+  let observed: string;
+  if (/^[a-z]:[\\/]/i.test(actual)) {
+    observed = normalized(win32.normalize(actual));
+  } else {
+    const mapped = /^\/(?:run\/desktop\/mnt\/host|host_mnt)\/([a-z])\/(.+)$/i.exec(actual);
+    if (
+      !mapped ||
+      mapped[2]!.split('/').some((part) => !part || part === '.' || part === '..')
+    ) {
+      return false;
+    }
+    observed = normalized(win32.normalize(mapped[1] + ':/' + mapped[2]));
+  }
+  return wanted === observed && !actual.includes('~');
+}
+
 type ObservedMount = {
   Type?: string;
   Source?: string;
   Target?: string;
+  Destination?: string;
   ReadOnly?: boolean;
+  RW?: boolean;
 };
 
-export function validateObservedMounts(raw: string, expectedSource: string): void {
+export function validateObservedMounts(
+  raw: string,
+  expectedSource: string,
+  platform = process.platform,
+): void {
   let mounts: ObservedMount[];
   try {
     mounts = JSON.parse(raw) as ObservedMount[];
@@ -52,24 +100,30 @@ export function validateObservedMounts(raw: string, expectedSource: string): voi
   const mount = mounts[0]!;
   if (
     mount.Type !== 'bind' ||
-    mount.Target !== '/workspace' ||
-    mount.ReadOnly !== true ||
+    (mount.Target ?? mount.Destination) !== '/workspace' ||
+    (mount.ReadOnly !== true && mount.RW !== false) ||
+    mount.ReadOnly === false ||
+    mount.RW === true ||
     !mount.Source ||
-    resolve(mount.Source).toLowerCase() !== resolve(expectedSource).toLowerCase()
+    !equivalentMountSource(mount.Source, expectedSource, platform)
   ) {
     throw new Error('Bind source, read-only policy or destination mismatch');
   }
 }
 
 type Pending = {
-  expected: 'ready' | 'pong' | 'stopped';
-  resolve: () => void;
+  expected: 'ready' | 'pong' | 'stopped' | 'file';
+  resolve: (value: string | undefined) => void;
   reject: (error: Error) => void;
   timer: NodeJS.Timeout;
 };
 
-/** Ephemeral no-command worker. Always attempt to remove container. */
-export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
+/** Ephemeral fixed-protocol worker. Never accepts shell commands. */
+export async function runMountedWorkerProbe(
+  sourcePath: string,
+  readPath?: string,
+): Promise<string | undefined> {
+  if (readPath !== undefined) validateScopedCodePath(readPath);
   const context = await callDocker(
     ['context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'],
     8_000,
@@ -98,6 +152,7 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
   let buffer = '';
   let pending: Pending | null = null;
   let cleanupFailed = false;
+  let readContent: string | undefined;
 
   const fail = (error: Error) => {
     if (!pending) return;
@@ -121,7 +176,7 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
     running.stdout.setEncoding('utf8');
     running.stdout.on('data', (part: string) => {
       buffer += part;
-      if (buffer.length > 4096) {
+      if (buffer.length > 16_384) {
         fail(new Error('Worker response exceeds limit'));
         running.kill();
         return;
@@ -130,7 +185,12 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
       while (newline >= 0) {
         const line = buffer.slice(0, newline).trim();
         buffer = buffer.slice(newline + 1);
-        let reply: { protocol?: number; event?: string; executionEnabled?: boolean };
+        let reply: {
+          protocol?: number;
+          event?: string;
+          executionEnabled?: boolean;
+          contentBase64?: string;
+        };
         try {
           reply = JSON.parse(line) as typeof reply;
         } catch {
@@ -149,9 +209,34 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
           running.kill();
           return;
         }
+        let text: string | undefined;
+        if (waiter.expected === 'file') {
+          const encoded = reply.contentBase64;
+          if (
+            !encoded ||
+            !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)
+          ) {
+            fail(new Error('Invalid worker file encoding'));
+            running.kill();
+            return;
+          }
+          const bytes = Buffer.from(encoded, 'base64');
+          if (bytes.length > READ_FILE_LIMIT || bytes.toString('base64') !== encoded) {
+            fail(new Error('Worker read exceeds limit'));
+            running.kill();
+            return;
+          }
+          try {
+            text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+          } catch {
+            fail(new Error('Worker read is not UTF-8'));
+            running.kill();
+            return;
+          }
+        }
         pending = null;
         clearTimeout(waiter.timer);
-        waiter.resolve();
+        waiter.resolve(text);
         newline = buffer.indexOf('\n');
       }
     });
@@ -160,9 +245,9 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
       fail(new Error('Docker worker exited unexpectedly'));
     });
     const exchange = (
-      request: 'HELLO/1' | 'PING/1' | 'SHUTDOWN/1',
+      request: string,
       expected: Pending['expected'],
-    ): Promise<void> =>
+    ): Promise<string | undefined> =>
       new Promise((resolveReady, reject) => {
         if (pending || running.exitCode !== null) {
           reject(new Error('Worker already busy or exited'));
@@ -184,6 +269,11 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
       8_000,
     );
     validateObservedMounts(mounts, sourcePath);
+    const observed = await callDocker(
+      ['inspect', '--format', '{{json .Mounts}}', name],
+      8_000,
+    );
+    validateObservedMounts(observed, sourcePath);
     const isolation = await callDocker(
       [
         'inspect',
@@ -232,6 +322,7 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
       throw new Error('Docker capability or resource boundaries changed');
     }
     await exchange('PING/1', 'pong');
+    if (readPath) readContent = await exchange(`READ/1 ${readPath}`, 'file');
     await exchange('SHUTDOWN/1', 'stopped');
     running.stdin.end();
   } finally {
@@ -257,4 +348,5 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
   if (cleanupFailed) {
     throw new Error('Unable to confirm Docker probe container cleanup');
   }
+  return readContent;
 }
