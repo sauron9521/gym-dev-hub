@@ -23,6 +23,7 @@ import { WorktreeIntegrityService } from './worktree/worktree-integrity.service.
 import { WorktreeMountService } from './worktree/worktree-mount.service.js';
 import { WorktreeCodeReadService } from './worktree/worktree-code-read.service.js';
 import { WorktreeToolService } from './worktree/worktree-tool.service.js';
+import { TaskRunnerPolicyService } from './worktree/task-runner-policy.service.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -52,6 +53,7 @@ import { WorktreeToolService } from './worktree/worktree-tool.service.js';
     WorktreeMountService,
     WorktreeCodeReadService,
     WorktreeToolService,
+    TaskRunnerPolicyService,
   ],
 })
 export class AppModule {}
