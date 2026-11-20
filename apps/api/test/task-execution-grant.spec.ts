@@ -307,6 +307,20 @@ describe('one-time fixed API_TYPECHECK authorization (without a runner)', () => 
     ).rejects.toThrow('Дозвіл');
   });
 
+  it('invalidates an outstanding grant immediately after secret rotation is detected', async () => {
+    const grant = await issue();
+    process.env.DEV_HUB_TASK_GRANT_OPERATOR_SECRET = 'different-random-rotated-secret-0123456789';
+    await expect(
+      service.consumeForPolicyCheck(SESSION, PLAN, consumption(grant.grantToken)),
+    ).rejects.toThrow('Дозвіл');
+    await expect(
+      service.revoke(SESSION, PLAN, {
+        grantToken: grant.grantToken,
+        operatorSecret: 'different-random-rotated-secret-0123456789',
+      }),
+    ).rejects.toThrow('Дозвіл');
+  });
+
   it('fails closed without a durable audit file, including a redirected symlink', async () => {
     const forbidden = join(dir, 'target.txt');
     await writeFile(forbidden, 'do not modify\n');
