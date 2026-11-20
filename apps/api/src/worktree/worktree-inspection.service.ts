@@ -122,7 +122,7 @@ function gitRead(cwd: string, args: string[]): Promise<string> {
       timeout: 12_000, maxBuffer: 2 * 1024 * 1024,
     }, (error, output) => {
       if (error) reject(new Error('Git read-only inspection failed'));
-      else resolveOutput(output);
+      else resolveOutput(output.trim());
     });
   });
 }
