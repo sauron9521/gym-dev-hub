@@ -3,7 +3,8 @@ import type { WorktreePlan, WorktreeInspection } from '@gym-dev-hub/contracts';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeAuthorizationService } from './worktree-authorization.service.js';
 import { WorktreeInspectionService } from './worktree-inspection.service.js';
-import type { WorktreeCreationGrant } from '@gym-dev-hub/contracts';
+import type { WorktreeCreationGrant, WorktreeHydrationGrant } from '@gym-dev-hub/contracts';
+import { WorktreeHydrationService } from './worktree-hydration.service.js';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
 export class WorktreePlanController {
@@ -11,6 +12,7 @@ export class WorktreePlanController {
     private readonly plans: WorktreePlanService,
     private readonly authorization: WorktreeAuthorizationService,
     private readonly inspection: WorktreeInspectionService,
+    private readonly hydration: WorktreeHydrationService,
   ) {}
 
   @Get()
@@ -59,6 +61,24 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreePlan> {
     return this.authorization.create(sessionId, planId, body);
+  }
+
+  @Post(':planId/hydration-authorize')
+  authorizeHydration(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeHydrationGrant> {
+    return this.hydration.authorize(sessionId, planId, body);
+  }
+
+  @Post(':planId/hydrate')
+  hydrate(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePlan> {
+    return this.hydration.hydrate(sessionId, planId, body);
   }
 
   @Post(':planId/revoke')
