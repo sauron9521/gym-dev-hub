@@ -137,9 +137,13 @@ jobs:
             "$base" --output "$engine/schema-engine.gz"
           curl --fail --location --silent --show-error --retry 3 --max-time 120 \
             "$base.sha256" --output "$engine/schema-engine.gz.sha256"
-          checksum="$(tr -d '\r\n ' < "$engine/schema-engine.gz.sha256")"
+          raw_checksum="$(head -c 180 "$engine/schema-engine.gz.sha256")"
+          compressed_sha="$(sha256sum "$engine/schema-engine.gz" | cut -d' ' -f1)"
+          echo "UPSTREAM_PRISMA_CHECKSUM_TEXT=$raw_checksum"
+          echo "UPSTREAM_PRISMA_COMPRESSED_SHA256=$compressed_sha"
+          checksum="$(printf '%s' "$raw_checksum" | grep -oE '[a-f0-9]{64}' | head -n 1)"
           [[ "$checksum" =~ ^[a-f0-9]{64}$ ]]
-          test "$(sha256sum "$engine/schema-engine.gz" | cut -d' ' -f1)" = "$checksum"
+          test "$compressed_sha" = "$checksum"
           gzip -t "$engine/schema-engine.gz"
           gzip -dc "$engine/schema-engine.gz" > "$engine/schema-engine"
           test "$(stat -c%s "$engine/schema-engine")" -ge 1000000
