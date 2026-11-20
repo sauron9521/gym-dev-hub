@@ -66,12 +66,17 @@ jobs:
             --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777' \
             --stop-timeout=3 \
             gym-dev-hub-node-runner:v1 >/dev/null
+          docker inspect "$name" --format '{{json .HostConfig}}' | jq '{
+            NetworkMode, ReadonlyRootfs, Privileged, CapDrop,
+            Memory, NanoCpus, PidsLimit, IpcMode, Binds, Mounts
+          }'
           docker inspect "$name" --format '{{json .HostConfig}}' | jq -e '
             .NetworkMode == "none" and .ReadonlyRootfs == true
-            and .Privileged == false and (.CapDrop | index("ALL") != null)
+            and .Privileged == false and (.CapDrop | any(.[]; ascii_downcase == "all"))
             and .Memory == 2147483648 and .NanoCpus == 2000000000
             and .PidsLimit == 128 and .IpcMode == "none"
-            and .Binds == null and .Mounts == []
+            and (.Binds == null or .Binds == [])
+            and (.Mounts == null or .Mounts == [])
           '
           docker inspect "$name" --format '{{json .Mounts}}' | jq -e 'length == 0'
           test "$(docker inspect "$name" --format '{{.Config.User}}')" = '65534:65534'
