@@ -41,3 +41,7 @@ A standalone, CI-only `offline-real-pair.mjs` demonstrates `pnpm fetch` of exact
 ## Real TypeScript 6 toolchain smoke (PR #26)
 
 The CI-only `offline-typescript-smoke.mjs` installs the **real `typescript@6.0.3`** from a checked, read-only, temporary store inside a networkless Docker container, then executes the compiler on exactly two reviewed, tiny TypeScript fixtures: one must typecheck and one must fail with `TS2322`. This deliberately executes npm-published TypeScript compiler code **inside CI Docker only**, not any Gym Platform code. Inputs are individually Git-blob-pinned, the installer remains `--offline --frozen-lockfile --ignore-scripts --trust-lockfile` and the diagnostic `runner.mjs` API remains non-executing. See `docs/typescript-toolchain-smoke.md`.
+
+## First pinned Gym Platform source typecheck (PR #27)
+
+A separate **CI-only** entrypoint `pinned-source-typecheck.mjs` checks the actual source code of four small, import-free TypeScript modules from the immutable Gym Platform Git commit `73b636f5d064c7f24b43607e0c8411e9161f8986`. Each file is copied from the reviewed commit to a disposable **read-only host snapshot**, rehashed against an independent Git blob pin inside networkless Docker, and typechecked with real `typescript@6.0.3` installed offline in a private tmpfs. It never runs Gym Platform scripts, imports/evaluates the source, mounts the full monorepo, or exposes execution to API/Codex. The ordinary `runner.mjs` remains diagnostic-only. See `docs/pinned-gym-platform-source-typecheck.md`.
