@@ -32,8 +32,9 @@
 30. **Private scratch overlay preflight**: Git-pinned full source remains read-only while independent disposable noexec tmpfs volumes hold temporary dependencies/cache/generated data and reports; restricted Docker inspection and adversarial CI checks; **no application execution** (PR #30).
 31. **Real API_TYPECHECK provisioning gate**: verify all direct API importer resolutions against 1,631 pinned lockfile SHA-512 records, the TypeScript recipe, generated Prisma client path and native-build blockers. Report fail-closed readiness; no install or execution (PR #31).
 32. **Real API offline dependency cache proof**: trusted CI installs pinned API dependencies with scripts disabled into a disposable store, then checks the same graph installs in isolated networkless Docker with immutable read-only source and private tmpfs (PR #32).
-33. **Controlled execution (future)**: reviewed native/Prisma generation strategy, then isolated API_TYPECHECK with fresh operator consent, bounded logs and cleanup; no auto-merge.
-34. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-35. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+33. **Isolated Prisma Client generation proof**: use the full pinned offline API dependency cache to run one reviewed fixed Prisma 7 code-generation step in a private, non-networked Docker overlay, without touching the immutable source or enabling the Hub task runner (PR #33).
+34. **Controlled execution (future)**: review native runtime/binary compatibility, then isolated API_TYPECHECK with fresh operator consent, bounded logs and cleanup; no auto-merge.
+35. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+36. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

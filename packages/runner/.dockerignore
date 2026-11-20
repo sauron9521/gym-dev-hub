@@ -10,4 +10,5 @@
 !full-source-audit.mjs
 !overlay-preflight.mjs
 !offline-api-cache.mjs
+!prisma-native-preflight.mjs
 !.dockerignore

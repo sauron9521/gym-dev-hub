@@ -57,3 +57,7 @@ The CI-only `overlay-preflight.mjs` first verifies the entire immutable Gym Plat
 ## Real API dependency closure smoke (PR #32)
 
 The CI-only `offline-api-cache.mjs` verifies a complete pinned Gym Platform source snapshot, accepts a temporary read-only pnpm cache from a credential-free trusted CI stage, copies both to a **private tmpfs**, and attempts an offline, frozen, script-free `@gym/api` dependency installation. This is a real target dependency installation, not a small two-package fixture, but **no Prisma generation, API typecheck, project scripts, or other code from Gym Platform is invoked**. The usual `runner.mjs` protocol remains non-executing. See `docs/real-api-dependency-cache.md`.
+
+## Private Prisma 7 client generation proof (PR #33)
+
+The CI-only `prisma-native-preflight.mjs` invokes the already reviewed, **script-free offline API dependency rehydration** on one immutable Gym Platform Git snapshot, then intentionally executes a **single fixed pinned Prisma CLI** in the disposable, offline, nonroot Docker container. Client files are written to the *private copied project* under `/workspace/project/apps/api/src/infra/database/generated/prisma`; the public source bind remains read-only and unchanged. The standard runner protocol, Hub API and Codex cannot call the proof. Native engine/prebuilt runtime suitability is not established by generating Prisma code; see `docs/private-prisma-native-preflight.md`.

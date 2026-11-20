@@ -36,5 +36,7 @@ COPY --chown=65534:65534 full-source-audit.mjs /opt/gym-dev-hub/full-source-audi
 COPY --chown=65534:65534 overlay-preflight.mjs /opt/gym-dev-hub/overlay-preflight.mjs
 # CI-only real API offline cache rehydration; not exposed by runner protocol.
 COPY --chown=65534:65534 offline-api-cache.mjs /opt/gym-dev-hub/offline-api-cache.mjs
+# CI-only approved Prisma 7 generator proof, no API/task runner entrypoint.
+COPY --chown=65534:65534 prisma-native-preflight.mjs /opt/gym-dev-hub/prisma-native-preflight.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]
