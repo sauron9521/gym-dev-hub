@@ -32,7 +32,7 @@ export function inspectTreeListing(listing: string): TreeSummary {
 
   for (const line of listing.split('\0')) {
     if (!line) continue;
-    const match = /^([0-7]{6}) (blob|commit) ([0-9a-f]{40,64}) ([0-9]+|-)\t(.+)$/s.exec(line);
+    const match = /^([0-7]{6}) (blob|commit) ([0-9a-f]{40,64}) +([0-9]+|-)\t(.+)$/s.exec(line);
     if (!match) {
       violations.push('Некоректний запис Git tree.');
       continue;
