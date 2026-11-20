@@ -40,8 +40,9 @@
 38. **Operator-controlled API_TYPECHECK**: explicitly opt-in local API endpoint consumes one use-only grant after fresh worktree verification and executes the CI-proven fixed recipe in pinned, networkless Docker with 64 KiB I/O bounds and cancellation. Requires trusted manual preprovisioning of the pinned offline bundle; no automatic merge or arbitrary commands (PR #37b).
 39. **Manual one-command local provisioning**: explicit operator-run CLI builds a separate credential-free trusted-network staging Docker image, fetches only the pinned source/tree/manifest and SHA-512 musl artifacts, verifies pinned Prisma engine and store, builds an immutable-ID runner, and smoke-tests the same compiler completely offline before publishing a non-secret local bundle (PR #55).
 40. **Safe provisioning recovery (PR #56)**: label newly created local provisioning containers with fixed scope/phase/checkout, expose read-only status and Docker Desktop preflight latency, and require an explicit opt-in for non-forced cleanup of stopped, stale, fully identified Hub containers; never delete unverified stage directories or other services.
-41. **Runner lifecycle improvements (future)**: review newer Gym Platform commits, add a verified ownership ledger for stale stage-directory recovery, richer bounded diagnostics and explicit operator-authenticated Windows/Home-PC end-to-end testing.
-42. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-43. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+41. **Owned stage journal and crash recovery (PR #57)**: host-private single-flight lock, exact stage inode/dev/checkout ledger created before Docker writes, explicit >24h orphan-stage recovery with no links, no active PID/container and protected legacy/unowned folders.
+42. **Runner lifecycle improvements (future)**: newer reviewed Gym Platform commits, richer bounded diagnostics, Windows Docker Desktop latency improvements and explicit operator-authenticated Home-PC end-to-end testing.
+43. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+44. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

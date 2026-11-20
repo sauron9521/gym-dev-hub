@@ -24,6 +24,7 @@ import {
 import { createReadStream } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { beginPinnedStage, finishPinnedStage } from './pinned-stage-ledger.mjs';
 
 export const FIXED = Object.freeze({
   commit: '7104f723c4ee7b81e7b9b64e9c9483aea344ef7a',
@@ -589,12 +590,15 @@ async function prepare() {
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error;
   }
-  const stage = await mkdtemp(join(root, 'stage-'));
+  // The ownership journal and exclusive process lock are created BEFORE
+  // granting the fixed network stage write access to this temporary folder.
+  const stageRun = await beginPinnedStage(root, PROVISIONING_CHECKOUT);
+  const stage = stageRun.stage;
   // It is newly created, empty and private to this invocation. The container
   // runs as UID 65534 and must be able to stage bytes on Linux bind mounts.
-  await chmod(stage, 0o777);
   let published = false;
   try {
+    await chmod(stage, 0o777);
     const provisionerId = await build(
       FIXED.provisioner,
       join(ROOT, 'packages', 'local-provisioner', 'Dockerfile'),
@@ -644,7 +648,10 @@ async function prepare() {
     published = true;
     process.stdout.write(JSON.stringify({ ...receipt, bundleDirectory: final }) + '\n');
   } finally {
-    if (!published) await rm(stage, { recursive: true, force: true }).catch(() => undefined);
+    // Preserve the ownership journal if deleting this run's scratch fails;
+    // a later explicit recovery can prove directory identity before removal.
+    if (!published) await rm(stage, { recursive: true, force: true });
+    await finishPinnedStage(stageRun);
   }
 }
 
