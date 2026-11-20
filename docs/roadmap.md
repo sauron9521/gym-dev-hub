@@ -38,8 +38,9 @@
 36. **Fixed Alpine native runtime smoke**: CI-only load pinned bcrypt and sharp with a tiny image roundtrip and run the pinned Prisma schema-engine version probe from a bounded networkless Docker container. Keep /workspace noexec; copy only reviewed native packages to a separate ephemeral exec /native tmpfs (PR #36).
 37. **Isolated fixed API_TYPECHECK proof (CI-only)**: reuse pinned offline API dependency installation and Prisma Client generation, then execute exactly TypeScript 6.0.3 `tsc --noEmit -p tsconfig.build.json` on the reviewed immutable source in a restricted disposable Docker overlay. No Hub task endpoint or operator grant consumption (PR #37a).
 38. **Operator-controlled API_TYPECHECK**: explicitly opt-in local API endpoint consumes one use-only grant after fresh worktree verification and executes the CI-proven fixed recipe in pinned, networkless Docker with 64 KiB I/O bounds and cancellation. Requires trusted manual preprovisioning of the pinned offline bundle; no automatic merge or arbitrary commands (PR #37b).
-39. **Local runner provisioning and lifecycle improvements (future)**: safely stage pinned source/store/engine and image with provenance proofs, expose bounded diagnostics/status, recover orphaned containers after a crash.
-40. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-41. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+39. **Manual one-command local provisioning**: explicit operator-run CLI builds a separate credential-free trusted-network staging Docker image, fetches only the pinned source/tree/manifest and SHA-512 musl artifacts, verifies pinned Prisma engine and store, builds an immutable-ID runner, and smoke-tests the same compiler completely offline before publishing a non-secret local bundle (PR #55).
+40. **Runner lifecycle improvements (future)**: safely refresh to separately reviewed Gym Platform commits, add verification-only mode, bounded status/diagnostics, recover orphaned Docker containers and provide an explicit operator-authenticated local end-to-end test.
+41. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+42. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

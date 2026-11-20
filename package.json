@@ -14,7 +14,9 @@
     "test": "turbo run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "provision:pinned-api": "node scripts/provision-pinned-api-local.mjs --prepare",
+    "test:local-provisioner": "node --test scripts/provision-pinned-api-local.test.mjs"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
