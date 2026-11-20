@@ -53,10 +53,7 @@ export function auditLockText(source) {
   if (separators.length !== 2 || separators[0] !== 0 || separators[1] < 15) {
     throw new Error('Expected both pnpm 12 lockfile YAML documents');
   }
-  const documents = [
-    lines.slice(separators[0], separators[1]),
-    lines.slice(separators[1]),
-  ];
+  const documents = [lines.slice(separators[0], separators[1]), lines.slice(separators[1])];
   const counts = [];
   const seenGlobal = new Set();
   for (const [documentIndex, document] of documents.entries()) {
@@ -94,9 +91,7 @@ export function auditLockText(source) {
       }
       if (/^    resolution:/.test(line)) {
         if (!current || currentResolved) throw new Error('Invalid resolution position');
-        const match = /^    resolution: \{integrity: sha512-([A-Za-z0-9+/]{86}==)\}$/.exec(
-          line,
-        );
+        const match = /^    resolution: \{integrity: sha512-([A-Za-z0-9+/]{86}==)\}$/.exec(line);
         if (!match) throw new Error('Unpinned or non-SHA512 package resolution: ' + current);
         const digest = Buffer.from(match[1], 'base64');
         if (digest.length !== 64 || digest.toString('base64') !== match[1]) {
@@ -117,7 +112,12 @@ export function auditLockText(source) {
         throw new Error('Unsupported importer source protocol');
       }
     }
-    counts.push({ yamlDocument: documentIndex + 1, packageCount: count, sha512Pins: count, packagesWithBins: binaries });
+    counts.push({
+      yamlDocument: documentIndex + 1,
+      packageCount: count,
+      sha512Pins: count,
+      packagesWithBins: binaries,
+    });
   }
   return {
     yamlDocuments: 2,
@@ -131,7 +131,7 @@ export function auditWorkspaceText(source) {
   if (typeof source !== 'string' || source.length > 100_000) {
     throw new Error('Invalid workspace policy');
   }
-  if (!source.includes("nodeLinker: hoisted")) throw new Error('Unexpected node linker');
+  if (!source.includes('nodeLinker: hoisted')) throw new Error('Unexpected node linker');
   const lines = source.split('\n');
   const start = lines.indexOf('allowBuilds:');
   if (start < 0 || lines.indexOf('allowBuilds:', start + 1) !== -1) {
@@ -209,7 +209,10 @@ export async function auditPinnedCheckout(root) {
     packageJson.packageManager !== 'pnpm@12.18.0' ||
     api.name !== '@gym/api' ||
     web.name !== '@gym/web' ||
-    [api, web].some((pkg) => !['lint', 'test', 'typecheck'].every((name) => typeof pkg.scripts?.[name] === 'string'))
+    [api, web].some(
+      (pkg) =>
+        !['lint', 'test', 'typecheck'].every((name) => typeof pkg.scripts?.[name] === 'string'),
+    )
   ) {
     throw new Error('Unexpected Gym Platform package metadata');
   }
@@ -230,7 +233,8 @@ export async function auditPinnedCheckout(root) {
     installExecuted: false,
     registryContacted: false,
     executionAuthorized: false,
-    caveat: 'Static audit of one immutable Git snapshot, not a package security scan or a live-main approval',
+    caveat:
+      'Static audit of one immutable Git snapshot, not a package security scan or a live-main approval',
   };
 }
 

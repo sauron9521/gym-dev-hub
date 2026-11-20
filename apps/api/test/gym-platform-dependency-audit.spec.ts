@@ -80,7 +80,9 @@ describe('Gym Platform static pinned dependency audit', () => {
 
   it('rejects custom archive sources, duplicate package entries and unsafe importer protocols', () => {
     expect(() =>
-      auditLockText(LOCK.replace('resolution: {integrity: ' + PIN + '}', 'resolution: {tarball: https://bad}')),
+      auditLockText(
+        LOCK.replace('resolution: {integrity: ' + PIN + '}', 'resolution: {tarball: https://bad}'),
+      ),
     ).toThrow('non-SHA512');
     expect(() => auditLockText(DOC('duplicate@1.0.0') + '\n' + DOC('duplicate@1.0.0'))).toThrow(
       'Duplicate package',
@@ -94,10 +96,10 @@ describe('Gym Platform static pinned dependency audit', () => {
     const result = auditWorkspaceText(WORKSPACE);
     expect(result.buildScriptsAllowed).toEqual([
       '@prisma/engines',
-      'prisma',
+      '@swc/core',
       'bcrypt',
       'esbuild',
-      '@swc/core',
+      'prisma',
     ]);
     expect(result.buildScriptsDenied).toEqual(['@parcel/watcher', '@scarf/scarf']);
     expect(result.auditAdvisoryExceptions).toEqual(['GHSA-fc5q-39xc-vjpf']);

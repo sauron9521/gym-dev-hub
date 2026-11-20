@@ -13,11 +13,11 @@ sauron9521/gym-platform
 
 The Node audit script **independently verifies Git blob identities** for exactly these five files before trusting their contents:
 
-| Path | Trusted Git blob SHA-1 |
-| --- | --- |
-| `pnpm-lock.yaml` | `994456e853beaa556ab5a0d5ee3533b8f7db5682` |
-| `pnpm-workspace.yaml` | `0af4a0308ad0b25ea1813badb71b09b0256b6513` |
-| `package.json` | `4fa06500522abaa2fc809d022e3c4f74267a8d67` |
+| Path                    | Trusted Git blob SHA-1                     |
+| ----------------------- | ------------------------------------------ |
+| `pnpm-lock.yaml`        | `994456e853beaa556ab5a0d5ee3533b8f7db5682` |
+| `pnpm-workspace.yaml`   | `0af4a0308ad0b25ea1813badb71b09b0256b6513` |
+| `package.json`          | `4fa06500522abaa2fc809d022e3c4f74267a8d67` |
 | `apps/api/package.json` | `314142f3577c0620ff3402b7de3d25ef9702a5f4` |
 | `apps/web/package.json` | `4bba19980d8d53075cac8774e1fd6de7e2720dbf` |
 
@@ -29,17 +29,17 @@ The script reads regular files only; it rejects symlinks, altered content, unexp
 
 The pinned `pnpm-lock.yaml` is approximately 742 KB and contains **two YAML documents**, which must both be audited. The first covers the package-manager dependency graph; the second contains the main project dependency graph. For this pinned snapshot the expected results are:
 
-| Area | Expected |
-| --- | --- |
-| Package manager | `pnpm@12.18.0` |
-| Lockfile documents | 2, both version `9.0` |
-| First document | 15 package resolutions |
-| Second document | 1,616 package resolutions |
-| Total | **1,631** SHA-512 integrity entries |
+| Area                            | Expected                                  |
+| ------------------------------- | ----------------------------------------- |
+| Package manager                 | `pnpm@12.18.0`                            |
+| Lockfile documents              | 2, both version `9.0`                     |
+| First document                  | 15 package resolutions                    |
+| Second document                 | 1,616 package resolutions                 |
+| Total                           | **1,631** SHA-512 integrity entries       |
 | Native/install build allowances | 5 explicitly allowed, 2 explicitly denied |
-| Advisory suppressions | 1 existing exception, recorded for review |
+| Advisory suppressions           | 1 existing exception, recorded for review |
 
-The script checks all package entries in both documents and rejects missing, malformed, non-SHA512 and duplicate resolutions, suspicious custom resolution formats, and unsafe importer sources (`file:`, `git:`, custom HTTP tarballs). SHA-512 SRI pins in a lockfile make fetched artifact substitution detectable **if the lockfile itself is trusted**, but this audit does *not* fetch those artifacts or verify their actual bytes. Git blob SHA-1 pins identify the reviewed source snapshot, not the cryptographic trust of an npm publisher.
+The script checks all package entries in both documents and rejects missing, malformed, non-SHA512 and duplicate resolutions, suspicious custom resolution formats, and unsafe importer sources (`file:`, `git:`, custom HTTP tarballs). SHA-512 SRI pins in a lockfile make fetched artifact substitution detectable **if the lockfile itself is trusted**, but this audit does _not_ fetch those artifacts or verify their actual bytes. Git blob SHA-1 pins identify the reviewed source snapshot, not the cryptographic trust of an npm publisher.
 
 ## Actual `allowBuilds` policy
 
@@ -48,7 +48,7 @@ The pinned workspace allows these package lifecycle/build hooks when normal inst
 - **Allowed:** `@prisma/engines`, `prisma`, `bcrypt`, `esbuild`, `@swc/core`.
 - **Denied:** `@parcel/watcher`, `@scarf/scarf`.
 
-These are **reported and checked**, *not executed* by this PR. The security audit configuration currently includes `GHSA-fc5q-39xc-vjpf` as an ignored advisory. We explicitly report this exception; **its presence is not evidence that the vulnerability is fixed or safe**. Adding a new suppression or changing any build allowance causes this pinned policy audit to fail until reviewed.
+These are **reported and checked**, _not executed_ by this PR. The security audit configuration currently includes `GHSA-fc5q-39xc-vjpf` as an ignored advisory. We explicitly report this exception; **its presence is not evidence that the vulnerability is fixed or safe**. Adding a new suppression or changing any build allowance causes this pinned policy audit to fail until reviewed.
 
 ## Automated checks
 
