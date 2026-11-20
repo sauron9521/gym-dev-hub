@@ -84,7 +84,7 @@ jobs:
 
           # The only networked step for the package; no tokens or dynamic URLs,
           # no redirects, and absolutely no npm install, unpack or script run.
-          curl --fail --silent --show-error --location-trusted=false \
+          curl --fail --silent --show-error \
             --proto '=https' --tlsv1.2 --max-redirs 0 \
             --connect-timeout 10 --max-time 45 --retry 2 --retry-delay 2 \
             --output "$stage/is-number-7.0.0.tgz" \
