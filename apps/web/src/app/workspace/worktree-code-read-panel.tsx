@@ -61,7 +61,7 @@ export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props)
       });
       if (!response.ok) {
         throw new Error(
-          'Не вдалося прочитати файл. UID 65534 може не мати доступу до файлів з правами 0600.',
+          'Не вдалося прочитати файл. Перевір Git snapshot, Docker Desktop та видалення тимчасового файла.',
         );
       }
       setResult((await response.json()) as WorktreeCodeReadResult);
