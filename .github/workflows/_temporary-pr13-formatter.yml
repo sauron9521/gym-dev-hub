@@ -29,7 +29,6 @@ jobs:
             apps/api/src/worktree/worktree-plan.controller.ts \
             apps/api/src/app.module.ts \
             apps/api/test/worktree-hydration.spec.ts \
-            apps/api/.env.example \
             apps/web/src/app/api/workspace/'[...segments]'/route.ts \
             apps/web/src/app/workspace/worktree-hydration-panel.tsx \
             apps/web/src/app/workspace/worktree-hydration-panel.test.tsx \
