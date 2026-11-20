@@ -30,8 +30,9 @@
 28. **Immutable full source snapshot audit**: independently reviewed commit/tree, full tracked-file Git blob manifest, and read-only no-network Docker verification of all 1,258 files with failure cases. No task commands or operator grant yet (PR #28).
 29. **Single-use task authorization foundation**: disabled-by-default local operator grants for the exact `API_TYPECHECK` preview, pinned Gym Platform commit/tree/manifest/fingerprint, 45-second TTL, revocation, replay prevention and secret-free durable audit; no execution endpoint (PR #29).
 30. **Private scratch overlay preflight**: Git-pinned full source remains read-only while independent disposable noexec tmpfs volumes hold temporary dependencies/cache/generated data and reports; restricted Docker inspection and adversarial CI checks; **no application execution** (PR #30).
-31. **Controlled execution (future)**: separately reviewed real toolchain and native build strategy, per-recipe execution wiring with fresh operator consent, bounded logs and cleanup; no auto-merge.
-32. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-33. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+31. **Real API_TYPECHECK provisioning gate**: verify all direct API importer resolutions against 1,631 pinned lockfile SHA-512 records, the TypeScript recipe, generated Prisma client path and native-build blockers. Report fail-closed readiness; no install or execution (PR #31).
+32. **Controlled execution (future)**: actual reviewed API dependency cache and native/Prisma strategy, then isolated per-recipe runner with fresh operator consent, bounded logs and cleanup; no auto-merge.
+33. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+34. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

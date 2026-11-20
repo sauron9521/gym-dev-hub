@@ -1,0 +1,140 @@
+name: API Typecheck Dependency Provisioning Gate (CI-only)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/api-typecheck-provisioning-gate.mjs'
+      - 'scripts/gym-platform-dependency-audit.mjs'
+      - 'apps/api/test/api-typecheck-provisioning-gate.spec.ts'
+      - '.github/workflows/api-typecheck-provisioning-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/api-typecheck-provisioning-gate.mjs'
+      - '.github/workflows/api-typecheck-provisioning-gate.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-typecheck-provisioning-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Verify full API importer, Prisma/native blockers / no execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Gym Dev Hub
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact pinned Gym Platform source
+        uses: actions/checkout@v4
+        with:
+          repository: sauron9521/gym-platform
+          ref: 7104f723c4ee7b81e7b9b64e9c9483aea344ef7a
+          path: .audit/gym-platform
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify approved immutable Git tree and eight source object identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=.audit/gym-platform
+          test "$(git -C "$source" rev-parse HEAD)" = '7104f723c4ee7b81e7b9b64e9c9483aea344ef7a'
+          test "$(git -C "$source" rev-parse HEAD^{tree})" = '2c140e1e740b3dd8cc7582db726f46b54b73b334'
+          specs=(
+            'package.json|4fa06500522abaa2fc809d022e3c4f74267a8d67'
+            'pnpm-workspace.yaml|0af4a0308ad0b25ea1813badb71b09b0256b6513'
+            'pnpm-lock.yaml|994456e853beaa556ab5a0d5ee3533b8f7db5682'
+            'apps/api/package.json|314142f3577c0620ff3402b7de3d25ef9702a5f4'
+            'apps/api/tsconfig.json|a69209733af2d44113e5a51b77e811100353eaa9'
+            'apps/api/tsconfig.build.json|2ea0defb45be21c0048d1b65406fa27738624d81'
+            'apps/api/prisma7.config.ts|52b055e27d1a84edc5bb060a326ac355a724c729'
+            'apps/api/prisma/schemas/schema.prisma|add9713fe6b2ce5a166c666aee3e255c0b0f5f06'
+          )
+          for spec in "${specs[@]}"; do
+            IFS='|' read -r path expected <<< "$spec"
+            test "$(git -C "$source" rev-parse "HEAD:$path")" = "$expected"
+            test -f "$source/$path"
+            test ! -L "$source/$path"
+            test "$(git hash-object "$source/$path")" = "$expected"
+          done
+          echo 'Eight separately reviewed Git objects match exact source commit/tree.'
+
+      - name: Evaluate API typecheck importer, native hooks, and generator blockers
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/api-typecheck-provisioning-gate.mjs .audit/gym-platform > "$RUNNER_TEMP/api-typecheck-plan.json"
+          node --input-type=module - "$RUNNER_TEMP/api-typecheck-plan.json" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const result = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+          const required = ['typescript', 'prisma', '@prisma/client', '@prisma/adapter-pg', 'bcrypt', 'sharp', '@types/node'];
+          if (
+            result.protocol !== 1 ||
+            result.event !== 'api-typecheck-provisioning-gate' ||
+            result.sourceCommit !== '7104f723c4ee7b81e7b9b64e9c9483aea344ef7a' ||
+            result.sourceManifestSha256 !== 'dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b' ||
+            result.recipe !== 'API_TYPECHECK' ||
+            result.actualScript !== 'tsc --noEmit -p tsconfig.build.json' ||
+            result.packageManager !== 'pnpm@12.18.0' ||
+            result.lockSha512Pins !== 1631 ||
+            result.resolvedDirectCount !== result.directDependencies + result.directDevDependencies ||
+            result.resolvedDirectCount < 35 ||
+            result.missingPrerequisites.length !== 4 ||
+            !required.every(name => result.resolutions.some(p => p.name === name && p.sha512.startsWith('sha512-'))) ||
+            result.provisionReady !== false || result.typecheckExecuted !== false ||
+            result.installExecuted !== false || result.nativeBuildsExecuted !== false ||
+            result.prismaGeneratorExecuted !== false || result.registryContacted !== false ||
+            result.executionEnabled !== false
+          ) throw new Error('API typecheck provisioning report unexpectedly grants execution or loses a pin');
+          console.log(JSON.stringify({
+            recipe: result.recipe,
+            verifiedDependencies: result.resolvedDirectCount,
+            lockedSRI: result.lockSha512Pins,
+            requiredNativeEngine: result.prismaEngine.version,
+            provisionReady: result.provisionReady,
+            blockers: result.missingPrerequisites,
+            executed: result.typecheckExecuted,
+          }, null, 2));
+          NODE
+
+      - name: Refuse modified lockfile, importer, TypeScript and Prisma configurations
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=.audit/gym-platform
+          # Every adversarial edit is checked against the immutable Git blob
+          # before the process can act on mutated source. Never run pnpm.
+          paths=(
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            apps/api/package.json
+            apps/api/tsconfig.json
+            apps/api/tsconfig.build.json
+            apps/api/prisma7.config.ts
+            apps/api/prisma/schemas/schema.prisma
+          )
+          for file in "${paths[@]}"; do
+            printf '\n# attempted unapproved change\n' >> "$source/$file"
+            if node scripts/api-typecheck-provisioning-gate.mjs .audit/gym-platform >/dev/null 2>&1; then
+              echo "Modified pinned file was accepted: $file"
+              exit 1
+            fi
+            git -C "$source" restore -- "$file"
+          done
+          if node scripts/api-typecheck-provisioning-gate.mjs /tmp >/dev/null 2>&1; then
+            echo 'Arbitrary source path was accepted'
+            exit 1
+          fi
+          test -z "$(git -C "$source" status --porcelain)"
+          echo 'Seven modified-source and one arbitrary-path cases all fail closed.'
