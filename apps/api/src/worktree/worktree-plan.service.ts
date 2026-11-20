@@ -535,6 +535,41 @@ export class WorktreePlanService {
     }, true);
   }
 
+  async availableForMountProbe(sessionId: string, planId: string): Promise<WorktreePlan> {
+    const session = await this.workspace.get(sessionId);
+    if (session.status === 'completed') {
+      throw new ConflictException('Не можна використовувати worktree завершеної сесії.');
+    }
+    return this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (plan.state !== 'created' || !plan.worktreeCreated ||
+          plan.hydrationState !== 'completed' || plan.repository !== session.repository ||
+          !this.github.listAllowedRepositories().includes(plan.repository)) {
+        throw new ConflictException('Worktree не завершено або репозиторій більше не дозволено.');
+      }
+      return publicPlan(plan);
+    });
+  }
+
+  async recordMountProbe(
+    sessionId: string, planId: string, step: 'started' | 'verified' | 'failed',
+  ): Promise<void> {
+    await this.transact((store) => {
+      const plan = this.find(store, sessionId, planId);
+      if (plan.state !== 'created' || plan.hydrationState !== 'completed') {
+        throw new ConflictException('План не готовий до запису журналу Docker mount.');
+      }
+      if (plan.history.length >= 250) {
+        throw new ConflictException('Ліміт записів аудиту, створюй нову сесію.');
+      }
+      plan.history.push({
+        event: step === 'started' ? 'mount-probe-started'
+          : step === 'verified' ? 'mount-probe-verified' : 'mount-probe-failed',
+        timestamp: new Date().toISOString(),
+      });
+    }, true);
+  }
+
   async revoke(sessionId: string, planId: string, input: unknown): Promise<WorktreePlan> {
     if (!noBodySchema.safeParse(input).success) {
       throw new BadRequestException('Некоректний запит відкликання.');
