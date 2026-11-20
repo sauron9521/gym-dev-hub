@@ -16,6 +16,9 @@ const GENERATED = join(API, 'src', 'infra', 'database', 'generated', 'prisma');
 const COMMIT = '7104f723c4ee7b81e7b9b64e9c9483aea344ef7a';
 const TREE = '2c140e1e740b3dd8cc7582db726f46b54b73b334';
 const MANIFEST_SHA256 = 'dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b';
+const ENGINE_COMMIT = 'd1b3f377ca835d73fd50954a5e22128b9ebdd6b8';
+const ENGINE_SHA256 = 'PIN_ENGINE_SHA256_AFTER_CI';
+const ENGINE_BINARY = '/engine/schema-engine';
 
 function run(command, args, cwd, timeout) {
   const result = spawnSync(command, args, {
@@ -34,6 +37,7 @@ function run(command, args, cwd, timeout) {
       XDG_DATA_HOME: '/workspace/.local/share',
       CI: 'true',
       PRISMA_HIDE_UPDATE_MESSAGE: 'true',
+      PRISMA_SCHEMA_ENGINE_BINARY: ENGINE_BINARY,
       npm_config_update_notifier: 'false',
       // No DATABASE_URL, GitHub token, app secrets or registry credentials.
     },
@@ -69,6 +73,34 @@ async function verifyGeneratedFiles(path, depth, tally) {
     }
   } else {
     throw new Error('Prisma generated unexpected special file');
+  }
+}
+
+async function verifyPinnedNativeEngine() {
+  const mountInfo = await readFile('/proc/self/mountinfo', 'utf8');
+  const engineMount = mountInfo.split('\n').find((line) => line.split(' ')[4] === '/engine');
+  if (!engineMount || !engineMount.split(' ')[5].split(',').includes('ro')) {
+    throw new Error('Pinned Prisma native binary mount must be read-only');
+  }
+  const directory = await lstat('/engine');
+  const file = await lstat(ENGINE_BINARY);
+  if (
+    !directory.isDirectory() ||
+    directory.isSymbolicLink() ||
+    !file.isFile() ||
+    file.isSymbolicLink() ||
+    file.size < 1000000 ||
+    file.size > 180000000 ||
+    !(file.mode & 0o111)
+  ) {
+    throw new Error('Unsafe Prisma musl schema-engine artifact');
+  }
+  const raw = await readFile(ENGINE_BINARY);
+  if (
+    digest(raw) !== ENGINE_SHA256 ||
+    !raw.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]))
+  ) {
+    throw new Error('Pinned native Prisma schema-engine SHA-256 or ELF mismatch');
   }
 }
 
@@ -110,6 +142,7 @@ async function mustNotExist(path) {
 
 async function main() {
   if (process.argv.length !== 2) throw new Error('No caller arguments permitted');
+  await verifyPinnedNativeEngine();
   // Script-free offline full API dependency install also validates the full
   // pinned source, manifest, store safety and three private tmpfs mounts.
   const installed = run(
@@ -196,6 +229,9 @@ async function main() {
       sourceTree: TREE,
       sourceManifestSha256: MANIFEST_SHA256,
       prismaVersion: '7.10.1',
+      schemaEngineCommit: ENGINE_COMMIT,
+      schemaEngineSha256: ENGINE_SHA256,
+      schemaEnginePlatform: 'linux-musl-openssl-3.0.x',
       outputPath: 'apps/api/src/infra/database/generated/prisma',
       generatedFiles: output.files,
       generatedBytes: output.bytes,
