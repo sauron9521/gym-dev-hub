@@ -7,11 +7,17 @@ const report: WorktreeIntegrityReport = {
   sessionId: '00000000-0000-4000-8000-000000000456',
   planId: '00000000-0000-4000-8000-000000000123',
   checkedAt: '2026-11-20T00:00:00.000Z',
-  status: 'verified', fileCount: 3, verifiedBytes: 100, findings: [],
+  status: 'verified',
+  fileCount: 3,
+  verifiedBytes: 100,
+  findings: [],
   mount: {
     sourcePath: 'F:\\programer\\gym-dev-hub\\apps\\api\\.local\\worktrees\\test',
-    targetPath: '/workspace', readOnly: true, networkEnabled: false,
-    mountEnabled: false, executionEnabled: false,
+    targetPath: '/workspace',
+    readOnly: true,
+    networkEnabled: false,
+    mountEnabled: false,
+    executionEnabled: false,
   },
 };
 
@@ -19,7 +25,8 @@ describe('ephemeral Docker mount consent panel', () => {
   it('requires explicit consent and operator secret before enabling a probe', () => {
     const html = renderToStaticMarkup(
       <WorktreeMountPanel
-        sessionId={report.sessionId} report={report}
+        sessionId={report.sessionId}
+        report={report}
         fingerprint={'sha256:' + 'b'.repeat(64)}
       />,
     );

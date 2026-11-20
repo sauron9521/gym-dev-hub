@@ -7,10 +7,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import type {
-  WorktreeMountGrant,
-  WorktreeMountProbeResult,
-} from '@gym-dev-hub/contracts';
+import type { WorktreeMountGrant, WorktreeMountProbeResult } from '@gym-dev-hub/contracts';
 import { BoundaryService } from '../boundary/boundary.service.js';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeIntegrityService } from './worktree-integrity.service.js';
@@ -60,16 +57,20 @@ export class WorktreeMountService {
 
   private verifyBoundary(): void {
     const status = this.boundary.status();
-    const age = status.checkedAt ? Date.now() - Date.parse(status.checkedAt) : Number.POSITIVE_INFINITY;
-    if (status.state !== 'passed' || !Number.isFinite(age) ||
-        age < 0 || age > PREFLIGHT_MAX_AGE_MS) {
+    const age = status.checkedAt
+      ? Date.now() - Date.parse(status.checkedAt)
+      : Number.POSITIVE_INFINITY;
+    if (
+      status.state !== 'passed' ||
+      !Number.isFinite(age) ||
+      age < 0 ||
+      age > PREFLIGHT_MAX_AGE_MS
+    ) {
       throw new ConflictException('Потрібен свіжий успішний Docker Safety Preflight.');
     }
   }
 
-  async authorize(
-    sessionId: string, planId: string, input: unknown,
-  ): Promise<WorktreeMountGrant> {
+  async authorize(sessionId: string, planId: string, input: unknown): Promise<WorktreeMountGrant> {
     const request = authorizeSchema.safeParse(input);
     if (!request.success) throw new BadRequestException('Некоректний запит погодження mount.');
     const configured = createHash('sha256').update(this.secret()).digest();
@@ -83,11 +84,13 @@ export class WorktreeMountService {
       throw new ConflictException('Маніфест або Git commit не відповідає запиту.');
     }
     const integrity = await this.integrity.verify(sessionId, planId);
-    if (integrity.status !== 'verified' ||
-        integrity.mount.sourcePath !== plan.targetPath ||
-        !integrity.mount.readOnly ||
-        integrity.mount.executionEnabled ||
-        integrity.mount.mountEnabled) {
+    if (
+      integrity.status !== 'verified' ||
+      integrity.mount.sourcePath !== plan.targetPath ||
+      !integrity.mount.readOnly ||
+      integrity.mount.executionEnabled ||
+      integrity.mount.mountEnabled
+    ) {
       throw new ConflictException('Worktree змінився або не пройшов перевірку цілісності.');
     }
 
@@ -97,8 +100,12 @@ export class WorktreeMountService {
       if (old.expiresAt <= Date.now()) this.grants.delete(key);
     }
     this.grants.set(createHash('sha256').update(token).digest('hex'), {
-      sessionId, planId, fingerprint: plan.fingerprint,
-      commit: plan.baseHeadSha, sourcePath: plan.targetPath, expiresAt,
+      sessionId,
+      planId,
+      fingerprint: plan.fingerprint,
+      commit: plan.baseHeadSha,
+      sourcePath: plan.targetPath,
+      expiresAt,
     });
     return {
       grantToken: token,
@@ -109,7 +116,9 @@ export class WorktreeMountService {
   }
 
   async probe(
-    sessionId: string, planId: string, input: unknown,
+    sessionId: string,
+    planId: string,
+    input: unknown,
   ): Promise<WorktreeMountProbeResult> {
     const request = runSchema.safeParse(input);
     if (!request.success) throw new BadRequestException('Некоректний одноразовий дозвіл.');
@@ -117,8 +126,12 @@ export class WorktreeMountService {
     const key = createHash('sha256').update(request.data.grantToken).digest('hex');
     const grant = this.grants.get(key);
     this.grants.delete(key); // No awaiting before single-use consumption.
-    if (!grant || grant.sessionId !== sessionId || grant.planId !== planId ||
-        Date.now() >= grant.expiresAt) {
+    if (
+      !grant ||
+      grant.sessionId !== sessionId ||
+      grant.planId !== planId ||
+      Date.now() >= grant.expiresAt
+    ) {
       throw new ForbiddenException('Дозвіл прострочено, використано або він недійсний.');
     }
     if (this.probing) throw new ConflictException('Інший Docker mount probe ще виконується.');
@@ -127,9 +140,11 @@ export class WorktreeMountService {
     try {
       this.verifyBoundary();
       const plan = await this.plans.availableForMountProbe(sessionId, planId);
-      if (plan.fingerprint !== grant.fingerprint ||
-          plan.baseHeadSha !== grant.commit ||
-          plan.targetPath !== grant.sourcePath) {
+      if (
+        plan.fingerprint !== grant.fingerprint ||
+        plan.baseHeadSha !== grant.commit ||
+        plan.targetPath !== grant.sourcePath
+      ) {
         throw new ConflictException('Дозвіл прив’язаний до іншого worktree або Git commit.');
       }
       const result = await this.integrity.verify(sessionId, planId);
@@ -144,7 +159,8 @@ export class WorktreeMountService {
       await this.plans.recordMountProbe(sessionId, planId, 'verified');
       recorded = false;
       return {
-        planId, sessionId,
+        planId,
+        sessionId,
         state: 'verified',
         checkedAt: new Date().toISOString(),
         sourcePath: grant.sourcePath,

@@ -2,11 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { resolve, isAbsolute } from 'node:path';
 import { callDocker, dockerEnvironment } from '../boundary/boundary.service.js';
-import {
-  workerArguments,
-  validateWorkerImage,
-  WORKER_IMAGE,
-} from '../worker/worker.service.js';
+import { workerArguments, validateWorkerImage, WORKER_IMAGE } from '../worker/worker.service.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PROTOCOL_TIMEOUT_MS = 12_000;
@@ -21,16 +17,18 @@ export function mountedWorkerArguments(
   imageId: string,
   sourcePath: string,
 ): string[] {
-  if (!isAbsolute(sourcePath) || resolve(sourcePath) !== sourcePath ||
-      /[,\r\n\0]/.test(sourcePath) ||
-      sourcePath.toLowerCase().includes('docker.sock')) {
+  if (
+    !isAbsolute(sourcePath) ||
+    resolve(sourcePath) !== sourcePath ||
+    /[,\r\n\0]/.test(sourcePath) ||
+    sourcePath.toLowerCase().includes('docker.sock')
+  ) {
     throw new Error('Unsafe bind mount source');
   }
   const args = workerArguments(name, imageId);
   const index = args.indexOf(imageId);
   if (index < 0) throw new Error('Missing image');
-  args.splice(index, 0, '--mount',
-    `type=bind,source=${sourcePath},target=/workspace,readonly`);
+  args.splice(index, 0, '--mount', `type=bind,source=${sourcePath},target=/workspace,readonly`);
   return args;
 }
 
@@ -52,10 +50,13 @@ export function validateObservedMounts(raw: string, expectedSource: string): voi
     throw new Error('Unexpected host mounts');
   }
   const mount = mounts[0]!;
-  if (mount.Type !== 'bind' || mount.Target !== '/workspace' ||
-      mount.ReadOnly !== true ||
-      !mount.Source ||
-      resolve(mount.Source).toLowerCase() !== resolve(expectedSource).toLowerCase()) {
+  if (
+    mount.Type !== 'bind' ||
+    mount.Target !== '/workspace' ||
+    mount.ReadOnly !== true ||
+    !mount.Source ||
+    resolve(mount.Source).toLowerCase() !== resolve(expectedSource).toLowerCase()
+  ) {
     throw new Error('Bind source, read-only policy or destination mismatch');
   }
 }
@@ -69,17 +70,23 @@ type Pending = {
 
 /** Ephemeral no-command worker. Always attempt to remove container. */
 export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
-  const context = await callDocker(['context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'], 8_000);
-  if (!(process.platform === 'win32'
-    ? context.startsWith('npipe:////./pipe/')
-    : context.startsWith('unix://'))) {
+  const context = await callDocker(
+    ['context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'],
+    8_000,
+  );
+  if (
+    !(process.platform === 'win32'
+      ? context.startsWith('npipe:////./pipe/')
+      : context.startsWith('unix://'))
+  ) {
     throw new Error('Remote Docker engine rejected');
   }
   if ((await callDocker(['info', '--format', '{{.OSType}}'], 8_000)) !== 'linux') {
     throw new Error('Linux Docker Engine required');
   }
   const imageInfo = await callDocker(
-    ['image', 'inspect', WORKER_IMAGE, '--format', '{{.Id}}|{{json .Config}}'], 8_000,
+    ['image', 'inspect', WORKER_IMAGE, '--format', '{{.Id}}|{{json .Config}}'],
+    8_000,
   );
   const imageId = validateWorkerImage(imageInfo);
   const name = `gym-dev-hub-worker-${randomUUID()}`;
@@ -131,8 +138,12 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
           return;
         }
         const waiter = pending;
-        if (!waiter || reply.protocol !== 1 ||
-            reply.event !== waiter.expected || reply.executionEnabled !== false) {
+        if (
+          !waiter ||
+          reply.protocol !== 1 ||
+          reply.event !== waiter.expected ||
+          reply.executionEnabled !== false
+        ) {
           fail(new Error('Worker protocol rejected'));
           running.kill();
           return;
@@ -147,52 +158,76 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
     running.on('exit', () => {
       fail(new Error('Docker worker exited unexpectedly'));
     });
-    const exchange = (request: 'HELLO/1' | 'PING/1' | 'SHUTDOWN/1',
-      expected: Pending['expected']): Promise<void> => new Promise((resolveReady, reject) => {
-      if (pending || running.exitCode !== null) {
-        reject(new Error('Worker already busy or exited'));
-        return;
-      }
-      const timer = setTimeout(() => fail(new Error('Worker protocol timeout')), PROTOCOL_TIMEOUT_MS);
-      pending = { expected, resolve: resolveReady, reject, timer };
-      running.stdin.write(request + '\n', 'utf8', (error) => {
-        if (error) fail(new Error('Worker stdin transport failure'));
+    const exchange = (
+      request: 'HELLO/1' | 'PING/1' | 'SHUTDOWN/1',
+      expected: Pending['expected'],
+    ): Promise<void> =>
+      new Promise((resolveReady, reject) => {
+        if (pending || running.exitCode !== null) {
+          reject(new Error('Worker already busy or exited'));
+          return;
+        }
+        const timer = setTimeout(
+          () => fail(new Error('Worker protocol timeout')),
+          PROTOCOL_TIMEOUT_MS,
+        );
+        pending = { expected, resolve: resolveReady, reject, timer };
+        running.stdin.write(request + '\n', 'utf8', (error) => {
+          if (error) fail(new Error('Worker stdin transport failure'));
+        });
       });
-    });
 
     await exchange('HELLO/1', 'ready');
     const mounts = await callDocker(
-      ['inspect', '--format', '{{json .HostConfig.Mounts}}', name], 8_000,
+      ['inspect', '--format', '{{json .HostConfig.Mounts}}', name],
+      8_000,
     );
     validateObservedMounts(mounts, sourcePath);
     const isolation = await callDocker(
-      ['inspect', '--format',
+      [
+        'inspect',
+        '--format',
         '{{.HostConfig.NetworkMode}}|{{.HostConfig.ReadonlyRootfs}}|{{.Config.User}}|{{.HostConfig.Privileged}}|{{.HostConfig.AutoRemove}}|{{.HostConfig.IpcMode}}',
-        name], 8_000,
+        name,
+      ],
+      8_000,
     );
     // Kernel-policy fields checked via Docker inspect, never asserted from intent alone.
     const segments = isolation.split('|');
-    if (segments.length !== 6 || segments[0] !== 'none' ||
-        segments[1] !== 'true' || segments[2] !== '65534:65534' ||
-        segments[3] !== 'false' || segments[4] !== 'true' ||
-        segments[5] !== 'none') {
+    if (
+      segments.length !== 6 ||
+      segments[0] !== 'none' ||
+      segments[1] !== 'true' ||
+      segments[2] !== '65534:65534' ||
+      segments[3] !== 'false' ||
+      segments[4] !== 'true' ||
+      segments[5] !== 'none'
+    ) {
       throw new Error('Unsafe Docker container configuration');
     }
     const constraints = await callDocker(
-      ['inspect', '--format',
+      [
+        'inspect',
+        '--format',
         '{{json .HostConfig.CapDrop}}|{{json .HostConfig.SecurityOpt}}|{{.HostConfig.PidsLimit}}|{{.HostConfig.Memory}}|{{.HostConfig.NanoCpus}}',
-        name], 8_000,
+        name,
+      ],
+      8_000,
     );
     const flags = constraints.split('|');
     const capabilities = JSON.parse(flags[0] ?? 'null') as unknown;
     const security = JSON.parse(flags[1] ?? 'null') as unknown;
-    if (flags.length !== 5 ||
-        !Array.isArray(capabilities) || capabilities.length !== 1 ||
-        String(capabilities[0]).toUpperCase() !== 'ALL' ||
-        !Array.isArray(security) ||
-        !security.some((entry) => String(entry).startsWith('no-new-privileges')) ||
-        flags[2] !== '32' || flags[3] !== '134217728' ||
-        flags[4] !== '500000000') {
+    if (
+      flags.length !== 5 ||
+      !Array.isArray(capabilities) ||
+      capabilities.length !== 1 ||
+      String(capabilities[0]).toUpperCase() !== 'ALL' ||
+      !Array.isArray(security) ||
+      !security.some((entry) => String(entry).startsWith('no-new-privileges')) ||
+      flags[2] !== '32' ||
+      flags[3] !== '134217728' ||
+      flags[4] !== '500000000'
+    ) {
       throw new Error('Docker capability or resource boundaries changed');
     }
     await exchange('PING/1', 'pong');
@@ -209,7 +244,8 @@ export async function runMountedWorkerProbe(sourcePath: string): Promise<void> {
     } catch {
       // --rm may already have removed the container after clean shutdown.
       const remaining = await callDocker(
-        ['ps', '--all', '--quiet', '--filter', `name=^${name}$`], 8_000,
+        ['ps', '--all', '--quiet', '--filter', `name=^${name}$`],
+        8_000,
       );
       if (remaining) throw new Error('Unable to clean up Docker probe container');
     }

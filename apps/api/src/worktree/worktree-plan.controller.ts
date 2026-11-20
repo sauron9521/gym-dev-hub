@@ -6,7 +6,11 @@ import { WorktreeInspectionService } from './worktree-inspection.service.js';
 import type { WorktreeCreationGrant, WorktreeHydrationGrant } from '@gym-dev-hub/contracts';
 import { WorktreeHydrationService } from './worktree-hydration.service.js';
 import { WorktreeIntegrityService } from './worktree-integrity.service.js';
-import type { WorktreeIntegrityReport, WorktreeMountGrant, WorktreeMountProbeResult } from '@gym-dev-hub/contracts';
+import type {
+  WorktreeIntegrityReport,
+  WorktreeMountGrant,
+  WorktreeMountProbeResult,
+} from '@gym-dev-hub/contracts';
 import { WorktreeMountService } from './worktree-mount.service.js';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')

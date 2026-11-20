@@ -87,8 +87,12 @@ export function WorktreeIntegrityPanel({ sessionId, planId, fingerprint }: Props
             </div>
           </div>
           {report.status === 'verified' && fingerprint && (
-            <WorktreeMountPanel key={report.checkedAt} sessionId={sessionId}
-              report={report} fingerprint={fingerprint} />
+            <WorktreeMountPanel
+              key={report.checkedAt}
+              sessionId={sessionId}
+              report={report}
+              fingerprint={fingerprint}
+            />
           )}
           <small>
             Підсумок є одноразовим знімком стану. Навіть успішна перевірка не дозволяє mount або

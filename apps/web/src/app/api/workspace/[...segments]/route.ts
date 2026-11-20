@@ -60,9 +60,16 @@ function allowedPath(segments: string[], method: string): string | null {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       segments[3] ?? '',
     ) &&
-    ['acknowledge', 'revoke', 'authorize', 'create', 'hydration-authorize', 'hydrate', 'mount-authorize', 'mount-probe'].includes(
-      segments[4] ?? '',
-    )
+    [
+      'acknowledge',
+      'revoke',
+      'authorize',
+      'create',
+      'hydration-authorize',
+      'hydrate',
+      'mount-authorize',
+      'mount-probe',
+    ].includes(segments[4] ?? '')
   ) {
     return `/workspace/sessions/${id}/worktree-plans/${segments[3]}/${segments[4]}`;
   }
@@ -133,12 +140,12 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
             path.endsWith('/mount-probe')
               ? 45_000
               : path.endsWith('/boundary/preflight')
-              ? 45_000
-              : path.endsWith('/hydrate')
-                ? 300_000
-                : path.includes('codex') || path.endsWith('/chat')
-                  ? 20_000
-                  : 10_000,
+                ? 45_000
+                : path.endsWith('/hydrate')
+                  ? 300_000
+                  : path.includes('codex') || path.endsWith('/chat')
+                    ? 20_000
+                    : 10_000,
           ),
       redirect: 'error',
     });

@@ -542,9 +542,13 @@ export class WorktreePlanService {
     }
     return this.transact((store) => {
       const plan = this.find(store, sessionId, planId);
-      if (plan.state !== 'created' || !plan.worktreeCreated ||
-          plan.hydrationState !== 'completed' || plan.repository !== session.repository ||
-          !this.github.listAllowedRepositories().includes(plan.repository)) {
+      if (
+        plan.state !== 'created' ||
+        !plan.worktreeCreated ||
+        plan.hydrationState !== 'completed' ||
+        plan.repository !== session.repository ||
+        !this.github.listAllowedRepositories().includes(plan.repository)
+      ) {
         throw new ConflictException('Worktree не завершено або репозиторій більше не дозволено.');
       }
       return publicPlan(plan);
@@ -552,7 +556,9 @@ export class WorktreePlanService {
   }
 
   async recordMountProbe(
-    sessionId: string, planId: string, step: 'started' | 'verified' | 'failed',
+    sessionId: string,
+    planId: string,
+    step: 'started' | 'verified' | 'failed',
   ): Promise<void> {
     await this.transact((store) => {
       const plan = this.find(store, sessionId, planId);
@@ -563,8 +569,12 @@ export class WorktreePlanService {
         throw new ConflictException('Ліміт записів аудиту, створюй нову сесію.');
       }
       plan.history.push({
-        event: step === 'started' ? 'mount-probe-started'
-          : step === 'verified' ? 'mount-probe-verified' : 'mount-probe-failed',
+        event:
+          step === 'started'
+            ? 'mount-probe-started'
+            : step === 'verified'
+              ? 'mount-probe-verified'
+              : 'mount-probe-failed',
         timestamp: new Date().toISOString(),
       });
     }, true);
