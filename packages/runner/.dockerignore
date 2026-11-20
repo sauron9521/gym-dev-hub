@@ -9,4 +9,5 @@
 !pinned-source-typecheck.mjs
 !full-source-audit.mjs
 !overlay-preflight.mjs
+!offline-api-cache.mjs
 !.dockerignore
