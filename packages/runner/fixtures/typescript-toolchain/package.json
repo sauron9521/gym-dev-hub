@@ -1,0 +1,17 @@
+{
+  "name": "@devhub/typescript-toolchain-proof",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "pnpm": "12.18.0"
+  },
+  "scripts": {
+    "preinstall": "node -e \"require('fs').writeFileSync('/workspace/preinstall-ran','bad')\"",
+    "install": "node -e \"require('fs').writeFileSync('/workspace/install-ran','bad')\"",
+    "postinstall": "node -e \"require('fs').writeFileSync('/workspace/postinstall-ran','bad')\"",
+    "prepare": "node -e \"require('fs').writeFileSync('/workspace/prepare-ran','bad')\""
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}
