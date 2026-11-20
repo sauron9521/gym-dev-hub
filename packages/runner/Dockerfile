@@ -44,5 +44,7 @@ COPY --chown=65534:65534 native-compatibility-preflight.mjs /opt/gym-dev-hub/nat
 # CI-only fixed native runtime experiment; unreachable via the diagnostic runner protocol.
 COPY --chown=65534:65534 native-runtime-smoke.mjs /opt/gym-dev-hub/native-runtime-smoke.mjs
 COPY --chown=65534:65534 native-runtime-fixture.mjs /opt/gym-dev-hub/native-runtime-fixture.mjs
+# CI-only fixed Prisma generation + approved TypeScript analysis; no HTTP/runner execution route.
+COPY --chown=65534:65534 api-typecheck-ci.mjs /opt/gym-dev-hub/api-typecheck-ci.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]
