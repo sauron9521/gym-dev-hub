@@ -26,6 +26,24 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      # Temporary PR19 formatter capture; remove from final diff.
+      - name: Temporary PR19 exact Prettier snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            apps/api/src/worktree/task-runner-policy.service.ts
+            apps/web/src/app/workspace/task-runner-preview-panel.tsx
+            docs/task-runner-policy.md
+            packages/contracts/src/task-runner.ts
+          )
+          pnpm exec prettier --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "DHFMTSTART:$file"
+            base64 -w0 "$file"
+            echo
+            echo "DHFMTEND:$file"
+          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint
