@@ -13,6 +13,8 @@ import type {
 } from '@gym-dev-hub/contracts';
 import { WorktreeMountService } from './worktree-mount.service.js';
 import { WorktreeCodeReadService } from './worktree-code-read.service.js';
+import { WorktreeToolService } from './worktree-tool.service.js';
+import type { WorktreeToolGrant, WorktreeToolResult } from '@gym-dev-hub/contracts';
 import type { WorktreeCodeReadGrant, WorktreeCodeReadResult } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
@@ -25,6 +27,7 @@ export class WorktreePlanController {
     private readonly integrity: WorktreeIntegrityService,
     private readonly mount: WorktreeMountService,
     private readonly codeRead: WorktreeCodeReadService,
+    private readonly tools: WorktreeToolService,
   ) {}
 
   @Get()
@@ -117,6 +120,24 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreeCodeReadResult> {
     return this.codeRead.read(sessionId, planId, body);
+  }
+
+  @Post(':planId/tool-authorize')
+  toolAuthorize(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeToolGrant> {
+    return this.tools.authorize(sessionId, planId, body);
+  }
+
+  @Post(':planId/tool-execute')
+  toolExecute(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeToolResult> {
+    return this.tools.execute(sessionId, planId, body);
   }
 
   @Post(':planId/hydration-authorize')
