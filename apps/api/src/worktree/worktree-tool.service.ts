@@ -13,6 +13,7 @@ import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeIntegrityService } from './worktree-integrity.service.js';
 import { assertRegularScopedFile } from './worktree-code-read.service.js';
 import { runMountedWorkerProbe, validateScopedCodePath } from './worktree-mount-probe.js';
+import { withPinnedFileStage } from './worktree-file-stage.js';
 
 const TTL_MS = 60_000;
 const authorizeSchema = z.strictObject({
@@ -170,10 +171,13 @@ export class WorktreeToolService {
       await assertRegularScopedFile(plan, grant.filePath);
       await this.plans.recordToolRun(sessionId, planId, 'started');
       recorded = true;
-      const sha256 = await runMountedWorkerProbe(grant.targetPath, undefined, grant.filePath);
-      if (!sha256 || !/^[0-9a-f]{64}$/.test(sha256)) {
-        throw new Error('Worker tool did not return a valid digest');
-      }
+      const sha256 = await withPinnedFileStage(plan, grant.filePath, async (stage) => {
+        const actual = await runMountedWorkerProbe(stage.sourcePath, undefined, stage.fileName);
+        if (actual !== stage.sha256) {
+          throw new Error('Worker digest does not match pinned Git blob');
+        }
+        return stage.sha256;
+      });
       await this.plans.recordToolRun(sessionId, planId, 'completed');
       recorded = false;
       return {
@@ -194,7 +198,7 @@ export class WorktreeToolService {
         await this.plans.recordToolRun(sessionId, planId, 'failed').catch(() => undefined);
       }
       throw new ServiceUnavailableException(
-        'Docker tool відхилено. Перевір локальний Docker, права UID 65534 і Git worktree.',
+        'Docker tool відхилено. Перевір локальний Docker, staging та pinned Git worktree.',
       );
     } finally {
       this.executing = false;
