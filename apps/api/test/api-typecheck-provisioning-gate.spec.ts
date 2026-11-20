@@ -72,7 +72,7 @@ describe('real API_TYPECHECK dependency provisioning safety gate', () => {
 
   it('resolves exact importer specifier, pinned version and scoped package', () => {
     expect(readImporterEntry(IMPORTER, 'dependencies', 'bcrypt', '^6.0.0')).toBe('6.0.0');
-    expect(readImporterEntry(IMPORTER, 'dependencies', "'@prisma/client'", '^7.10.1')).toBe(
+    expect(readImporterEntry(IMPORTER, 'dependencies', '@prisma/client', '^7.10.1')).toBe(
       '7.10.1',
     );
     expect(readImporterEntry(IMPORTER, 'devDependencies', 'typescript', '^6.0.3')).toBe(
@@ -90,7 +90,7 @@ describe('real API_TYPECHECK dependency provisioning safety gate', () => {
       readImporterEntry(IMPORTER.replace('version: 6.0.0', 'version: https://evil'), 'dependencies', 'bcrypt', '^6.0.0'),
     ).toThrow('non-registry');
     expect(() =>
-      readImporterEntry(IMPORTER + '\n      bcrypt:\n        specifier: ^6.0.0\n        version: 6.0.0', 'dependencies', 'bcrypt', '^6.0.0'),
+      readImporterEntry(IMPORTER.replace('    devDependencies:', '      bcrypt:\n        specifier: ^6.0.0\n        version: 6.0.0\n    devDependencies:'), 'dependencies', 'bcrypt', '^6.0.0'),
     ).toThrow('duplicate');
   });
 
