@@ -1,0 +1,110 @@
+name: Offline pnpm Provisioning (fixture only)
+
+on:
+  pull_request:
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/offline-pnpm-provisioning.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/runner/**'
+      - '.github/workflows/offline-pnpm-provisioning.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-pnpm-provisioning-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-fixture:
+    name: Offline frozen install / no lifecycle scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build reviewed Node/pnpm toolchain image
+        run: |
+          docker build --pull=false \
+            --tag gym-dev-hub-node-runner:v1 \
+            --file packages/runner/Dockerfile packages/runner
+
+      - name: Prove isolated, frozen, offline, script-free install with one local workspace dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="$(realpath packages/runner/fixtures/offline)"
+          name="gym-dev-hub-offline-${{ github.run_id }}"
+          cleanup() {
+            docker rm -f "$name" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker create --name "$name" --pull=never \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --user=65534:65534 --ipc=none \
+            --pids-limit=128 --memory=2048m --cpus=2 \
+            --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=128m,mode=1777' \
+            --mount "type=bind,source=$fixture,target=/input,readonly" \
+            --stop-timeout=3 \
+            --entrypoint /usr/bin/node \
+            gym-dev-hub-node-runner:v1 \
+            /opt/gym-dev-hub/offline-provision.mjs >/dev/null
+
+          docker inspect "$name" --format '{{json .HostConfig}}' | jq -e '
+            .NetworkMode == "none" and .ReadonlyRootfs == true
+            and .Privileged == false and (.CapDrop | any(.[]; ascii_downcase == "all"))
+            and .Memory == 2147483648 and .NanoCpus == 2000000000
+            and .PidsLimit == 128 and .IpcMode == "none"
+            and (.Mounts | length) == 1
+            and .Mounts[0].Type == "bind" and .Mounts[0].Target == "/input"
+            and .Mounts[0].ReadOnly == true
+            and (.Tmpfs["/workspace"] | contains("noexec"))
+          '
+          reply="$(docker start --attach "$name")"
+          test "$(docker inspect "$name" --format '{{.State.ExitCode}}')" = '0'
+          printf '%s\n' "$reply" | jq -e '
+            .protocol == 1 and .event == "offline-deps-provisioned"
+            and .executionEnabled == false and .scriptsSkipped == true
+            and .externalDownloadsAllowed == false and .packagesLinked == 1
+            and (.lockSha256 | test("^[a-f0-9]{64}$"))
+          '
+          docker rm "$name"
+          test -z "$(docker ps --all --quiet --filter "name=^$name$")"
+          echo 'Offline fixture linked its local workspace package, preserved the lockfile, and skipped malicious scripts.'
+
+      - name: Reject malformed lockfile without ever installing packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad="$(mktemp -d)"
+          name="gym-dev-hub-offline-bad-${{ github.run_id }}"
+          cleanup() {
+            docker rm -f "$name" >/dev/null 2>&1 || true
+            rm -rf "$bad"
+          }
+          trap cleanup EXIT
+          cp -a packages/runner/fixtures/offline/. "$bad/"
+          sed -i "s/lockfileVersion: '9.0'/lockfileVersion: '8.0'/" "$bad/pnpm-lock.yaml"
+
+          docker create --name "$name" --pull=never \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --user=65534:65534 --ipc=none \
+            --pids-limit=128 --memory=2048m --cpus=2 \
+            --tmpfs='/workspace:rw,nosuid,nodev,noexec,size=128m,mode=1777' \
+            --mount "type=bind,source=$bad,target=/input,readonly" \
+            --stop-timeout=3 \
+            --entrypoint /usr/bin/node \
+            gym-dev-hub-node-runner:v1 \
+            /opt/gym-dev-hub/offline-provision.mjs >/dev/null
+
+          docker start --attach "$name" > /dev/null 2>&1 || true
+          test "$(docker inspect "$name" --format '{{.State.ExitCode}}')" != '0'
+          docker rm "$name"
+          test -z "$(docker ps --all --quiet --filter "name=^$name$")"
+          echo 'Tampered lockfile was rejected without fallback to online installation.'
