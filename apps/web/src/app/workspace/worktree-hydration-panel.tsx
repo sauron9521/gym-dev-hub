@@ -147,7 +147,7 @@ export function WorktreeHydrationPanel({ sessionId, plan, completed, onRefresh }
         </>
       )}
       {plan.hydrationState === 'completed' && (
-        <WorktreeIntegrityPanel key={plan.id} sessionId={sessionId} planId={plan.id} />
+        <WorktreeIntegrityPanel key={plan.id} sessionId={sessionId} planId={plan.id} fingerprint={plan.fingerprint} />
       )}
       {error && (
         <p className="ws-chat-error" role="alert">
