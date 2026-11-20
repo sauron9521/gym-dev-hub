@@ -77,6 +77,14 @@ describe('trusted network staging container boundary', () => {
   });
   it('permits only one disposable output bind; no extra host mounts', () => {
     assert.doesNotThrow(() => verifyProvisionerIsolation(expected()));
+    // Docker Desktop omits ReadOnly:false from HostConfig.Mounts when a bind is RW.
+    // Actual live mount RW is checked separately before the stage is started.
+    assert.doesNotThrow(() =>
+      verifyProvisionerIsolation({
+        ...expected(),
+        Mounts: [{ Type: 'bind', Target: '/bundle' }],
+      }),
+    );
     for (const candidate of [
       { ...expected(), NetworkMode: 'host' },
       { ...expected(), ReadonlyRootfs: false },

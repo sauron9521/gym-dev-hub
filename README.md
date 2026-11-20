@@ -24,11 +24,15 @@ See [GitHub Dashboard and PR Checks setup](docs/github-dashboard.md) for the per
 
 ### Agent Workspace (local foundation)
 
-Open <http://127.0.0.1:3100/workspace> to create separate implementation-task sessions, open multiple tabs, update task statuses, and save local notes. The Agent Chat interface now supports opt-in **real read-only Codex text turns with SSE streaming**. Agent command execution, Git worktrees and PR creation remain future work. Session files remain local and are gitignored. See [Agent Workspace setup](docs/agent-workspace.md).
+Open <http://127.0.0.1:3100/workspace> to create separate implementation-task sessions, open multiple tabs, update task statuses, and save local notes. The Agent Chat interface now supports opt-in **real read-only Codex text turns with SSE streaming**. Unrestricted agent command execution and automatic PR creation remain disabled; worktree creation and the fixed API typecheck require distinct explicit operator authorization. Session files remain local and are gitignored. See [Agent Workspace setup](docs/agent-workspace.md).
 
 ### Docker Execution Boundary (preflight)
 
 The Workspace now includes a [Docker isolation preflight](docs/execution-boundary.md) which checks an ephemeral non-networked, read-only test container. **This is not a runnable agent environment** and does not grant file access or Git permissions.
+
+### Fixed API_TYPECHECK: operator-only local provisioning
+
+A narrowly scoped [one-use, operator-approved API typecheck](docs/operator-api-typecheck.md) is available for **one reviewed Gym Platform commit only**, with no generic commands or agent-triggered execution. To prepare its offline inputs explicitly on Windows or Linux with local Docker, use `pnpm provision:pinned-api`. This invokes a separate networked _staging_ container without host credentials, verifies immutable source/dependencies, and runs a final typecheck in a **networkless** container before publishing a secret-free local bundle. It does not enable execution flags or write secrets. See [local pinned provisioning](docs/local-pinned-provisioning.md).
 
 ### Isolated Worker Foundation
 
