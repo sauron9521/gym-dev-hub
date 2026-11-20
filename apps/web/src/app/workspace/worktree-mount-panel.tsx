@@ -10,12 +10,13 @@ import type {
 type Props = {
   sessionId: string;
   report: WorktreeIntegrityReport;
+  fingerprint: string;
 };
 
 const base = (sessionId: string, planId: string) =>
   `/api/workspace/sessions/${sessionId}/worktree-plans/${planId}`;
 
-export function WorktreeMountPanel({ sessionId, report }: Props) {
+export function WorktreeMountPanel({ sessionId, report, fingerprint }: Props) {
   const [operatorSecret, setOperatorSecret] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
   const [grant, setGrant] = useState<WorktreeMountGrant | null>(null);
@@ -33,7 +34,7 @@ export function WorktreeMountPanel({ sessionId, report }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fingerprint: report.mountFingerprint,
+          fingerprint,
           operatorSecret,
         }),
         cache: 'no-store',
