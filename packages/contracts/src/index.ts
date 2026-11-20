@@ -51,4 +51,6 @@ export type {
   WorktreeCreationGrant,
   WorktreeInspection,
   WorktreeInspectionState,
+  WorktreeHydrationState,
+  WorktreeHydrationGrant,
 } from './worktree.js';
