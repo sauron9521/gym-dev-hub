@@ -112,7 +112,8 @@ async function pinnedCompiler() {
       }
       const path = join(candidate, 'bin', 'tsc');
       const info = await lstat(path);
-      if (!info.isFile() || info.isSymbolicLink() || info.size < 100) {
+      // The reviewed TypeScript launcher is a 45-byte Node shim, not the full compiler.
+      if (!info.isFile() || info.isSymbolicLink() || info.size < 32 || info.size > 4096) {
         throw new Error('TypeScript entrypoint is not a safe regular file');
       }
       return path;
