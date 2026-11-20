@@ -109,7 +109,7 @@ export async function inspectInstalledNativeArtifacts(project, engine) {
   );
   const sharp = await firstCandidate(
     project,
-    withSuffix('@img/sharp-linuxmusl-x64/lib/sharp-linuxmusl-x64.node'),
+    withSuffix('@img/sharp-linuxmusl-x64/lib/sharp-linuxmusl-x64-0.35.5.node'),
   );
   const libvips = await libvipsCandidate(project);
   const prismaSchemaEngine = await inspectElfFile(engine, '/engine');
