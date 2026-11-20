@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { randomUUID, createHash } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { chmod, lstat, mkdtemp, open, realpath, rmdir, unlink } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -88,6 +88,9 @@ export async function withPinnedFileStage<T>(
   filePath: string,
   action: (stage: PinnedStage) => Promise<T>,
 ): Promise<T> {
+  if (process.env.DEV_HUB_ENABLE_PINNED_FILE_STAGE !== 'true') {
+    throw new Error('Ephemeral pinned file staging is not enabled');
+  }
   validateScopedCodePath(filePath);
   const root = await realpath(plan.targetPath);
   if (root !== resolve(plan.targetPath) || !(await lstat(root)).isDirectory()) {
