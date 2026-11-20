@@ -87,6 +87,9 @@ async function main() {
       env: {
         PATH: '/usr/bin:/bin',
         HOME: OUTPUT,
+        TMPDIR: OUTPUT,
+        TMP: OUTPUT,
+        TEMP: OUTPUT,
         XDG_CACHE_HOME: join(OUTPUT, '.cache'),
         XDG_DATA_HOME: join(OUTPUT, '.local', 'share'),
         npm_config_store_dir: join(OUTPUT, '.pnpm-store'),
