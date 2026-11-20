@@ -1,0 +1,97 @@
+name: Gym Platform Pinned Dependency Audit
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/gym-platform-dependency-audit.mjs'
+      - 'apps/api/test/gym-platform-dependency-audit.spec.ts'
+      - '.github/workflows/gym-platform-dependency-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/gym-platform-dependency-audit.mjs'
+      - '.github/workflows/gym-platform-dependency-audit.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gym-platform-pinned-audit-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Static audit / pinned Gym Platform Git objects
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Dev Hub source (never run target scripts)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Fetch exact read-only Gym Platform snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: sauron9521/gym-platform
+          ref: 73b636f5d064c7f24b43607e0c8411e9161f8986
+          path: .audit/gym-platform
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install Node 24 only (no pnpm install)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify source commit and five original Git objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=.audit/gym-platform
+          test "$(git -C "$source" rev-parse HEAD)" = '73b636f5d064c7f24b43607e0c8411e9161f8986'
+          test "$(git -C "$source" rev-parse HEAD:pnpm-lock.yaml)" = '994456e853beaa556ab5a0d5ee3533b8f7db5682'
+          test "$(git -C "$source" rev-parse HEAD:pnpm-workspace.yaml)" = '0af4a0308ad0b25ea1813badb71b09b0256b6513'
+          test "$(git -C "$source" rev-parse HEAD:package.json)" = '4fa06500522abaa2fc809d022e3c4f74267a8d67'
+          test "$(git -C "$source" rev-parse HEAD:apps/api/package.json)" = '314142f3577c0620ff3402b7de3d25ef9702a5f4'
+          test "$(git -C "$source" rev-parse HEAD:apps/web/package.json)" = '4bba19980d8d53075cac8774e1fd6de7e2720dbf'
+
+      - name: Run read-only audit on actual pinned 742 KB pnpm lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/gym-platform-dependency-audit.mjs .audit/gym-platform > /tmp/devhub-gym-dependency-report.json
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const report = JSON.parse(readFileSync("/tmp/devhub-gym-dependency-report.json", "utf8"));
+            if (
+              report.status !== "verified-pinned-snapshot" ||
+              report.commit !== "73b636f5d064c7f24b43607e0c8411e9161f8986" ||
+              report.filesVerifiedByGitBlob !== 5 ||
+              report.lock.yamlDocuments !== 2 ||
+              report.lock.packageCount !== 1631 ||
+              report.lock.sha512Pins !== 1631 ||
+              report.lock.documents[0].packageCount !== 15 ||
+              report.lock.documents[1].packageCount !== 1616 ||
+              report.workspace.buildScriptsAllowed.length !== 5 ||
+              report.workspace.buildScriptsDenied.length !== 2 ||
+              report.workspace.auditAdvisoryExceptions[0] !== "GHSA-fc5q-39xc-vjpf" ||
+              report.installExecuted !== false ||
+              report.registryContacted !== false ||
+              report.executionAuthorized !== false
+            ) {
+              throw new Error("Pinned dependency audit summary drift");
+            }
+            process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+          '
+
+      - name: Reject a changed lockfile without running any package code
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '\n# simulate a modified dependency lockfile\n' >> .audit/gym-platform/pnpm-lock.yaml
+          if node scripts/gym-platform-dependency-audit.mjs .audit/gym-platform >/dev/null 2>&1; then
+            echo 'Changed Git blob incorrectly accepted'
+            exit 1
+          fi
+          echo 'Changed lockfile rejected by independent source Git blob pin.'
