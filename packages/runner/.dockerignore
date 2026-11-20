@@ -4,4 +4,5 @@
 !offline-provision.mjs
 !cache-verify.mjs
 !real-artifact-verify.mjs
+!offline-real-pair.mjs
 !.dockerignore
