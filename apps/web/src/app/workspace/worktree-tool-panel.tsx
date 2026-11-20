@@ -57,7 +57,7 @@ export function WorktreeToolPanel({ sessionId, report, fingerprint }: Props) {
         cache: 'no-store',
       });
       if (!response.ok) {
-        throw new Error('Інструмент відхилено. Перевір Docker, mount і права доступу UID 65534.');
+        throw new Error('Інструмент відхилено. Перевір Docker, pinned Git snapshot і очищення staging.');
       }
       setResult((await response.json()) as WorktreeToolResult);
     } catch (cause) {
