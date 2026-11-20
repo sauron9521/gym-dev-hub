@@ -2,4 +2,5 @@
 !Dockerfile
 !runner.mjs
 !offline-provision.mjs
+!cache-verify.mjs
 !.dockerignore
