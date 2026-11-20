@@ -30,7 +30,7 @@ The production `gym-platform` mono-repository currently uses `pnpm@12.18.0`, a l
 | Capabilities | Dropped (`ALL`) |
 | Docker socket | Not mounted |
 | Input mount | One *reviewed fixture*, read-only |
-| Output | Ephemeral `/workspace` tmpfs, `noexec` |
+| Output | Ephemeral `/workspace` and `/tmp` tmpfs mounts, `noexec` |
 | Memory / CPU / PIDs | 2 GiB / 2 / 128 |
 | pnpm | Offline, frozen lockfile, ignore scripts |
 | Timeout | 30 seconds for pnpm |
