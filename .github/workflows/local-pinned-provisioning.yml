@@ -5,6 +5,7 @@ on:
     paths:
       - 'packages/local-provisioner/**'
       - 'scripts/provision-pinned-api-local*'
+      - 'scripts/pinned-provision-recovery*'
       - 'packages/runner/Dockerfile'
       - 'packages/runner/api-typecheck-local.mjs'
       - 'package.json'
@@ -36,6 +37,8 @@ jobs:
           node-version: '24'
       - name: Validate CLI pinning, Docker metadata and negative receipts
         run: node --test scripts/provision-pinned-api-local.test.mjs
+      - name: Reject foreign, running, recent and unsafe cleanup candidates
+        run: node --test scripts/pinned-provision-recovery.test.mjs
       - name: Syntax-check the fixed network provisioning script
         run: sh -n packages/local-provisioner/stage-pinned-api.sh
       - name: Run full pinned provisioning and actual offline TypeScript proof
@@ -44,6 +47,23 @@ jobs:
           GH_TOKEN: ''
           NPM_TOKEN: ''
         run: node scripts/provision-pinned-api-local.mjs --prepare
+      - name: Recovery status must be read-only after a complete provisioning run
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/pinned-provision-recovery.mjs --status > "$RUNNER_TEMP/recovery-status.json"
+          node --input-type=module - "$RUNNER_TEMP/recovery-status.json" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const status = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+          if (status.event !== 'pinned-provisioning-recovery-preview' ||
+              status.containers.length !== 0 ||
+              status.stagedDirectories.length !== 0 ||
+              status.unrelatedContainersTouched !== false ||
+              status.stagedDirectoriesRemoved !== false) {
+            throw new Error('Recovery status did not leave provisioned assets untouched');
+          }
+          console.log('Local recovery preflight read-only; no orphan containers or partial stages.');
+          NODE
       - name: Verify only audited, non-secret artifacts were published
         shell: bash
         run: |
