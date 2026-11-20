@@ -1,0 +1,60 @@
+name: Worker Image
+
+on:
+  pull_request:
+    paths:
+      - 'packages/worker/**'
+      - '.github/workflows/worker-image.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/worker/**'
+      - '.github/workflows/worker-image.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  image-smoke:
+    name: Worker image / fixed protocol
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build worker from pinned base (no build RUN network)
+        run: |
+          docker build --pull=false --network=none \
+            --tag gym-dev-hub-worker:v1 \
+            --file packages/worker/Dockerfile packages/worker
+
+      - name: Verify non-root image and fixed HELLO/PING/SHUTDOWN
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect gym-dev-hub-worker:v1 --format '{{.Config.User}}')" = '65534:65534'
+
+          flags=(
+            --rm -i --pull never
+            --network none --read-only --cap-drop ALL
+            --security-opt no-new-privileges
+            --user 65534:65534 --ipc none
+            --pids-limit 32 --memory 128m --cpus 0.5
+            --tmpfs '/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777'
+          )
+          image='gym-dev-hub-worker:v1'
+          actual="$(printf 'HELLO/1\nPING/1\nSHUTDOWN/1\n' | docker run "${flags[@]}" "$image")"
+          expected="$(printf '%s\n' \
+            '{"protocol":1,"event":"ready","executionEnabled":false}' \
+            '{"protocol":1,"event":"pong","executionEnabled":false}' \
+            '{"protocol":1,"event":"stopped","executionEnabled":false}')"
+          test "$actual" = "$expected"
+
+          rejected="$(printf 'RUN arbitrary-command\nSHUTDOWN/1\n' | docker run "${flags[@]}" "$image")"
+          reject_expected="$(printf '%s\n' \
+            '{"protocol":1,"event":"rejected","executionEnabled":false,"code":"UNSUPPORTED_REQUEST"}' \
+            '{"protocol":1,"event":"stopped","executionEnabled":false}')"
+          test "$rejected" = "$reject_expected"
+          echo "Worker accepts only fixed commands; shell execution rejected."

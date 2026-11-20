@@ -30,6 +30,10 @@ Open <http://127.0.0.1:3100/workspace> to create separate implementation-task se
 
 The Workspace now includes a [Docker isolation preflight](docs/execution-boundary.md) which checks an ephemeral non-networked, read-only test container. **This is not a runnable agent environment** and does not grant file access or Git permissions.
 
+### Isolated Worker Foundation
+
+The Workspace can now start, ping and stop a [fixed-protocol Docker worker](docs/isolated-worker.md) built locally from `packages/worker`. It does not execute AI or shell commands, and it receives no host mounts. Build the local image before running its controls; the Docker Safety Preflight must pass first.
+
 ### Codex Adapter (opt-in)
 
 The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. PR #6 adds a separate text-only [Codex Agent Chat](docs/agent-chat.md) using these threads, while keeping worktree and PR mutation disabled. See [Codex Adapter setup and security](docs/codex-adapter.md).

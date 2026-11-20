@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CodexChatPanel } from './codex-chat-panel';
 import { BoundaryStatusPanel } from './boundary-status-panel';
+import { WorkerStatusPanel } from './worker-status-panel';
 import { useEffect, useState, type FormEvent } from 'react';
 import type {
   AgentSession,
@@ -265,7 +266,7 @@ export function WorkspaceClient({ initial, initialError }: Props) {
         <div className="topbar-right">
           <span className="mode-dot" />
           <span>Локальні робочі сесії</span>
-          <span className="topbar-badge">Execution Boundary / PR #7</span>
+          <span className="topbar-badge">Worker Foundation / PR #8</span>
         </div>
       </header>
 
@@ -335,6 +336,7 @@ export function WorkspaceClient({ initial, initialError }: Props) {
           </div>
 
           <BoundaryStatusPanel />
+          <WorkerStatusPanel />
 
           <div className="ws-scope-notice ws-codex-panel">
             <div>

@@ -1659,3 +1659,55 @@ strong {
     flex-direction: column;
   }
 }
+
+/* Lifecycle controls for the fixed-protocol Docker worker. */
+.ws-worker-panel {
+  margin: 18px 0;
+  border: 1px solid #345276;
+  border-radius: 13px;
+  padding: 21px 24px;
+  background: #142237;
+}
+.ws-worker-panel > p {
+  color: #a7b7cd;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ws-worker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-top: 1px solid #2b3c56;
+  padding-top: 17px;
+}
+.ws-worker-actions button {
+  cursor: pointer;
+}
+.ws-worker-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.ws-worker-footer {
+  margin-top: 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ws-worker-footer strong {
+  color: #e4d2b5;
+  font-size: 12px;
+}
+.ws-worker-footer small {
+  color: #94a5bc;
+  font-size: 10px;
+  line-height: 1.7;
+}
+@media (max-width: 700px) {
+  .ws-worker-panel {
+    padding: 17px;
+  }
+  .ws-worker-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

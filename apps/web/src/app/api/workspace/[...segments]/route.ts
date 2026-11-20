@@ -9,6 +9,12 @@ function allowedPath(segments: string[], method: string): string | null {
     if (segments[1] === 'status' && method === 'GET') return '/workspace/codex/status';
     if (segments[1] === 'connect' && method === 'POST') return '/workspace/codex/connect';
   }
+  if (segments.length === 2 && segments[0] === 'worker') {
+    if (segments[1] === 'status' && method === 'GET') return '/workspace/worker/status';
+    if (['start', 'ping', 'stop'].includes(segments[1]) && method === 'POST') {
+      return `/workspace/worker/${segments[1]}`;
+    }
+  }
   if (segments.length === 2 && segments[0] === 'boundary') {
     if (segments[1] === 'status' && method === 'GET') return '/workspace/boundary/status';
     if (segments[1] === 'preflight' && method === 'POST') return '/workspace/boundary/preflight';
