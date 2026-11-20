@@ -9,7 +9,7 @@ const MAX_FILES = 5_000;
 const MAX_TREE_BYTES = 100 * 1024 * 1024;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const SHA = /^[0-9a-f]{40,64}$/;
-const FORBIDDEN = /[<>:"\\|?*\x00-\x1f]/;
+const FORBIDDEN = /[<>:"\\|?*]/;
 const WINDOWS_DEVICE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
 
 export interface TreeSummary {
@@ -73,6 +73,7 @@ export function inspectTreeListing(listing: string): TreeSummary {
           part.endsWith('.') ||
           part.endsWith(' ') ||
           FORBIDDEN.test(part) ||
+      [...part].some((character) => character.charCodeAt(0) < 32) ||
           WINDOWS_DEVICE.test(part),
       )
     ) {
