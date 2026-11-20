@@ -1,0 +1,183 @@
+name: Real npm Artifact Provenance (one pinned package)
+
+on:
+  pull_request:
+    paths:
+      - 'packages/runner/**'
+      - 'scripts/gym-platform-dependency-audit.mjs'
+      - '.github/workflows/real-npm-artifact-provenance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/runner/**'
+      - 'scripts/gym-platform-dependency-audit.mjs'
+      - '.github/workflows/real-npm-artifact-provenance.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-npm-artifact-provenance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  one-package:
+    name: Real SHA-512 tarball / separate network and offline stages
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout Hub source without credential persistence
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact Gym Platform snapshot, never execute its code
+        uses: actions/checkout@v4
+        with:
+          repository: sauron9521/gym-platform
+          ref: 73b636f5d064c7f24b43607e0c8411e9161f8986
+          path: .audit/gym-platform
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify real lockfile identity and exact artifact SRI (static only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .audit/gym-platform rev-parse HEAD)" = '73b636f5d064c7f24b43607e0c8411e9161f8986'
+          node scripts/gym-platform-dependency-audit.mjs .audit/gym-platform >/dev/null
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const lock = readFileSync('.audit/gym-platform/pnpm-lock.yaml', 'utf8');
+          const matches = [...lock.matchAll(/^  is-number@7\.0\.0:\r?\n    resolution: \{integrity: (sha512-[^\s}]+)\}/gm)];
+          const expected = 'sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==';
+          if (matches.length !== 1 || matches[0][1] !== expected) {
+            throw new Error('Pinned Gym Platform package SRI changed');
+          }
+          console.log('One reviewed SHA-512 lockfile record matches the independent runner pin.');
+          NODE
+
+      - name: Build reviewed, non-executing Node toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull=false --tag gym-dev-hub-node-runner:v1 \
+            --file packages/runner/Dockerfile packages/runner
+
+      - name: Download ONE fixed public npm archive; inspect isolated cache and reject corruption
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage="$(mktemp -d)"
+          bad="$(mktemp -d)"
+          name="gym-devhub-real-npm-${{ github.run_id }}"
+          cleanup() {
+            docker rm -f "$name" >/dev/null 2>&1 || true
+            rm -rf "$stage" "$bad"
+          }
+          trap cleanup EXIT
+          chmod 755 "$stage" "$bad"
+
+          # The only networked step for the package; no tokens or dynamic URLs,
+          # no redirects, and absolutely no npm install, unpack or script run.
+          curl --fail --silent --show-error --location-trusted=false \
+            --proto '=https' --tlsv1.2 --max-redirs 0 \
+            --connect-timeout 10 --max-time 45 --retry 2 --retry-delay 2 \
+            --output "$stage/is-number-7.0.0.tgz" \
+            'https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz'
+          chmod 644 "$stage/is-number-7.0.0.tgz"
+
+          # Independently hash downloaded bytes BEFORE supplying them to Docker.
+          node --input-type=module - "$stage/is-number-7.0.0.tgz" <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync } from 'node:fs';
+          const data = readFileSync(process.argv[2]);
+          const pin = 'sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==';
+          const calculated = 'sha512-' + createHash('sha512').update(data).digest('base64');
+          if (calculated !== pin || data.length < 32 || data.length > 131072) {
+            throw new Error('Real registry archive does not match the reviewed lockfile');
+          }
+          console.log('Downloaded real npm bytes match the pinned SHA-512.');
+          NODE
+
+          docker create --name "$name" --pull=never \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --user=65534:65534 --ipc=none \
+            --pids-limit=128 --memory=2048m --cpus=2 \
+            --tmpfs='/cache:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+            --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+            --mount "type=bind,source=$stage,target=/input,readonly" \
+            --stop-timeout=3 --entrypoint /usr/bin/node \
+            gym-dev-hub-node-runner:v1 /opt/gym-dev-hub/real-artifact-verify.mjs >/dev/null
+
+          docker inspect "$name" --format '{{json .HostConfig}}' | jq -e '
+            .NetworkMode == "none" and .ReadonlyRootfs == true
+            and .Privileged == false and (.CapDrop | any(.[]; ascii_downcase == "all"))
+            and .Memory == 2147483648 and .NanoCpus == 2000000000
+            and .PidsLimit == 128 and .IpcMode == "none"
+            and (.Mounts | length) == 1
+            and .Mounts[0].Type == "bind" and .Mounts[0].Target == "/input"
+            and .Mounts[0].ReadOnly == true
+            and (.Tmpfs["/cache"] | contains("noexec"))
+          '
+          docker inspect "$name" --format '{{json .Mounts}}' | jq -e '
+            length == 1 and .[0].Type == "bind"
+            and .[0].Destination == "/input" and .[0].RW == false
+          '
+          test "$(docker inspect "$name" --format '{{.Config.User}}')" = '65534:65534'
+          reply="$(docker start --attach "$name")"
+          test "$(docker inspect "$name" --format '{{.State.ExitCode}}')" = '0'
+          printf '%s\n' "$reply" | jq -e '
+            .protocol == 1 and .event == "real-npm-artifact-pinned"
+            and .package == "is-number@7.0.0"
+            and .reviewedCommit == "73b636f5d064c7f24b43607e0c8411e9161f8986"
+            and .integrity == "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng=="
+            and (.cacheKey | test("^sha512-[a-f0-9]{128}$"))
+            and .artifactBytes > 32 and .artifactBytes < 131072
+            and .scriptsExecuted == false and .extracted == false
+            and .dependencyInstallationExecuted == false
+            and .runtimeNetworkAccess == false and .executionEnabled == false
+          '
+          docker rm "$name"
+          test -z "$(docker ps -aq --filter "name=^$name$")"
+
+          # Use the exact same security flags for negative cases.
+          for scenario in corrupted symlink; do
+            cp "$stage/is-number-7.0.0.tgz" "$bad/is-number-7.0.0.tgz"
+            if [ "$scenario" = 'corrupted' ]; then
+              python3 - "$bad/is-number-7.0.0.tgz" <<'PY'
+          from pathlib import Path
+          import sys
+          p = Path(sys.argv[1])
+          payload = bytearray(p.read_bytes())
+          payload[15] ^= 1
+          p.write_bytes(payload)
+          PY
+            else
+              rm "$bad/is-number-7.0.0.tgz"
+              ln -s /dev/null "$bad/is-number-7.0.0.tgz"
+            fi
+
+            if docker run --rm --pull=never \
+              --network=none --read-only --cap-drop=ALL \
+              --security-opt=no-new-privileges \
+              --user=65534:65534 --ipc=none \
+              --pids-limit=128 --memory=2048m --cpus=2 \
+              --tmpfs='/cache:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+              --tmpfs='/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777' \
+              --mount "type=bind,source=$bad,target=/input,readonly" \
+              --stop-timeout=3 --entrypoint /usr/bin/node \
+              gym-dev-hub-node-runner:v1 \
+              /opt/gym-dev-hub/real-artifact-verify.mjs >/dev/null 2>&1; then
+              echo "Untrusted artifact accepted: $scenario"
+              exit 1
+            fi
+            rm "$bad/is-number-7.0.0.tgz"
+          done
+          test -z "$(docker ps -aq --filter 'ancestor=gym-dev-hub-node-runner:v1')"
+          echo 'Authentic registry bytes verified and cached without execution; corrupted and symlink inputs denied.'
