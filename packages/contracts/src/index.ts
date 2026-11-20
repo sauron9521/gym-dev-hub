@@ -42,3 +42,4 @@ export type {
 } from './codex.js';
 
 export type { ExecutionBoundaryStatus, BoundaryState } from './boundary.js';
+export type { WorkerState, IsolatedWorkerStatus } from './worker.js';

@@ -57,7 +57,7 @@ export function probeArguments(name: string): string[] {
   ];
 }
 
-function dockerEnvironment(): NodeJS.ProcessEnv {
+export function dockerEnvironment(): NodeJS.ProcessEnv {
   // No GitHub, Codex, API or database credentials in the Docker CLI process.
   const env: NodeJS.ProcessEnv = {};
   for (const key of [
@@ -77,7 +77,7 @@ function dockerEnvironment(): NodeJS.ProcessEnv {
   return env;
 }
 
-function callDocker(args: string[], timeoutMs = 20_000): Promise<string> {
+export function callDocker(args: string[], timeoutMs = 20_000): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn('docker', args, {
       shell: false,

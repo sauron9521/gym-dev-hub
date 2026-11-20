@@ -44,7 +44,7 @@ The API must remain **localhost-only**, because Gym Dev Hub does not yet have a 
 
 Future independently reviewed PRs should:
 
-1. Create a dedicated worker image and a fixed worker protocol (no direct arbitrary host shell).
+1. **Completed in PR #8**: create a dedicated worker image, fixed non-executing protocol and worker lifecycle (no direct arbitrary host shell). See [Worker Foundation](isolated-worker.md).
 2. Mount **only approved, per-task Git worktrees** into an isolated worker, with explicit path and permission validation.
 3. Add signed, single-use user approvals, bounded execution, process cancellation, auditing, and cleanup.
 4. Run a complete canary test against worker execution before enabling any mutations or GitHub write operations.
