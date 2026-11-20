@@ -26,22 +26,6 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      # Temporary PR18 one-file formatter; removed before review.
-      - name: Temporary PR18 final formatting snapshot
-        shell: bash
-        run: |
-          set -euo pipefail
-          files=(
-            apps/api/src/worktree/worktree-file-stage.ts
-            apps/api/test/worktree-file-stage.spec.ts
-          )
-          pnpm exec prettier --write "${files[@]}"
-          for file in "${files[@]}"; do
-            echo "DHFMTSTART:$file"
-            base64 -w0 "$file"
-            echo
-            echo "DHFMTEND:$file"
-          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint

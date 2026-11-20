@@ -1,7 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmod, lstat, mkdtemp, mkdir, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  lstat,
+  mkdtemp,
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { WorktreePlan } from '@gym-dev-hub/contracts';

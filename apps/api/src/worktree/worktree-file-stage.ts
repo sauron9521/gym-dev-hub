@@ -108,17 +108,12 @@ export async function withPinnedFileStage<T>(
   }
   const root = await realpath(plan.targetPath);
   const actual = await lstat(root);
-  if (
-    !actual.isDirectory() ||
-    actual.dev !== supplied.dev ||
-    actual.ino !== supplied.ino
-  ) {
+  if (!actual.isDirectory() || actual.dev !== supplied.dev || actual.ino !== supplied.ino) {
     throw new Error('Worktree directory changed during canonicalization');
   }
   if (
     process.platform === 'win32'
-      ? win32.parse(root).root.toLowerCase() !==
-        win32.parse(originalPath).root.toLowerCase()
+      ? win32.parse(root).root.toLowerCase() !== win32.parse(originalPath).root.toLowerCase()
       : root !== originalPath
   ) {
     throw new Error('Worktree path escapes its approved volume');
