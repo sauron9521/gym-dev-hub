@@ -26,6 +26,22 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      # Temporary PR27 Prettier capture; removed from final branch.
+      - name: Temporary PR27 formatting snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            docs/pinned-gym-platform-source-typecheck.md
+            packages/runner/pinned-source-typecheck.mjs
+          )
+          pnpm exec prettier --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "DHFMTSTART:$file"
+            base64 -w0 "$file"
+            echo
+            echo "DHFMTEND:$file"
+          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint
