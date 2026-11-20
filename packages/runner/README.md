@@ -33,3 +33,7 @@ The normal `runner.mjs` protocol still rejects arbitrary execution. See `docs/de
 ## One real pinned npm artifact (PR #24)
 
 GitHub Actions fetches **one exact public `is-number@7.0.0` tarball** from npm's HTTPS registry in a separate, credential-free networked CI step, first confirms that the source `gym-platform` lockfile matches a reviewed Git commit/blob and the independently pinned SHA-512 SRI, and then gives only the verified tarball to a `--network=none`, non-root, read-only Docker container. The CI-only `real-artifact-verify.mjs` revalidates the SRI and stages compressed bytes in an ephemeral noexec, content-addressed `/cache` tmpfs. Modified bytes and symlink inputs are rejected. The archive is **not extracted or installed** and no project script executes; see `docs/real-npm-artifact-provenance.md`.
+
+## Two real pinned npm packages, installed fully offline (PR #25)
+
+A standalone, CI-only `offline-real-pair.mjs` demonstrates `pnpm fetch` of exactly two reviewed real npm packages (`to-regex-range@5.0.1` and transitive `is-number@7.0.0`) in a credential-free trusted CI step, followed by a **frozen, offline, script-free** installation inside an isolated Docker container. The pnpm store and the three-file fixture are read-only host inputs; everything written by pnpm is in an ephemeral noexec tmpfs. The installed dependency graph is checked using package metadata only, without importing the packages. No native builds, code execution, real Gym Platform source or permanent package cache are added. See `docs/real-offline-dependency-install.md`.
