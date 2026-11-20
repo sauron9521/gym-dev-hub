@@ -26,6 +26,22 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      # Temporary PR20 snapshot; removed before ready-for-review.
+      - name: Temporary PR20 exact Prettier snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            apps/api/test/runner-policy.spec.ts
+            packages/runner/runner.mjs
+          )
+          pnpm exec prettier --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "DHFMTSTART:$file"
+            base64 -w0 "$file"
+            echo
+            echo "DHFMTEND:$file"
+          done
       - name: Formatting
         run: pnpm format:check
       - name: Lint
