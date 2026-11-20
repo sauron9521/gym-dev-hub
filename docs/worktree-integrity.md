@@ -50,4 +50,4 @@ This is an **observational** read-only check. Local untrusted administrators/pro
 
 ## Next
 
-PR #15 should prepare **separately approved, scoped read-only worker mounting** with a fresh integrity validation at action time and full Docker safety preflight. Codex execution, shell commands, write privileges, cleanup and GitHub merges remain separate later PRs. Merges are always manual.
+PR #15 adds [separately approved ephemeral read-only worker mounting](worktree-mount.md) with fresh integrity checks and Docker safety preflight. Codex execution and persistent mounts remain disabled. Codex execution, shell commands, write privileges, cleanup and GitHub merges remain separate later PRs. Merges are always manual.
