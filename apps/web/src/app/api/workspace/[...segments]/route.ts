@@ -75,7 +75,7 @@ function allowedPath(segments: string[], method: string): string | null {
     ) &&
     ['inspection', 'integrity'].includes(segments[4] ?? '')
   ) {
-    return `/workspace/sessions/${id}/worktree-plans/${segments[3]}/inspection`;
+    return `/workspace/sessions/${id}/worktree-plans/${segments[3]}/${segments[4]}`;
   }
   if (segments.length === 3 && segments[2] === 'codex' && method === 'POST') {
     return `/workspace/sessions/${id}/codex`;
