@@ -40,6 +40,9 @@ const SHA_IMAGE = /^sha256:[a-f0-9]{64}$/;
 export const PROVISIONING_LABEL = 'org.gym-dev-hub.local-provisioning';
 export const PROVISIONING_SCOPE = 'pinned-api-v1';
 export const PROVISIONING_PHASE_LABEL = 'org.gym-dev-hub.local-provisioning-phase';
+export const PROVISIONING_CHECKOUT_LABEL = 'org.gym-dev-hub.local-provisioning-checkout';
+// Prevent cleanup from another clone/worktree from selecting this checkout's containers.
+export const PROVISIONING_CHECKOUT = createHash('sha256').update(ROOT).digest('hex');
 
 function noDockerCredentials() {
   const allowed = [
@@ -326,6 +329,8 @@ async function stageInDocker(stage, imageId) {
         PROVISIONING_LABEL + '=' + PROVISIONING_SCOPE,
         '--label',
         PROVISIONING_PHASE_LABEL + '=stage',
+        '--label',
+        PROVISIONING_CHECKOUT_LABEL + '=' + PROVISIONING_CHECKOUT,
         '--pull=never',
         '--network=bridge',
         '--read-only',
@@ -395,6 +400,8 @@ async function smoke(bundle, imageId) {
         PROVISIONING_LABEL + '=' + PROVISIONING_SCOPE,
         '--label',
         PROVISIONING_PHASE_LABEL + '=offline-smoke',
+        '--label',
+        PROVISIONING_CHECKOUT_LABEL + '=' + PROVISIONING_CHECKOUT,
         '--pull=never',
         ...reviewedDockerOptions(),
         ...mountEntries(bundle),
