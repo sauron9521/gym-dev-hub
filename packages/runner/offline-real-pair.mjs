@@ -2,7 +2,7 @@
  * CI-only, fixed real two-package offline pnpm install proof.
  * No API entrypoint or support for executing arbitrary project scripts.
  */
-import { readdir, lstat, cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, lstat, cp, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -116,7 +116,6 @@ async function main() {
   for (const [name, bytes] of source) {
     await writeFile(join(OUTPUT, name), bytes, { flag: 'wx', mode: 0o600 });
   }
-  await mkdir(TARGET_STORE, { mode: 0o700 });
   await cp(STORE, TARGET_STORE, {
     recursive: true,
     force: false,
