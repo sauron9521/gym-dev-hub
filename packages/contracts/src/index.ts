@@ -1,3 +1,5 @@
+export type { TaskRunnerRecipeId, TaskRunnerPreview } from './task-runner.js';
+
 export interface HealthResponse {
   status: 'ok';
   service: 'gym-dev-hub-api';

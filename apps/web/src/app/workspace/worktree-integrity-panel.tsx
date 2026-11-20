@@ -5,6 +5,7 @@ import type { WorktreeIntegrityReport } from '@gym-dev-hub/contracts';
 import { WorktreeMountPanel } from './worktree-mount-panel';
 import { WorktreeCodeReadPanel } from './worktree-code-read-panel';
 import { WorktreeToolPanel } from './worktree-tool-panel';
+import { TaskRunnerPreviewPanel } from './task-runner-preview-panel';
 
 type Props = { sessionId: string; planId: string; fingerprint?: string };
 
@@ -104,6 +105,12 @@ export function WorktreeIntegrityPanel({ sessionId, planId, fingerprint }: Props
               />
               <WorktreeToolPanel
                 key={report.checkedAt + '-tool'}
+                sessionId={sessionId}
+                report={report}
+                fingerprint={fingerprint}
+              />
+              <TaskRunnerPreviewPanel
+                key={report.checkedAt + '-task-preview'}
                 sessionId={sessionId}
                 report={report}
                 fingerprint={fingerprint}

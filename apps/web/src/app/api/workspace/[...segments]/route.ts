@@ -73,6 +73,7 @@ function allowedPath(segments: string[], method: string): string | null {
       'code-read',
       'tool-authorize',
       'tool-execute',
+      'task-preview',
     ].includes(segments[4] ?? '')
   ) {
     return `/workspace/sessions/${id}/worktree-plans/${segments[3]}/${segments[4]}`;
