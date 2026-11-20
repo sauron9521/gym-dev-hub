@@ -23,8 +23,9 @@
 21. **Offline dependency provisioning proof**: reproducible, fixture-only pnpm workspace preparation with `--offline --frozen-lockfile --ignore-scripts` under a no-network read-only Docker boundary; native dependency builds remain blocked (PR #21).
 22. **Pinned dependency cache integrity proof**: independently pinned SHA-512 SRI, immutable input manifest verification, content-addressed compressed archive in private tmpfs, tampering denial. Fixture-only, no package execution (PR #22).
 23. **Real Gym Platform dependency manifest audit**: fixed, commit- and Git-blob-pinned read-only review of both pnpm 12 lockfile documents, all SHA-512 resolutions, native build allowances and audit exceptions; no installs (PR #23).
-24. **Controlled execution (future)**: separately approved real package cache, native build strategy, immutable source snapshot, safe test runner with bounded outputs and review; no auto-merge.
-25. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-26. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+24. **One real npm artifact provenance**: fetch one reviewed, SHA-512-pinned `gym-platform` registry tarball in a trusted CI stage and verify/stage it in networkless Docker without extraction or scripts (PR #24).
+25. **Controlled execution (future)**: separately approved multi-package real cache, native build strategy, immutable source snapshot, safe test runner with bounded outputs and review; no auto-merge.
+26. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+27. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
