@@ -19,7 +19,8 @@
     "test:local-provisioner": "node --test scripts/provision-pinned-api-local.test.mjs",
     "provision:status": "node scripts/pinned-provision-recovery.mjs --status",
     "provision:cleanup-stale": "node scripts/pinned-provision-recovery.mjs --prune-stale",
-    "test:provision-recovery": "node --test scripts/pinned-provision-recovery.test.mjs"
+    "test:provision-recovery": "node --test scripts/pinned-provision-recovery.test.mjs",
+    "test:stage-ledger": "node --test scripts/pinned-stage-ledger.test.mjs"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
