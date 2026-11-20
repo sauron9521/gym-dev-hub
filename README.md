@@ -46,6 +46,10 @@ An acknowledged [worktree plan](docs/worktree-plans.md) can now be turned into a
 
 The Workspace can run a [read-only Git worktree inspection](docs/worktree-inspection.md) on created or interrupted plans. It validates worktree registration, the pinned commit and Git tree safety before any future checkout. **This does not hydrate files, delete anything, or authorize agents.**
 
+### Explicit Raw Git Worktree Hydration (PR #13)
+
+A created, inspected worktree can be populated from pinned **raw Git blobs** after a second, independent operator-secret approval. [Safe hydration setup, limits, and recovery](docs/worktree-hydration.md). Disabled by default; the process does not execute Git hooks, checkout filters, Codex, or arbitrary commands. Incomplete hydration never auto-cleans or retries.
+
 ### Codex Adapter (opt-in)
 
 The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. PR #6 adds a separate text-only [Codex Agent Chat](docs/agent-chat.md) using these threads, while keeping worktree and PR mutation disabled. See [Codex Adapter setup and security](docs/codex-adapter.md).
@@ -56,7 +60,7 @@ The Workspace can now connect to a locally installed Codex CLI and create or res
 pnpm check
 ```
 
-The monorepo includes Next.js, NestJS, shared TypeScript/contract packages, and GitHub Actions CI. Agent chat and local session storage are now available. AI-controlled code writes, checkout of source files into worktrees, production authentication and databases are **not** included. Worktree creation is a separate operator-authorized action, never triggered by plan acknowledgement alone.
+The monorepo includes Next.js, NestJS, shared TypeScript/contract packages, and GitHub Actions CI. Agent chat and local session storage are now available. AI-controlled code execution, unrestricted checkout, production authentication and databases are **not** included. Scoped raw-blob hydration is explicitly operator-gated and remains separate from agent execution. Worktree creation is a separate operator-authorized action, never triggered by plan acknowledgement alone.
 
 ## Safety and governance
 
