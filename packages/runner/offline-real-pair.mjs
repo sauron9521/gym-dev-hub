@@ -117,7 +117,7 @@ async function main() {
   for (const name of FILES) source.set(name, await readFixture(name));
   for (const [name, data] of source) {
     const gitBlobSha = createHash('sha1')
-      .update(Buffer.from('blob ' + data.length + '\\0'))
+      .update(Buffer.concat([Buffer.from('blob ' + data.length), Buffer.from([0])]))
       .update(data)
       .digest('hex');
     if (gitBlobSha !== TRUSTED_GIT_BLOBS[name]) {
