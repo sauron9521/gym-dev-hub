@@ -60,7 +60,7 @@ function allowedPath(segments: string[], method: string): string | null {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       segments[3] ?? '',
     ) &&
-    ['acknowledge', 'revoke', 'authorize', 'create', 'hydration-authorize', 'hydrate'].includes(
+    ['acknowledge', 'revoke', 'authorize', 'create', 'hydration-authorize', 'hydrate', 'mount-authorize', 'mount-probe'].includes(
       segments[4] ?? '',
     )
   ) {
@@ -130,7 +130,9 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
       signal: isEventStream
         ? request.signal
         : AbortSignal.timeout(
-            path.endsWith('/boundary/preflight')
+            path.endsWith('/mount-probe')
+              ? 45_000
+              : path.endsWith('/boundary/preflight')
               ? 45_000
               : path.endsWith('/hydrate')
                 ? 300_000
