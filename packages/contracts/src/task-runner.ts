@@ -36,3 +36,36 @@ export interface TaskRunnerPreview {
   executesUntrustedProjectScripts: true;
   notes: string[];
 }
+
+
+/**
+ * A locally authorized, single-use capability for one fixed pinned recipe.
+ * PR #29 issues/revokes grants but cannot use them to run source code.
+ */
+export interface TaskExecutionGrant {
+  grantId: string;
+  /** Returned once. Never logged, written to disk or accepted as an arbitrary command. */
+  grantToken: string;
+  recipeId: 'API_TYPECHECK';
+  sourceCommit: '7104f723c4ee7b81e7b9b64e9c9483aea344ef7a';
+  sourceTree: '2c140e1e740b3dd8cc7582db726f46b54b73b334';
+  sourceManifestSha256: 'dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b';
+  fingerprint: string;
+  expiresAt: string;
+  purpose: 'AUTHORIZE_ONE_PINNED_API_TYPECHECK';
+  /** No execution entrypoint exists in this release. */
+  executionEnabled: false;
+}
+
+export interface TaskExecutionGrantRevocation {
+  grantId: string;
+  status: 'revoked';
+  executionEnabled: false;
+}
+
+export interface TaskExecutionGrantReceipt {
+  grantId: string;
+  recipeId: 'API_TYPECHECK';
+  status: 'consumed-no-execution';
+  executionEnabled: false;
+}
