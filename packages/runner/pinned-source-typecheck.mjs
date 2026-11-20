@@ -217,7 +217,8 @@ async function main() {
   const result = run('/usr/bin/node', [compiler, '--noEmit', '-p', 'tsconfig.json'], 45000);
   if (result.status !== 0) {
     throw new Error(
-      'Pinned Gym Platform source did not typecheck: ' + (result.stdout || result.stderr).slice(0, 800),
+      'Pinned Gym Platform source did not typecheck: ' +
+        (result.stdout || result.stderr).slice(0, 800),
     );
   }
   const after = await readFile(join(WORK, 'pnpm-lock.yaml'));

@@ -6,12 +6,12 @@ This PR moves beyond PR #26's **synthetic TypeScript samples** to compile **four
 
 The trusted GitHub Actions job checks out the public repository at exactly `73b636f5d064c7f24b43607e0c8411e9161f8986` with no persisted Git credentials. The existing PR #23 audit validates the commit's five pinned dependency metadata blobs, including its actual `pnpm-lock.yaml`. The workflow checks each selected file against the commit's Git tree, copies **only** those four files into a disposable directory and rehashes the copies:
 
-| File from Gym Platform | Reviewed Git blob |
-| --- | --- |
-| `packages/domain/src/index.ts` | `4bfb3dd4455f6612eb818ad694ccbb7e56f743ce` |
-| `packages/i18n/src/locales.ts` | `acdfbb8e07aa031e8ac0ca05e8d3fb6026ffc77a` |
+| File from Gym Platform                                                     | Reviewed Git blob                          |
+| -------------------------------------------------------------------------- | ------------------------------------------ |
+| `packages/domain/src/index.ts`                                             | `4bfb3dd4455f6612eb818ad694ccbb7e56f743ce` |
+| `packages/i18n/src/locales.ts`                                             | `acdfbb8e07aa031e8ac0ca05e8d3fb6026ffc77a` |
 | `apps/api/src/modules/workout-analytics/utils/workout-analytics-window.ts` | `cab78200f48bfe265ff374df9eebe4fd3902684e` |
-| `apps/mobile/src/features/exercises/lib/exercises-pagination.ts` | `bc1a7817f2cfcf0f6bf3672502d0212cb843b276` |
+| `apps/mobile/src/features/exercises/lib/exercises-pagination.ts`           | `bc1a7817f2cfcf0f6bf3672502d0212cb843b276` |
 
 These modules have **no imports** and can be checked without the rest of Gym Platform's dependency tree. The CI makes a flat, four-file snapshot (renaming each file to a deterministic unique basename) and verifies its exact file count and absence of symlinks before giving Docker a **read-only** mount. The entire repository, `.git`, environment files and credentials are not mounted.
 
