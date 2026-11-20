@@ -1,0 +1,77 @@
+name: Local Pinned API Provisioning (manual CLI proof)
+
+on:
+  pull_request:
+    paths:
+      - 'packages/local-provisioner/**'
+      - 'scripts/provision-pinned-api-local*'
+      - 'packages/runner/Dockerfile'
+      - 'packages/runner/api-typecheck-local.mjs'
+      - 'package.json'
+      - '.github/workflows/local-pinned-provisioning.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/local-provisioner/**'
+      - 'scripts/provision-pinned-api-local*'
+      - 'packages/runner/Dockerfile'
+      - 'packages/runner/api-typecheck-local.mjs'
+      - '.github/workflows/local-pinned-provisioning.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-bundle:
+    name: Trusted network provisioning and offline API_TYPECHECK
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate CLI pinning, Docker metadata and negative receipts
+        run: node --test scripts/provision-pinned-api-local.test.mjs
+      - name: Syntax-check the fixed network provisioning script
+        run: sh -n packages/local-provisioner/stage-pinned-api.sh
+      - name: Run full pinned provisioning and actual offline TypeScript proof
+        env:
+          GITHUB_TOKEN: ''
+          GH_TOKEN: ''
+          NPM_TOKEN: ''
+        run: node scripts/provision-pinned-api-local.mjs --prepare
+      - name: Verify only audited, non-secret artifacts were published
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle=".local/pinned-api-runner/pinned-7104f723c4ee"
+          test -f "$bundle/provisioning.json"
+          test -f "$bundle/task-typecheck.env.example"
+          test -f "$bundle/source/apps/api/package.json"
+          test -f "$bundle/manifest/tracked-files.bin"
+          test -f "$bundle/engine/schema-engine"
+          test -d "$bundle/store"
+          test -z "$(find "$bundle" -type l -print -quit)"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const p = '.local/pinned-api-runner/pinned-7104f723c4ee';
+          const proof = JSON.parse(readFileSync(p + '/provisioning.json', 'utf8'));
+          if (
+            proof.event !== 'local-pinned-api-runner-provisioned' ||
+            proof.sourceCommit !== '7104f723c4ee7b81e7b9b64e9c9483aea344ef7a' ||
+            proof.sourceManifestSha256 !== 'dd06a6e61c08886f8c783ffe51152854ed6aeca44115659fabc884d5b180bb0b' ||
+            proof.typecheckVerified !== true ||
+            proof.containerRemoved !== true ||
+            proof.taskExecutionEnabled !== false ||
+            !/^sha256:[a-f0-9]{64}$/.test(proof.runnerImageId)
+          ) throw new Error('Local provisioning attestation incomplete');
+          const env = readFileSync(p + '/task-typecheck.env.example', 'utf8');
+          if (env.split('\n').some(line => line.startsWith('DEV_HUB_ENABLE_TASK_EXECUTION=true'))) {
+            throw new Error('Provisioning unexpectedly enabled task execution');
+          }
+          console.log('Pinned offline bundle successfully proven without task activation.');
+          NODE
