@@ -13,4 +13,6 @@
 !prisma-native-preflight.mjs
 !native-binary-inspect.mjs
 !native-compatibility-preflight.mjs
+!native-runtime-smoke.mjs
+!native-runtime-fixture.mjs
 !.dockerignore
