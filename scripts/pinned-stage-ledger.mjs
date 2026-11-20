@@ -267,7 +267,10 @@ export async function pruneStaleRunLock(root, checkout, hasActiveContainers, now
     isLivePid(record.pid)
   ) return false;
   // Do not unlock a run that still has any owned journal, including bad ones.
-  const remaining = await readdir(join(root, JOURNAL)).catch(() => ['unknown']);
+  const remaining = await readdir(join(root, JOURNAL)).catch((error) => {
+    if (error?.code === 'ENOENT') return [];
+    return ['unknown'];
+  });
   if (remaining.length > 0) return false;
   const again = (await readBoundedJson(path)).value;
   if (again.runId !== record.runId || isLivePid(again.pid)) return false;
