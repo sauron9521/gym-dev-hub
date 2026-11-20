@@ -53,3 +53,7 @@ A **CI-only** entrypoint, `full-source-audit.mjs`, verifies **every one of the 1
 ## Separate temporary scratch volumes for future execution (PR #30)
 
 The CI-only `overlay-preflight.mjs` first verifies the entire immutable Gym Platform source tree via the reviewed `full-source-audit.mjs` code, then validates two **independent noexec tmpfs** mounts: `/workspace` for transient dependencies, cache and generated files, and `/results` for ephemeral diagnostics. It never writes to the read-only `/source` or `/manifest` Git mounts, never installs packages or launches Gym Platform scripts, and neither the ordinary runner protocol nor the API can invoke it. Two clean container instances prove that outputs are not shared; negative probes reject missing/unsafe mounts and tampered source/manifest. This is a private scratch-volume _foundation_, not a working overlayfs/union filesystem and not task execution. See `docs/private-overlay-preflight.md`.
+
+## Real API dependency closure smoke (PR #32)
+
+The CI-only `offline-api-cache.mjs` verifies a complete pinned Gym Platform source snapshot, accepts a temporary read-only pnpm cache from a credential-free trusted CI stage, copies both to a **private tmpfs**, and attempts an offline, frozen, script-free `@gym/api` dependency installation. This is a real target dependency installation, not a small two-package fixture, but **no Prisma generation, API typecheck, project scripts, or other code from Gym Platform is invoked**. The usual `runner.mjs` protocol remains non-executing. See `docs/real-api-dependency-cache.md`.

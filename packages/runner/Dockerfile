@@ -34,5 +34,7 @@ COPY --chown=65534:65534 pinned-source-typecheck.mjs /opt/gym-dev-hub/pinned-sou
 COPY --chown=65534:65534 full-source-audit.mjs /opt/gym-dev-hub/full-source-audit.mjs
 # CI-only ephemeral scratch-volume proof; not available via runner protocol.
 COPY --chown=65534:65534 overlay-preflight.mjs /opt/gym-dev-hub/overlay-preflight.mjs
+# CI-only real API offline cache rehydration; not exposed by runner protocol.
+COPY --chown=65534:65534 offline-api-cache.mjs /opt/gym-dev-hub/offline-api-cache.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]
