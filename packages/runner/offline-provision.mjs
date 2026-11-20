@@ -96,7 +96,10 @@ async function main() {
     },
   );
   if (result.error || result.status !== 0 || result.signal) {
-    throw new Error('Offline, frozen, script-free pnpm installation failed');
+    const detail = (result.stderr || result.stdout || result.error?.message || 'unknown error')
+      .toString()
+      .slice(0, 500);
+    throw new Error('Offline pnpm failed: ' + detail);
   }
 
   const installed = JSON.parse(
@@ -129,7 +132,9 @@ async function main() {
   );
 }
 
-main().catch(() => {
-  process.stderr.write('Offline provisioning fixture rejected\n');
+main().catch((error) => {
+  const message = error instanceof Error ? error.message.slice(0, 600) : 'unknown error';
+  // CI-only fixture does not receive project files, registry tokens, or secrets.
+  process.stderr.write('Offline provisioning fixture rejected: ' + message + '\n');
   process.exitCode = 1;
 });
