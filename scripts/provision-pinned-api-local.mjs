@@ -36,6 +36,13 @@ export const FIXED = Object.freeze({
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MAX_CAPTURE = 64 * 1024;
 const SHA_IMAGE = /^sha256:[a-f0-9]{64}$/;
+// Recovery tooling may inspect/prune only containers bearing BOTH explicit labels.
+export const PROVISIONING_LABEL = 'org.gym-dev-hub.local-provisioning';
+export const PROVISIONING_SCOPE = 'pinned-api-v1';
+export const PROVISIONING_PHASE_LABEL = 'org.gym-dev-hub.local-provisioning-phase';
+export const PROVISIONING_CHECKOUT_LABEL = 'org.gym-dev-hub.local-provisioning-checkout';
+// Prevent cleanup from another clone/worktree from selecting this checkout's containers.
+export const PROVISIONING_CHECKOUT = createHash('sha256').update(ROOT).digest('hex');
 
 function noDockerCredentials() {
   const allowed = [
@@ -119,7 +126,7 @@ async function docker(...args) {
   return command('docker', args, 90000);
 }
 
-async function checkLocalDocker() {
+export async function checkLocalDocker() {
   const endpoint = await docker('context', 'inspect', '--format', '{{.Endpoints.docker.Host}}');
   if (
     !(process.platform === 'win32'
@@ -318,6 +325,12 @@ async function stageInDocker(stage, imageId) {
         'create',
         '--name',
         name,
+        '--label',
+        PROVISIONING_LABEL + '=' + PROVISIONING_SCOPE,
+        '--label',
+        PROVISIONING_PHASE_LABEL + '=stage',
+        '--label',
+        PROVISIONING_CHECKOUT_LABEL + '=' + PROVISIONING_CHECKOUT,
         '--pull=never',
         '--network=bridge',
         '--read-only',
@@ -383,6 +396,12 @@ async function smoke(bundle, imageId) {
         'create',
         '--name',
         name,
+        '--label',
+        PROVISIONING_LABEL + '=' + PROVISIONING_SCOPE,
+        '--label',
+        PROVISIONING_PHASE_LABEL + '=offline-smoke',
+        '--label',
+        PROVISIONING_CHECKOUT_LABEL + '=' + PROVISIONING_CHECKOUT,
         '--pull=never',
         ...reviewedDockerOptions(),
         ...mountEntries(bundle),

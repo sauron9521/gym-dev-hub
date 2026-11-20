@@ -39,8 +39,9 @@
 37. **Isolated fixed API_TYPECHECK proof (CI-only)**: reuse pinned offline API dependency installation and Prisma Client generation, then execute exactly TypeScript 6.0.3 `tsc --noEmit -p tsconfig.build.json` on the reviewed immutable source in a restricted disposable Docker overlay. No Hub task endpoint or operator grant consumption (PR #37a).
 38. **Operator-controlled API_TYPECHECK**: explicitly opt-in local API endpoint consumes one use-only grant after fresh worktree verification and executes the CI-proven fixed recipe in pinned, networkless Docker with 64 KiB I/O bounds and cancellation. Requires trusted manual preprovisioning of the pinned offline bundle; no automatic merge or arbitrary commands (PR #37b).
 39. **Manual one-command local provisioning**: explicit operator-run CLI builds a separate credential-free trusted-network staging Docker image, fetches only the pinned source/tree/manifest and SHA-512 musl artifacts, verifies pinned Prisma engine and store, builds an immutable-ID runner, and smoke-tests the same compiler completely offline before publishing a non-secret local bundle (PR #55).
-40. **Runner lifecycle improvements (future)**: safely refresh to separately reviewed Gym Platform commits, add verification-only mode, bounded status/diagnostics, recover orphaned Docker containers and provide an explicit operator-authenticated local end-to-end test.
-41. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-42. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+40. **Safe provisioning recovery (PR #56)**: label newly created local provisioning containers with fixed scope/phase/checkout, expose read-only status and Docker Desktop preflight latency, and require an explicit opt-in for non-forced cleanup of stopped, stale, fully identified Hub containers; never delete unverified stage directories or other services.
+41. **Runner lifecycle improvements (future)**: review newer Gym Platform commits, add a verified ownership ledger for stale stage-directory recovery, richer bounded diagnostics and explicit operator-authenticated Windows/Home-PC end-to-end testing.
+42. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+43. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.

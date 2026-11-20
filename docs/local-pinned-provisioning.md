@@ -53,3 +53,16 @@ Enable these only when personally ready to approve one use of the fixed recipe. 
 - The initial script intentionally refuses to overwrite an existing bundle. Future work can add explicit versioned refresh, verification-only mode, migration to a newer reviewed Gym Platform commit, crash recovery and secure automatic path configuration.
 - Successful provisioning **does not prove** the later HTTP one-time operator-authenticated flow; that still requires an actual local operator grant, session and hydrated matching worktree.
 - If the Docker daemon or host crashes during provisioning, inspect and remove orphan containers prefixed `gym-devhub-pinned-stage-` or `gym-devhub-provision-check-`. The script attempts explicit cleanup for normal failures and timeouts.
+
+## Crash recovery and Windows diagnostics (PR #56)
+
+The provisioner now assigns **three non-secret labels** to its own two ephemeral container types: exact immutable provisioning scope, checkout fingerprint and phase. New maintenance commands operate on the local Docker Engine only:
+
+```sh
+pnpm provision:status          # read-only: engine preflight latency, owned containers and staging names
+pnpm provision:cleanup-stale  # explicit: remove only stopped, older-than-24h, verified Hub containers
+```
+
+The status command does not stop, create or remove containers. It shows Docker preflight latency as a Windows/Docker Desktop diagnostic. The cleanup command **does not use force**, does not touch running, paused, recently created, unlabelled, foreign-checkout or unexpectedly configured containers, and re-inspects each candidate before an ordinary `docker rm`. It never changes feature flags, operator secrets or the final pinned bundle. It also never deletes `stage-*` folders: those are reported as **unpublished, untouched** until a future operator-verified ownership ledger permits safe stage cleanup. Containers created by older PR #55 have no checkout labels and therefore require manual inspection; this avoids deleting unknown Docker resources.
+
+On Windows, keeping Docker Desktop's Linux engine responsive and locating large workloads on a Linux/WSL2 filesystem may improve latency, but **the tool does not move or modify any other existing worktree or Docker volume**. GitHub Linux CI validates the recovery filters; a full Windows/Home-PC provisioning run still needs separate confirmation once that computer is available.
