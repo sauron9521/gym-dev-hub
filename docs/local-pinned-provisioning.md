@@ -11,6 +11,9 @@ From a clean checkout of the reviewed Hub revision:
 ```sh
 pnpm provision:pinned-api
 # Equivalent: node scripts/provision-pinned-api-local.mjs --prepare
+
+# Once the bundle exists, run a no-download fixed offline compiler proof:
+pnpm provision:verify
 ```
 
 **This is not an API endpoint and does not run automatically on startup, from an agent, or when a grant is issued.** It must be explicitly invoked by the local operator. It refuses arbitrary command arguments, remote Docker engines, modified image entrypoints, existing output bundles, and changing the pinned source version.
@@ -76,3 +79,11 @@ After successful publication or handled failure, the stage is no longer present 
 `pnpm provision:status` now includes the stage ownership records. `pnpm provision:cleanup-stale` may explicitly delete an abandoned stage only when every check passes: journal in a private local folder, fixed checkout/UUID/name, exact original device/inode, age **over 24 hours**, dead original PID, no active owned Docker provisioning container, no symlinks/junctions/special files in the bounded directory tree, and a second identity check before deletion. A stale record for an already-missing stage can be removed without touching a published bundle. The stale run lock is released only after all journals are gone and its owner process is no longer active.
 
 Old unjournaled `stage-*` folders created by earlier revisions remain untouched. Live or suspicious stages remain untouched. Cleanup is **manual**, not scheduled, and never runs through the Hub task endpoint. Host administrators, a malicious Docker daemon or a local attacker with access to the operator's private `.local/` root are outside the trust guarantee. Windows/Home-PC execution still requires separate verification when that device is available.
+
+## Repeatable Windows/Linux offline re-verification (PR #58)
+
+After the one-time pinned network provisioning finishes, run `pnpm provision:verify` in the **same Hub checkout**. The command refuses to run if the local stage lock still exists or the fixed published bundle is absent. It checks the exact source commit/tree/manifest and pinned Prisma engine, validates the short immutable provisioning receipt, checks that the generated configuration example is unmodified and that the Docker runner image ID still matches the original pinned image. It then runs the **same fixed API TypeScript recipe in a new networkless, read-only disposable container**, re-verifying all original source/store/engine inputs and container cleanup.
+
+This command performs **no** Git fetch, pnpm download, package install, Docker image build/pull, automatic `.env` update, grant issuance or task enablement. It is intended for repeatable verification after Windows Docker Desktop restarts, without downloading hundreds of packages again. A missing or tampered bundle fails closed; do not trust the existence of `provisioning.json` alone. Docker remains required and the offline compiler itself still takes resources.
+
+GitHub CI tests `--verify` after the initial full provisioning on Linux; a separate native Windows job runs receipt-verification unit tests. The Home-PC Windows integration result is tracked separately from GitHub CI.

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   FIXED,
+  verifyPublishedReceipt,
   verifyLocalProof,
   verifyImageMetadata,
   verifyProvisionerIsolation,
@@ -193,5 +194,51 @@ describe('local image metadata pinning', () => {
         ),
       /Unexpected/,
     );
+  });
+});
+
+const published = () => ({
+  protocol: 1,
+  event: 'local-pinned-api-runner-provisioned',
+  sourceCommit: FIXED.commit,
+  sourceTree: FIXED.tree,
+  sourceManifestSha256: FIXED.manifest,
+  prismaEngineSha256: FIXED.engine,
+  runnerImageId: 'sha256:' + 'a'.repeat(64),
+  provisionerImageId: 'sha256:' + 'b'.repeat(64),
+  typecheckVerified: true,
+  containerRemoved: true,
+  operatorGrantConsumed: false,
+  taskExecutionEnabled: false,
+  createdAt: '2026-11-20T20:00:00.000Z',
+});
+
+describe('Windows-friendly no-download revalidation of an existing pinned bundle', () => {
+  it('accepts only the completed reviewed provisioning receipt', () => {
+    assert.equal(verifyPublishedReceipt(published()), 'sha256:' + 'a'.repeat(64));
+  });
+
+  for (const [label, patch] of [
+    ['changed commit', { sourceCommit: 'b'.repeat(40) }],
+    ['changed tree', { sourceTree: 'a'.repeat(40) }],
+    ['tampered manifest', { sourceManifestSha256: 'b'.repeat(64) }],
+    ['tampered Prisma engine', { prismaEngineSha256: 'a'.repeat(64) }],
+    ['unreviewed runner image', { runnerImageId: 'latest' }],
+    ['unreviewed provisioner image', { provisionerImageId: 'sha256:bad' }],
+    ['no compiler proof', { typecheckVerified: false }],
+    ['container not cleaned', { containerRemoved: false }],
+    ['reused operator grant', { operatorGrantConsumed: true }],
+    ['execution enabled', { taskExecutionEnabled: true }],
+    ['invalid date', { createdAt: 'never' }],
+    ['wrong event', { event: 'unchecked' }],
+  ]) {
+    it('rejects ' + label, () => {
+      assert.throws(() => verifyPublishedReceipt({ ...published(), ...patch }), /not trusted/);
+    });
+  }
+
+  it('rejects missing or empty metadata', () => {
+    assert.throws(() => verifyPublishedReceipt(null), /not trusted/);
+    assert.throws(() => verifyPublishedReceipt({}), /not trusted/);
   });
 });
