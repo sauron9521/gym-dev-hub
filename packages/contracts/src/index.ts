@@ -57,4 +57,6 @@ export type {
   WorktreeMountPreflight,
   WorktreeMountGrant,
   WorktreeMountProbeResult,
+  WorktreeCodeReadGrant,
+  WorktreeCodeReadResult,
 } from './worktree.js';

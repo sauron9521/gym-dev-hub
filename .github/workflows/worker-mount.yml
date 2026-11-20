@@ -85,4 +85,3 @@ jobs:
           test ! -e mount-fixture/secret.ts
           test -z "$(docker ps --all --quiet --filter "name=gym-dev-hub-ci-read-${{ github.run_id }}")"
           echo 'Fixed protocol passed; bounded read succeeded, traversal rejected, worker removed.'
-

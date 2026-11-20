@@ -622,5 +622,4 @@ export class WorktreePlanService {
       });
     }, true);
   }
-
 }

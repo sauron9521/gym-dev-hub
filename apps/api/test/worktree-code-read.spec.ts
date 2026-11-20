@@ -74,7 +74,9 @@ describe('explicit scoped code-reading authorization', () => {
       },
     };
     integrity = { verify: vi.fn().mockResolvedValue(report) };
-    boundary = { status: vi.fn().mockReturnValue({ state: 'passed', checkedAt: new Date().toISOString() }) };
+    boundary = {
+      status: vi.fn().mockReturnValue({ state: 'passed', checkedAt: new Date().toISOString() }),
+    };
     service = new WorktreeCodeReadService(plans as never, integrity as never, boundary as never);
     vi.mocked(runMountedWorkerProbe).mockResolvedValue('export const ready = true;\n');
   });
@@ -106,35 +108,55 @@ describe('explicit scoped code-reading authorization', () => {
       containerRemoved: true,
     });
     expect(runMountedWorkerProbe).toHaveBeenCalledWith(root, 'src/main.ts');
-    expect(plans.recordCodeRead.mock.calls.map(([, , step]) => step)).toEqual(['started', 'completed']);
-    await expect(service.read(SESSION, PLAN, { grantToken: grant.grantToken }))
-      .rejects.toThrow('вже використано');
+    expect(plans.recordCodeRead.mock.calls.map(([, , step]) => step)).toEqual([
+      'started',
+      'completed',
+    ]);
+    await expect(service.read(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow(
+      'вже використано',
+    );
   });
 
-  it.each(['../secrets.ts', '/etc/passwd', '.env', '.git/config.json', 'src//main.ts', 'src/../main.ts', 'src/main.ts;whoami', 'src/main.exe'])(
-    'rejects invalid paths without starting Docker: %s',
-    async (filePath) => {
-      await expect(service.authorize(SESSION, PLAN, request(filePath))).rejects.toThrow();
-      expect(runMountedWorkerProbe).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    '../secrets.ts',
+    '/etc/passwd',
+    '.env',
+    '.git/config.json',
+    'src//main.ts',
+    'src/../main.ts',
+    'src/main.ts;whoami',
+    'src/main.exe',
+  ])('rejects invalid paths without starting Docker: %s', async (filePath) => {
+    await expect(service.authorize(SESSION, PLAN, request(filePath))).rejects.toThrow();
+    expect(runMountedWorkerProbe).not.toHaveBeenCalled();
+  });
 
   it('requires separate opt-in and a strong operator secret', async () => {
     delete process.env.DEV_HUB_ENABLE_SCOPED_CODE_READ;
     await expect(service.authorize(SESSION, PLAN, request())).rejects.toThrow('вимкнено');
     process.env.DEV_HUB_ENABLE_SCOPED_CODE_READ = 'true';
-    await expect(service.authorize(SESSION, PLAN, { ...request(), operatorSecret: 'not-the-actual-secret-123456789123456789' })).rejects.toThrow('Невірний секрет');
+    await expect(
+      service.authorize(SESSION, PLAN, {
+        ...request(),
+        operatorSecret: 'not-the-actual-secret-123456789123456789',
+      }),
+    ).rejects.toThrow('Невірний секрет');
     expect(runMountedWorkerProbe).not.toHaveBeenCalled();
   });
 
   it('refuses stale preflight, integrity drift and file changes', async () => {
-    boundary.status.mockReturnValue({ state: 'passed', checkedAt: new Date(Date.now() - 6 * 60_000).toISOString() });
+    boundary.status.mockReturnValue({
+      state: 'passed',
+      checkedAt: new Date(Date.now() - 6 * 60_000).toISOString(),
+    });
     await expect(service.authorize(SESSION, PLAN, request())).rejects.toThrow('Safety Preflight');
     boundary.status.mockReturnValue({ state: 'passed', checkedAt: new Date().toISOString() });
     const grant = await service.authorize(SESSION, PLAN, request());
     await writeFile(join(root, 'src', 'main.ts'), 'drift');
     integrity.verify.mockResolvedValueOnce({ status: 'mismatch' });
-    await expect(service.read(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow('Scoped read');
+    await expect(service.read(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow(
+      'Scoped read',
+    );
     expect(runMountedWorkerProbe).not.toHaveBeenCalled();
   });
 
@@ -147,18 +169,29 @@ describe('explicit scoped code-reading authorization', () => {
   it('records Docker protocol failures without leaking partial source text', async () => {
     const grant = await service.authorize(SESSION, PLAN, request());
     vi.mocked(runMountedWorkerProbe).mockRejectedValueOnce(new Error('Docker denied'));
-    await expect(service.read(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow('Scoped read');
-    expect(plans.recordCodeRead.mock.calls.map(([, , step]) => step)).toEqual(['started', 'failed']);
+    await expect(service.read(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow(
+      'Scoped read',
+    );
+    expect(plans.recordCodeRead.mock.calls.map(([, , step]) => step)).toEqual([
+      'started',
+      'failed',
+    ]);
   });
 
   it('rejects cross-session and expired grants even when the file remains valid', async () => {
     const grant = await service.authorize(SESSION, PLAN, request());
-    await expect(service.read('00000000-0000-4000-8000-000000000999', PLAN, { grantToken: grant.grantToken })).rejects.toThrow('вже використано');
-    await expect(service.read(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow('вже використано');
+    await expect(
+      service.read('00000000-0000-4000-8000-000000000999', PLAN, { grantToken: grant.grantToken }),
+    ).rejects.toThrow('вже використано');
+    await expect(service.read(SESSION, PLAN, { grantToken: grant.grantToken })).rejects.toThrow(
+      'вже використано',
+    );
     const expiring = await service.authorize(SESSION, PLAN, request());
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now + 61_000);
-    await expect(service.read(SESSION, PLAN, { grantToken: expiring.grantToken })).rejects.toThrow('прострочено');
+    await expect(service.read(SESSION, PLAN, { grantToken: expiring.grantToken })).rejects.toThrow(
+      'прострочено',
+    );
     expect(runMountedWorkerProbe).not.toHaveBeenCalled();
   });
 });

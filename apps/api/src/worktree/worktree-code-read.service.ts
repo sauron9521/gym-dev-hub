@@ -9,7 +9,11 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { lstat, realpath } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import { z } from 'zod';
-import type { WorktreeCodeReadGrant, WorktreeCodeReadResult, WorktreePlan } from '@gym-dev-hub/contracts';
+import type {
+  WorktreeCodeReadGrant,
+  WorktreeCodeReadResult,
+  WorktreePlan,
+} from '@gym-dev-hub/contracts';
 import { BoundaryService } from '../boundary/boundary.service.js';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeIntegrityService } from './worktree-integrity.service.js';
@@ -87,12 +91,7 @@ export class WorktreeCodeReadService {
     const age = status.checkedAt
       ? Date.now() - Date.parse(status.checkedAt)
       : Number.POSITIVE_INFINITY;
-    if (
-      status.state !== 'passed' ||
-      !Number.isFinite(age) ||
-      age < 0 ||
-      age > 5 * 60_000
-    ) {
+    if (status.state !== 'passed' || !Number.isFinite(age) || age < 0 || age > 5 * 60_000) {
       throw new ConflictException('Потрібен свіжий успішний Docker Safety Preflight.');
     }
   }

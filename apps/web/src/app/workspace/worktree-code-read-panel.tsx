@@ -35,7 +35,8 @@ export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props)
         body: JSON.stringify({ fingerprint, operatorSecret, filePath }),
         cache: 'no-store',
       });
-      if (!response.ok) throw new Error('Читання не дозволено. Перевір шлях, секрет та Docker preflight.');
+      if (!response.ok)
+        throw new Error('Читання не дозволено. Перевір шлях, секрет та Docker preflight.');
       setGrant((await response.json()) as WorktreeCodeReadGrant);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не вдалося погодити читання.');
@@ -59,7 +60,9 @@ export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props)
         cache: 'no-store',
       });
       if (!response.ok) {
-        throw new Error('Не вдалося прочитати файл. UID 65534 може не мати доступу до файлів з правами 0600.');
+        throw new Error(
+          'Не вдалося прочитати файл. UID 65534 може не мати доступу до файлів з правами 0600.',
+        );
       }
       setResult((await response.json()) as WorktreeCodeReadResult);
     } catch (reason) {
@@ -74,15 +77,19 @@ export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props)
       <div className="overline">ONE-FILE SCOPED READ · PR #16</div>
       <h4>Прочитати один файл у Docker</h4>
       <p>
-        Окремий одноразовий дозвіл для конкретного файла до 8 КБ. Немає доступу до команд,
-        зміни коду, мережі або постійного контейнера. Codex не запускається.
+        Окремий одноразовий дозвіл для конкретного файла до 8 КБ. Немає доступу до команд, зміни
+        коду, мережі або постійного контейнера. Codex не запускається.
       </p>
       <label htmlFor="scoped-read-path">Відносний шлях у worktree</label>
       <input
         id="scoped-read-path"
         type="text"
         value={filePath}
-        onChange={(event) => { setFilePath(event.target.value); setGrant(null); setResult(null); }}
+        onChange={(event) => {
+          setFilePath(event.target.value);
+          setGrant(null);
+          setResult(null);
+        }}
         placeholder="apps/api/src/main.ts"
         maxLength={160}
         autoComplete="off"
@@ -111,31 +118,48 @@ export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props)
       <button
         type="button"
         className="refresh"
-        disabled={busy || Boolean(grant) || !acknowledged || !filePath || operatorSecret.length < 32}
+        disabled={
+          busy || Boolean(grant) || !acknowledged || !filePath || operatorSecret.length < 32
+        }
         onClick={() => void authorize()}
       >
         Авторизувати читання одного файла
       </button>
       {grant && (
         <div className="ws-worktree-grant">
-          <small>Тільки <code>{grant.filePath}</code> у commit <code>{grant.baseHeadSha}</code>, до{' '}
-            {new Date(grant.expiresAt).toLocaleTimeString('uk-UA')}.</small>
-          <button className="ws-primary" type="button" onClick={() => void readFile()} disabled={busy}>
+          <small>
+            Тільки <code>{grant.filePath}</code> у commit <code>{grant.baseHeadSha}</code>, до{' '}
+            {new Date(grant.expiresAt).toLocaleTimeString('uk-UA')}.
+          </small>
+          <button
+            className="ws-primary"
+            type="button"
+            onClick={() => void readFile()}
+            disabled={busy}
+          >
             Прочитати та видалити контейнер
           </button>
         </div>
       )}
       {result && (
         <div role="status">
-          <p>Прочитано <code>{result.filePath}</code>; тимчасовий контейнер видалено.</p>
-          <pre className="ws-code-read-result"><code>{result.content}</code></pre>
+          <p>
+            Прочитано <code>{result.filePath}</code>; тимчасовий контейнер видалено.
+          </p>
+          <pre className="ws-code-read-result">
+            <code>{result.content}</code>
+          </pre>
         </div>
       )}
-      {error && <p role="alert" className="ws-chat-error">{error}</p>}
+      {error && (
+        <p role="alert" className="ws-chat-error">
+          {error}
+        </p>
+      )}
       <small>
-        Потрібні DEV_HUB_ENABLE_WORKTREE_MOUNT=true,
-        DEV_HUB_ENABLE_SCOPED_CODE_READ=true, новий worker image і свіжий Safety Preflight.
-        Файли з правами 0600 можуть бути недоступні для непривілейованого worker.
+        Потрібні DEV_HUB_ENABLE_WORKTREE_MOUNT=true, DEV_HUB_ENABLE_SCOPED_CODE_READ=true, новий
+        worker image і свіжий Safety Preflight. Файли з правами 0600 можуть бути недоступні для
+        непривілейованого worker.
       </small>
     </div>
   );

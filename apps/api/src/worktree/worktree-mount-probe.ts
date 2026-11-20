@@ -32,7 +32,6 @@ export function mountedWorkerArguments(
   return args;
 }
 
-
 const READ_FILE_LIMIT = 8_192;
 
 /** One regular source file, never a command, glob, directory or hidden path. */
@@ -63,10 +62,7 @@ export function equivalentMountSource(
     observed = normalized(win32.normalize(actual));
   } else {
     const mapped = /^\/(?:run\/desktop\/mnt\/host|host_mnt)\/([a-z])\/(.+)$/i.exec(actual);
-    if (
-      !mapped ||
-      mapped[2]!.split('/').some((part) => !part || part === '.' || part === '..')
-    ) {
+    if (!mapped || mapped[2]!.split('/').some((part) => !part || part === '.' || part === '..')) {
       return false;
     }
     observed = normalized(win32.normalize(mapped[1] + ':/' + mapped[2]));
@@ -269,10 +265,7 @@ export async function runMountedWorkerProbe(
       8_000,
     );
     validateObservedMounts(mounts, sourcePath);
-    const observed = await callDocker(
-      ['inspect', '--format', '{{json .Mounts}}', name],
-      8_000,
-    );
+    const observed = await callDocker(['inspect', '--format', '{{json .Mounts}}', name], 8_000);
     validateObservedMounts(observed, sourcePath);
     const isolation = await callDocker(
       [
