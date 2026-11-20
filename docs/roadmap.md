@@ -13,8 +13,9 @@
 11. **Metadata-only worktree creation**: explicit local operator secret, SHA-pinned single-use grant, safe Git worktree registration without checkout, state/audit recovery (PR #10).
 12. **Worktree recovery and hydration preflight**: read-only Git metadata checks, tree safety scan, no auto cleanup and no checkout (PR #11).
 13. **Gated raw Git blob hydration**: separate operator-secret grant, pinned blob read, exclusive bounded writes, durable progress and failure state (PR #13).
-14. **Isolated execution**: post-hydration integrity verification, scoped worker mounts, and controlled agent command execution in separate safe PRs.
-15. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
-16. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
+14. **Post-hydration integrity & mount preview**: read-only Git blob hashing, extra-file detection and a non-executing scoped mount policy (PR #14).
+15. **Isolated execution**: separately approved read-only worker mounts and controlled agent command execution in later safe PRs.
+16. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
+17. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
