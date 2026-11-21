@@ -464,3 +464,56 @@ temporary snapshots under `/tmp` for owner inspection; do not
 automatically remove unrelated directories. Keep #107 open until the
 real live operator's authorized post-apply audit and controlled in-flight
 API kill/restart are verified.
+
+## Launch #107 — isolated real SIGKILL / HTTP audit recovery (manual)
+
+`scripts/launch-sigkill-recovery-smoke.mjs` is an opt-in Linux-only
+_destructive test of its own disposable child process_, **never** the
+production Hub API, Web HMR or any user-owned Docker container. It is not
+invoked by CI or `pnpm check`. The normal test suite covers only CLI
+guardrails and strict Docker container ownership checks.
+
+With a trusted owner-managed private env containing the pinned **public
+Gym Dev Hub** runner image, and a verified offline public-only store for
+the exact current `pnpm-lock.yaml`, run from a clean isolated Hub worktree:
+
+```sh
+pnpm --filter @gym-dev-hub/api build
+sg docker -c 'cd /path/to/isolated/gym-dev-hub && DEV_HUB_PATCH_CHECK_PNPM_STORE=/path/to/verified/private-pnpm-store node --env-file=/path/to/owner-private/apps/api/.env scripts/launch-sigkill-recovery-smoke.mjs --confirm-isolated-sigkill-recovery'
+```
+
+The probe refuses root, remote/TLS Docker, a nonlocal Docker socket,
+existing fixed-check containers, missing image/store or absent explicit
+confirmation. It archives **only a specific committed Git tree** into a
+fresh `/tmp/gym-dev-hub-sigkill-*` fixture (no dirty working files or
+`.env`), creates independent random test-only operator credentials and
+a private durable journal, then starts an **isolated child Node/Nest HTTP
+server on 127.0.0.1**, with the actual `WorktreePatchChecksService`.
+The reviewed plan and Docker boundary preflight are **controlled
+fixtures**; this test does not repeat the real patch review in #125.
+
+After the child issues a genuine single-use HTTP grant and fsyncs
+`issued → attempted`, the parent observes an actual **running**
+non-root, network-disabled `WEB_TEST` Docker container. It verifies
+the container's pinned image, immutable read-only mounts, exact
+disposable source path, store-stage key and parent-owned identity
+**before sending SIGKILL to the exact child PID it spawned**. A **new
+child process and new Nest app** then queries the same on-disk audit
+using the actual history endpoint and confirms `interrupted` and
+HTTP 409 for replay, without any fabricated `passed` or `rejected`
+record. The parent removes **only the container it independently
+verified belongs to its fixture**, and only the temporary source/store
+folders proven to belong to this run. Foreign/ambiguous containers
+or an unproven stage cause a fail-closed result and manual inspection.
+
+Only a successful complete cleanup returns a success receipt. A crash
+of the **parent** can leave a public-only temporary store or Docker
+container requiring manual inspection; never blindly prune Docker
+containers or all `/tmp/gym-dev-hub-*` folders. Live production audit,
+secrets, running API/Web services and Gym Platform are never touched.
+
+This verifies an actual in-flight disposable-process **SIGKILL →
+real Docker interruption → cold HTTP restart → durable
+`interrupted`**. It is **not** a live owner-approved production
+plan, production grant or production audit acceptance. Keep #107
+open until these separate operational prerequisites are verified.
