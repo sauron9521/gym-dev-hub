@@ -375,3 +375,32 @@ export interface WorktreeCommitWriteResult {
   pushEnabled: false;
   mergeEnabled: false;
 }
+
+/** Manual one-shot publication of an already audited local task-branch commit. */
+export interface WorktreeGitHubPushGrant {
+  grantId: string;
+  grantToken: string;
+  branch: string;
+  commitSha: string;
+  parentSha: string;
+  expiresAt: string;
+  purpose: 'CREATE_NEW_GITHUB_TASK_BRANCH_ONLY';
+  forcePushEnabled: false;
+  mainWriteEnabled: false;
+  pullRequestEnabled: false;
+  mergeEnabled: false;
+}
+
+export interface WorktreeGitHubPushResult {
+  runId: string;
+  grantId: string;
+  commitSha: string;
+  parentSha: string;
+  branch: string;
+  branchUrl: string;
+  status: 'published';
+  forcePushEnabled: false;
+  mainWriteEnabled: false;
+  pullRequestCreated: false;
+  mergeEnabled: false;
+}

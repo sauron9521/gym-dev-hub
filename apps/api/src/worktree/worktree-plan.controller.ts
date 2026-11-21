@@ -19,6 +19,7 @@ import { WorktreePatchReviewService } from './worktree-patch-review.service.js';
 import { WorktreePatchChecksService } from './worktree-patch-checks.service.js';
 import { WorktreeCommitCandidateService } from './worktree-commit-candidate.service.js';
 import { WorktreeCommitWriteService } from './worktree-commit-write.service.js';
+import { WorktreeGitHubPushService } from './worktree-github-push.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './task-execution-grant.service.js';
@@ -46,6 +47,8 @@ import type {
   WorktreeCommitCandidateAcknowledgement,
   WorktreeCommitWriteGrant,
   WorktreeCommitWriteResult,
+  WorktreeGitHubPushGrant,
+  WorktreeGitHubPushResult,
 } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
@@ -64,6 +67,7 @@ export class WorktreePlanController {
     private readonly patchChecks: WorktreePatchChecksService,
     private readonly commitCandidate: WorktreeCommitCandidateService,
     private readonly commitWrite: WorktreeCommitWriteService,
+    private readonly githubPush: WorktreeGitHubPushService,
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
     private readonly taskGrants: TaskExecutionGrantService,
@@ -279,6 +283,26 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreeCommitWriteResult> {
     return this.commitWrite.execute(sessionId, planId, body);
+  }
+
+  /** Separate explicit GitHub task-branch publication capability. */
+  @Post(':planId/github-push-authorize')
+  githubPushAuthorize(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeGitHubPushGrant> {
+    return this.githubPush.authorize(sessionId, planId, body);
+  }
+
+  /** Atomic create-new-branch only, never force, update main or merge. */
+  @Post(':planId/github-push-execute')
+  githubPushExecute(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeGitHubPushResult> {
+    return this.githubPush.execute(sessionId, planId, body);
   }
 
   @Post(':planId/tool-authorize')

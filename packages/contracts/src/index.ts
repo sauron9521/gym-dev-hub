@@ -84,6 +84,8 @@ export type {
   WorktreeCommitCandidateAcknowledgement,
   WorktreeCommitWriteGrant,
   WorktreeCommitWriteResult,
+  WorktreeGitHubPushGrant,
+  WorktreeGitHubPushResult,
   WorktreeToolCapability,
   WorktreeToolGrant,
   WorktreeToolResult,

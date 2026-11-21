@@ -367,3 +367,12 @@ local commit grant is **disabled by default**, requires its own Git
 secret and configured author identity, and is separate from reviewing
 a PR #67 candidate. Only the approved task ref can advance; no push,
 GitHub PR creation or merge is provided.
+
+## Controlled GitHub new task-branch publication (PR #69)
+
+See [github-task-branch-publish.md](./github-task-branch-publish.md).
+The localhost-only, disabled-by-default pilot publishes an audited
+local task commit as a **new** GitHub branch using exact Git Data
+objects and atomic new-ref creation. It requires an independent
+operator secret, a repository-scoped write token and separate explicit
+grant/execute steps. No force-push, main write, PR creation or merge.
