@@ -34,7 +34,7 @@ describe('operator-reviewed read-only Git commit candidate', () => {
     reviewOperatorSecret: REVIEW_SECRET,
     operatorSecret: SECRET,
   });
-  async function recordPassed(recipeId: 'API_TYPECHECK' | 'API_TEST', options = {}) {
+  async function recordPassed(recipeId: 'API_FORMAT' | 'API_TYPECHECK' | 'API_TEST', options = {}) {
     const checkGrant = {
       id: randomUUID(),
       sessionId: SESSION,
@@ -98,7 +98,21 @@ describe('operator-reviewed read-only Git commit candidate', () => {
     await expect(service.preview(SESSION, PLAN, request())).rejects.toThrow('Docker-перевірка');
   });
 
+  it('blocks commit candidates even if TypeScript and Vitest pass but Prettier is missing', async () => {
+    await recordPassed('API_TYPECHECK');
+    await recordPassed('API_TEST');
+    await expect(service.preview(SESSION, PLAN, request())).rejects.toThrow('Prettier');
+    // Wrong-source formatting proof must not authorize a commit.
+    await recordPassed('API_FORMAT', { proposedSha256: 'e'.repeat(64) });
+    await expect(service.preview(SESSION, PLAN, request())).rejects.toThrow('Prettier');
+    await recordPassed('API_FORMAT');
+    const candidate = await service.preview(SESSION, PLAN, request());
+    expect(candidate.missingRecipes).toEqual([]);
+    expect(candidate.verifiedRecipes).toEqual(['API_FORMAT', 'API_TYPECHECK', 'API_TEST']);
+  });
+
   it('previews exact Git diff, warns about missing recipe and separately acknowledges once', async () => {
+    await recordPassed('API_FORMAT');
     await recordPassed('API_TYPECHECK');
     const candidate = await service.preview(SESSION, PLAN, request());
     expect(candidate).toMatchObject({
@@ -110,7 +124,7 @@ describe('operator-reviewed read-only Git commit candidate', () => {
       diff: DIFF,
       commitSubject: request().commitSubject,
       status: 'review-required',
-      verifiedRecipes: ['API_TYPECHECK'],
+      verifiedRecipes: ['API_FORMAT', 'API_TYPECHECK'],
       missingRecipes: ['API_TEST'],
       readOnly: true,
       commitCreated: false,
@@ -140,6 +154,7 @@ describe('operator-reviewed read-only Git commit candidate', () => {
   });
 
   it('preserves only a short-lived, one-time human review proof for a separate Git grant', async () => {
+    await recordPassed('API_FORMAT');
     await recordPassed('API_TYPECHECK');
     const candidate = await service.preview(SESSION, PLAN, request());
     const proof = {
@@ -179,6 +194,7 @@ describe('operator-reviewed read-only Git commit candidate', () => {
   });
 
   it('rejects an unreviewed candidate, wrong SHA and changed diff at Git grant time', async () => {
+    await recordPassed('API_FORMAT');
     await recordPassed('API_TYPECHECK');
     const candidate = await service.preview(SESSION, PLAN, request());
     await expect(
@@ -236,10 +252,11 @@ describe('operator-reviewed read-only Git commit candidate', () => {
   });
 
   it('reports both verified checks without running tests or Git writes', async () => {
+    await recordPassed('API_FORMAT');
     await recordPassed('API_TYPECHECK');
     await recordPassed('API_TEST');
     const preview = await service.preview(SESSION, PLAN, request());
-    expect(preview.verifiedRecipes).toEqual(['API_TYPECHECK', 'API_TEST']);
+    expect(preview.verifiedRecipes).toEqual(['API_FORMAT', 'API_TYPECHECK', 'API_TEST']);
     expect(preview.missingRecipes).toEqual([]);
     expect(review.review).toHaveBeenCalledWith(SESSION, PLAN, {
       grantId: GRANT,
@@ -253,6 +270,7 @@ describe('operator-reviewed read-only Git commit candidate', () => {
   });
 
   it('denies off-scope repos, incorrect source SHA and changed HEAD', async () => {
+    await recordPassed('API_FORMAT');
     await recordPassed('API_TYPECHECK');
     plans.availableForMountProbe.mockResolvedValueOnce({
       repository: 'sauron9521/gym-platform',
@@ -297,6 +315,7 @@ describe('operator-reviewed read-only Git commit candidate', () => {
   });
 
   it('burns the acknowledgement on payload mismatch, wrong plan and replay', async () => {
+    await recordPassed('API_FORMAT');
     await recordPassed('API_TYPECHECK');
     const candidate = await service.preview(SESSION, PLAN, request());
     const approval = {
@@ -323,6 +342,7 @@ describe('operator-reviewed read-only Git commit candidate', () => {
   });
 
   it('fails closed if actual Git diff changes between preview and acknowledgement', async () => {
+    await recordPassed('API_FORMAT');
     await recordPassed('API_TYPECHECK');
     const candidate = await service.preview(SESSION, PLAN, request());
     review.review.mockResolvedValueOnce({
@@ -346,6 +366,7 @@ describe('operator-reviewed read-only Git commit candidate', () => {
   });
 
   it('fails closed when check coverage changes while candidate is awaiting review', async () => {
+    await recordPassed('API_FORMAT');
     await recordPassed('API_TYPECHECK');
     const candidate = await service.preview(SESSION, PLAN, request());
     await recordPassed('API_TEST');
@@ -360,6 +381,7 @@ describe('operator-reviewed read-only Git commit candidate', () => {
   });
 
   it('rejects acknowledgement without the exact independent human confirmation', async () => {
+    await recordPassed('API_FORMAT');
     await recordPassed('API_TYPECHECK');
     const candidate = await service.preview(SESSION, PLAN, request());
     await expect(

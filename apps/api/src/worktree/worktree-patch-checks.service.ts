@@ -29,7 +29,14 @@ import {
 } from './worktree-patch-checks-docker.js';
 import { withPatchCheckSourceStage } from './worktree-patch-check-stage.js';
 
-const RECIPES = ['API_TYPECHECK', 'API_TEST', 'WEB_TYPECHECK', 'WEB_TEST'] as const;
+const RECIPES = [
+  'API_FORMAT',
+  'API_TYPECHECK',
+  'API_TEST',
+  'WEB_FORMAT',
+  'WEB_TYPECHECK',
+  'WEB_TEST',
+] as const;
 const request = z.strictObject({
   grantId: z.uuid(),
   fingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/),

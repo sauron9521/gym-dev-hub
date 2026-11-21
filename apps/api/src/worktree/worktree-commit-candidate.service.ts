@@ -88,8 +88,8 @@ function assertFeature(secret: string): void {
   }
 }
 function scopedRecipe(filePath: string): readonly WorktreePatchCheckRecipe[] {
-  if (filePath.startsWith('apps/api/src/')) return ['API_TYPECHECK', 'API_TEST'];
-  if (filePath.startsWith('apps/web/src/')) return ['WEB_TYPECHECK', 'WEB_TEST'];
+  if (filePath.startsWith('apps/api/src/')) return ['API_FORMAT', 'API_TYPECHECK', 'API_TEST'];
+  if (filePath.startsWith('apps/web/src/')) return ['WEB_FORMAT', 'WEB_TYPECHECK', 'WEB_TEST'];
   throw new ConflictException('Commit candidate має бути одним схваленим source-файлом.');
 }
 function signature(value: {
@@ -210,9 +210,18 @@ export class WorktreeCommitCandidateService {
         })
         .map((entry) => entry.recipeId),
     );
-    // At least one real successful fixed check is required to propose a
-    // candidate. A missing second check is shown explicitly, not invented.
-    if (!passed.size) throw new ConflictException('Спочатку потрібна успішна Docker-перевірка.');
+    // Formatting is a mandatory, immutable SHA-bound gate, not an optional
+    // warning. Prevent a candidate (and therefore every subsequent Git
+    // authorization) if its approved postimage failed formatting.
+    const format = allowed[0]!;
+    if (!passed.has(format)) {
+      throw new ConflictException('Потрібна успішна Docker-перевірка форматування Prettier.');
+    }
+    // Require at least one actual typecheck/test receipt in addition to
+    // the formatting gate, preserving earlier approval requirements.
+    if (!allowed.slice(1).some((recipe) => passed.has(recipe))) {
+      throw new ConflictException('Потрібна успішна Docker-перевірка TypeScript або Vitest.');
+    }
     return {
       diff: verified.diff,
       diffSha256: sha256(verified.diff),

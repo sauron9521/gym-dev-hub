@@ -11,7 +11,7 @@ describe('secret-protected patch check history panel', () => {
       <WorktreePatchCheckHistoryPanel sessionId={sessionId} planId={planId} />,
     );
     expect(html).toContain('Історія перевірок Docker');
-    expect(html).toContain('Історія TypeScript / Vitest перевірок');
+    expect(html).toContain('Історія Prettier / TypeScript / Vitest перевірок');
     expect(html).toContain('DEV_HUB_PATCH_CHECK_OPERATOR_SECRET');
     expect(html).toContain('type="password"');
     expect(html).toContain('autoComplete="off"');

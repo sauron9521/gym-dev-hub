@@ -19,6 +19,8 @@ type Props = {
 const SUBJECT =
   /^(feat|fix|refactor|docs|test|chore|perf|build|ci|style)(\([a-z][a-z0-9-]{0,29}\))?: [\p{L}\p{N}][^\r\n]*$/u;
 const labels = {
+  API_FORMAT: 'API · Prettier',
+  WEB_FORMAT: 'Web · Prettier',
   API_TYPECHECK: 'API TypeScript',
   API_TEST: 'API Vitest',
   WEB_TYPECHECK: 'Web TypeScript',

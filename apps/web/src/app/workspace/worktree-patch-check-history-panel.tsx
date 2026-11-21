@@ -19,6 +19,8 @@ const statuses: Record<WorktreePatchCheckHistoryStatus, string> = {
 };
 
 const recipes = {
+  API_FORMAT: 'API · Prettier',
+  WEB_FORMAT: 'Web · Prettier',
   API_TYPECHECK: 'API · TypeScript',
   API_TEST: 'API · Vitest',
   WEB_TYPECHECK: 'Web · TypeScript',
@@ -86,7 +88,7 @@ export function WorktreePatchCheckHistoryPanel({ sessionId, planId }: Props) {
   return (
     <section className="ws-worktree-authorization" aria-label="Історія перевірок Docker">
       <div className="overline">PATCH CHECK AUDIT · PR #66</div>
-      <h4>Історія TypeScript / Vitest перевірок</h4>
+      <h4>Історія Prettier / TypeScript / Vitest перевірок</h4>
       <p>
         Окремий приватний журнал для цього worktree: лише статус, рецепт, час і короткий результат.
         Жодних сирих логів, токенів або повторного запуску. Зберігається після перезапуску Hub.

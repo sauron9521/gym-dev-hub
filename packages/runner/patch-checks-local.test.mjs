@@ -15,7 +15,14 @@ const CONTENT = 'export const answer = 42;\n';
 const SHA = hash(CONTENT);
 
 test('accepts only fixed API/Web recipes scoped to an approved source file', () => {
-  for (const recipe of ['API_TYPECHECK', 'API_TEST', 'WEB_TYPECHECK', 'WEB_TEST']) {
+  for (const recipe of [
+    'API_FORMAT',
+    'API_TYPECHECK',
+    'API_TEST',
+    'WEB_FORMAT',
+    'WEB_TYPECHECK',
+    'WEB_TEST',
+  ]) {
     const path = recipe.startsWith('API_') ? 'apps/api/src/main.ts' : 'apps/web/src/app/page.tsx';
     assert.equal(validatePatchCheckArgs([recipe, path, SHA]).recipeId, recipe);
   }

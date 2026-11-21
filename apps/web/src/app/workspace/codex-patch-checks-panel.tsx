@@ -19,6 +19,8 @@ type Props = {
 };
 
 const checks = {
+  API_FORMAT: 'API · Prettier',
+  WEB_FORMAT: 'Web · Prettier',
   API_TYPECHECK: 'API: TypeScript',
   API_TEST: 'API: Vitest',
   WEB_TYPECHECK: 'Web: TypeScript',
@@ -33,7 +35,7 @@ export function CodexPatchChecksPanel({
   verified,
 }: Props) {
   const [recipeId, setRecipeId] = useState<WorktreePatchCheckRecipe>(
-    applied.filePath.startsWith('apps/api/') ? 'API_TYPECHECK' : 'WEB_TYPECHECK',
+    applied.filePath.startsWith('apps/api/') ? 'API_FORMAT' : 'WEB_FORMAT',
   );
   const [reviewSecret, setReviewSecret] = useState('');
   const [checkSecret, setCheckSecret] = useState('');
@@ -46,9 +48,9 @@ export function CodexPatchChecksPanel({
   const [busy, setBusy] = useState(false);
 
   const allowed = applied.filePath.startsWith('apps/api/src/')
-    ? (['API_TYPECHECK', 'API_TEST'] as const)
+    ? (['API_FORMAT', 'API_TYPECHECK', 'API_TEST'] as const)
     : applied.filePath.startsWith('apps/web/src/')
-      ? (['WEB_TYPECHECK', 'WEB_TEST'] as const)
+      ? (['WEB_FORMAT', 'WEB_TYPECHECK', 'WEB_TEST'] as const)
       : [];
 
   const fields = {
