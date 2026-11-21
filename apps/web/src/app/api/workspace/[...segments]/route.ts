@@ -72,6 +72,8 @@ function allowedPath(segments: string[], method: string): string | null {
       'code-read-authorize',
       'code-read',
       'patch-preflight',
+      'patch-apply-authorize',
+      'patch-apply',
       'tool-authorize',
       'tool-execute',
       'task-preview',
@@ -120,7 +122,11 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
   let body: string | undefined;
   if (isWrite) {
     const statedLength = Number(request.headers.get('content-length') ?? 0);
-    const maxBodyLength = path.endsWith('/patch-preflight') ? 30_000 : 10_000;
+    const maxBodyLength = ['/patch-preflight', '/patch-apply-authorize', '/patch-apply'].some(
+      (end) => path.endsWith(end),
+    )
+      ? 30_000
+      : 10_000;
     if (statedLength > maxBodyLength) {
       return Response.json({ message: 'Завелике тіло запиту' }, { status: 413 });
     }

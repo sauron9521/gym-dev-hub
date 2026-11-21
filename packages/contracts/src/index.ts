@@ -70,6 +70,8 @@ export type {
   WorktreeCodeReadGrant,
   WorktreeCodeReadResult,
   WorktreePatchPreflightResult,
+  WorktreePatchApplyGrant,
+  WorktreePatchApplyResult,
   WorktreeToolCapability,
   WorktreeToolGrant,
   WorktreeToolResult,

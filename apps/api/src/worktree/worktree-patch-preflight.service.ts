@@ -130,7 +130,32 @@ export class WorktreePatchPreflightService {
       throw new BadRequestException('Недозволений шлях вихідного файла.');
     }
 
+    const { operatorSecret: _operatorSecret, ...proposal } = parsed.data;
+    void _operatorSecret;
+    return this.revalidateForWrite(sessionId, planId, proposal);
+  }
+
+  /**
+   * Trusted internal revalidation for an independently authenticated one-use
+   * write grant. Never exposed directly as an endpoint.
+   */
+  async revalidateForWrite(
+    sessionId: string,
+    planId: string,
+    proposal: Omit<z.infer<typeof inputSchema>, 'operatorSecret'>,
+  ): Promise<WorktreePatchPreflightResult> {
+    if (
+      process.env.DEV_HUB_ENABLE_PATCH_PREFLIGHT !== 'true' ||
+      process.env.DEV_HUB_ENABLE_SCOPED_CODE_READ !== 'true' ||
+      process.env.DEV_HUB_ENABLE_WORKTREE_MOUNT !== 'true'
+    ) {
+      throw new ServiceUnavailableException('Patch preflight вимкнено.');
+    }
+    const valid = inputSchema.omit({ operatorSecret: true }).safeParse(proposal);
+    if (!valid.success) throw new BadRequestException('Некоректний патч.');
+    const parsed = { data: valid.data };
     // Keep full-tree revalidation bounded to one request at a time.
+
     if (this.running) throw new ConflictException('Інша перевірка патча ще виконується.');
     this.running = true;
     try {

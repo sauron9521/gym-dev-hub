@@ -179,3 +179,29 @@ export interface WorktreePatchPreflightResult {
   authorizationGranted: false;
   readOnly: true;
 }
+
+/** Single-use local operator capability, never a general workspace permission. */
+export interface WorktreePatchApplyGrant {
+  grantToken: string;
+  grantId: string;
+  expiresAt: string;
+  filePath: string;
+  sourceCommit: string;
+  patchSha256: string;
+  proposedSha256: string;
+  purpose: 'WRITE_ONE_APPROVED_WORKTREE_FILE';
+}
+
+export interface WorktreePatchApplyResult {
+  sessionId: string;
+  planId: string;
+  grantId: string;
+  filePath: string;
+  sourceCommit: string;
+  sourceSha256: string;
+  proposedSha256: string;
+  appliedAt: string;
+  status: 'applied';
+  mergeEnabled: false;
+  githubPushEnabled: false;
+}

@@ -14,6 +14,7 @@ import type {
 import { WorktreeMountService } from './worktree-mount.service.js';
 import { WorktreeCodeReadService } from './worktree-code-read.service.js';
 import { WorktreePatchPreflightService } from './worktree-patch-preflight.service.js';
+import { WorktreePatchApplyService } from './worktree-patch-apply.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './task-execution-grant.service.js';
@@ -30,6 +31,8 @@ import type {
   WorktreeCodeReadGrant,
   WorktreeCodeReadResult,
   WorktreePatchPreflightResult,
+  WorktreePatchApplyGrant,
+  WorktreePatchApplyResult,
 } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
@@ -43,6 +46,7 @@ export class WorktreePlanController {
     private readonly mount: WorktreeMountService,
     private readonly codeRead: WorktreeCodeReadService,
     private readonly patchPreflight: WorktreePatchPreflightService,
+    private readonly patchApply: WorktreePatchApplyService,
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
     private readonly taskGrants: TaskExecutionGrantService,
@@ -149,6 +153,26 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreePatchPreflightResult> {
     return this.patchPreflight.preview(sessionId, planId, body);
+  }
+
+  /** Explicit single-file operator grant, disabled by default. */
+  @Post(':planId/patch-apply-authorize')
+  patchApplyAuthorize(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePatchApplyGrant> {
+    return this.patchApply.authorize(sessionId, planId, body);
+  }
+
+  /** Consume one approved grant and write only that pinned worktree file. */
+  @Post(':planId/patch-apply')
+  patchApplyFile(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePatchApplyResult> {
+    return this.patchApply.apply(sessionId, planId, body);
   }
 
   @Post(':planId/tool-authorize')
