@@ -5,10 +5,10 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { MemoryReadQuerySchema } from '@gym-dev-hub/contracts';
-import type { MemoryReadPage } from '@gym-dev-hub/contracts';
+import { MemoryReadQuerySchema, MemoryRepositorySchema } from '@gym-dev-hub/contracts';
+import type { MemoryReadItem, MemoryReadPage, MemoryReadRevisions } from '@gym-dev-hub/contracts';
 import pg from 'pg';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import { resolveMemoryDatabaseConfiguration } from '../database/memory-database-policy.js';
 import { MemoryAuthorizationService } from '../security/memory-authorization.service.js';
 import {
@@ -25,6 +25,7 @@ import {
 } from './memory-query.service.js';
 
 type PoolFactory = (url: string) => pg.Pool;
+const detailQuerySchema = z.strictObject({ repository: MemoryRepositorySchema });
 
 /**
  * Single, independently opted-in HTTP read gateway. Bearer scope is never
@@ -46,6 +47,79 @@ export class MemoryAuthenticatedReadService {
         idleTimeoutMillis: 1000,
       }),
   ) {}
+
+  async get(request: MemoryHttpReadRequest, filters: unknown, id: string): Promise<MemoryReadItem> {
+    return this.readItem(request, filters, id, 'get');
+  }
+
+  async revisions(
+    request: MemoryHttpReadRequest,
+    filters: unknown,
+    id: string,
+  ): Promise<MemoryReadRevisions> {
+    return this.readItem(request, filters, id, 'revisions');
+  }
+
+  private async readItem(
+    request: MemoryHttpReadRequest,
+    filters: unknown,
+    id: string,
+    operation: 'get',
+  ): Promise<MemoryReadItem>;
+  private async readItem(
+    request: MemoryHttpReadRequest,
+    filters: unknown,
+    id: string,
+    operation: 'revisions',
+  ): Promise<MemoryReadRevisions>;
+  private async readItem(
+    request: MemoryHttpReadRequest,
+    filters: unknown,
+    id: string,
+    operation: 'get' | 'revisions',
+  ): Promise<MemoryReadItem | MemoryReadRevisions> {
+    if (this.env.DEV_HUB_MEMORY_READ_HTTP_ENABLE !== 'true')
+      throw new ServiceUnavailableException('Memory HTTP reads disabled');
+
+    // Never accept URL/query identity as authority. The agent's bearer is
+    // authenticated before any query parsing or database activity.
+    const principal = authenticateMemoryHttpRead(request, this.authorization, this.env);
+    const parsed = detailQuerySchema.safeParse(filters);
+    if (!parsed.success || !z.uuid().safeParse(id).success)
+      throw new BadRequestException('Invalid memory detail request');
+    if (parsed.data.repository !== principal.repository)
+      throw new NotFoundException('Memory record not found');
+
+    let pool: pg.Pool | undefined;
+    try {
+      const config = resolveMemoryDatabaseConfiguration(this.env);
+      if (!config.enabled) throw new MemorySecurityError('disabled');
+      pool = this.makePool(config.url);
+      // Recheck the claimed agent/task/session against the same-repo DB on
+      // EVERY detail and revision request, even if the token was issued earlier.
+      await verifyMemoryPrincipalBinding(principal, pool);
+      const query = new MemoryQueryService(pool, this.cursorKey);
+      return operation === 'get'
+        ? await query.get(principal.readContext, principal.repository, id)
+        : await query.revisions(principal.readContext, principal.repository, id);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      if (error instanceof MemorySecurityError) throw toMemoryHttpException(error);
+      if (error instanceof MemoryReadNotFoundError)
+        throw new NotFoundException('Memory record not found');
+      if (error instanceof MemoryReadValidationError || error instanceof ZodError)
+        throw new BadRequestException('Invalid memory detail request');
+      throw new ServiceUnavailableException('Memory read unavailable');
+    } finally {
+      if (pool) {
+        try {
+          await pool.end();
+        } catch {
+          // Never leak connection cleanup details.
+        }
+      }
+    }
+  }
 
   async list(request: MemoryHttpReadRequest, filters: unknown): Promise<MemoryReadPage> {
     // An issued credential does not implicitly enable HTTP memory reads.

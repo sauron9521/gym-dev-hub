@@ -4,6 +4,7 @@ import {
   Get,
   Header,
   Inject,
+  Param,
   Query,
   Req,
   ServiceUnavailableException,
@@ -14,10 +15,7 @@ type LocalRequest = IncomingMessage & { originalUrl?: string };
 const single = (value: string | string[] | undefined): string | undefined =>
   typeof value === 'string' ? value : undefined;
 
-/**
- * Repository-scoped HTTP list is independently opt-in. Detail/revision reads
- * stay disabled until their separate, request-level authorization review.
- */
+/** Verified-only list/detail/revisions share a separately opted-in bearer/DB read gateway. */
 @Controller('v1/memory')
 export class MemoryController {
   constructor(
@@ -25,8 +23,16 @@ export class MemoryController {
     private readonly reads: MemoryAuthenticatedReadService,
   ) {}
 
-  private disabled(): never {
-    throw new ServiceUnavailableException('Shared Agent Memory detail reads disabled');
+  private requestContext(request: LocalRequest) {
+    return {
+      method: request.method ?? '',
+      host: single(request.headers.host),
+      remoteAddress: request.socket.remoteAddress,
+      origin: single(request.headers.origin),
+      fetchSite: single(request.headers['sec-fetch-site']),
+      path: request.originalUrl ?? request.url ?? '',
+      authorization: single(request.headers.authorization),
+    };
   }
 
   @Get()
@@ -35,27 +41,38 @@ export class MemoryController {
   @Header('Referrer-Policy', 'no-referrer')
   @Header('X-Content-Type-Options', 'nosniff')
   list(@Req() request: LocalRequest, @Query() filters: Record<string, unknown>) {
-    return this.reads.list(
-      {
-        method: request.method ?? '',
-        host: single(request.headers.host),
-        remoteAddress: request.socket.remoteAddress,
-        origin: single(request.headers.origin),
-        fetchSite: single(request.headers['sec-fetch-site']),
-        path: request.originalUrl ?? request.url ?? '',
-        authorization: single(request.headers.authorization),
-      },
-      filters,
-    );
+    return this.reads.list(this.requestContext(request), filters);
+  }
+
+  // A static reserved route must not be mistaken for a record UUID.
+  @Get('status')
+  status(): never {
+    throw new ServiceUnavailableException('Shared Agent Memory status disabled');
   }
 
   @Get(':id/revisions')
-  revisions(): never {
-    return this.disabled();
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('X-Content-Type-Options', 'nosniff')
+  revisions(
+    @Req() request: LocalRequest,
+    @Query() filters: Record<string, unknown>,
+    @Param('id') id: string,
+  ) {
+    return this.reads.revisions(this.requestContext(request), filters, id);
   }
 
   @Get(':id')
-  get(): never {
-    return this.disabled();
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('X-Content-Type-Options', 'nosniff')
+  get(
+    @Req() request: LocalRequest,
+    @Query() filters: Record<string, unknown>,
+    @Param('id') id: string,
+  ) {
+    return this.reads.get(this.requestContext(request), filters, id);
   }
 }

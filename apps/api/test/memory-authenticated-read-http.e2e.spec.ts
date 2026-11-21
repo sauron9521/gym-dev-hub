@@ -36,11 +36,60 @@ const valid = {
   session_exists: true,
   membership_exists: true,
 };
+const memoryId = randomUUID();
+const sourceId = randomUUID();
+const revisionId = randomUUID();
+const now = new Date();
+const visibleRecord = {
+  id: memoryId,
+  repository,
+  scope: 'PROJECT',
+  kind: 'DECISION',
+  status: 'VERIFIED',
+  text: 'approved decision for the current repository',
+  revision: 2,
+  task_id: null,
+  session_id: null,
+  agent_id: null,
+  source_sha: null,
+  superseded_by_id: null,
+  expires_at: null,
+  verified_by: 'operator',
+  verified_at: now,
+  created_at: now,
+  updated_at: now,
+  provenance_id: sourceId,
+  source_type: 'HUMAN',
+  actor_id: 'operator',
+  source_ref: 'local-human-approval',
+  provenance_source_sha: null,
+  observed_at: now,
+  provenance_created_at: now,
+};
+const visibleRevision = {
+  id: revisionId,
+  repository,
+  memory_id: memoryId,
+  revision: 2,
+  scope: 'PROJECT',
+  kind: 'DECISION',
+  status: 'VERIFIED',
+  text: visibleRecord.text,
+  source_sha: null,
+  source_id: sourceId,
+  changed_by: 'operator',
+  created_at: now,
+};
+let showVisibleRecord = false;
 let dbResult: 'success' | 'foreign' | 'error' = 'success';
 const query = vi.fn(async (sql: string) => {
   if (dbResult === 'error') throw new Error('private PostgreSQL password should not escape');
   if (sql.includes('memory_repositories'))
     return { rows: [{ ...valid, ...(dbResult === 'foreign' ? { agent_exists: false } : {}) }] };
+  if (sql.includes('FROM memory_revisions'))
+    return { rows: showVisibleRecord ? [visibleRevision] : [] };
+  if (sql.includes('r.id=$8::uuid LIMIT 1'))
+    return { rows: showVisibleRecord ? [visibleRecord] : [] };
   return { rows: [] };
 });
 const end = vi.fn(async () => undefined);
@@ -182,11 +231,113 @@ describe('actual Nest GET /v1/memory authorization, opt-in and scope', () => {
     dbResult = 'success';
   });
 
-  it('rejects forged or other-context cursor as 400; detail and revisions stay 503', async () => {
+  it('rejects invalid cursor; unknown detail and revisions are uniformly 404', async () => {
     const response = await request(path + '&cursor=not-a-valid-cursor');
     expect(response.status).toBe(400);
     for (const route of ['/v1/memory/' + randomUUID(), '/v1/memory/' + randomUUID() + '/revisions'])
-      expect((await request(route)).status).toBe(503);
+      expect((await request(route + '?' + new URLSearchParams({ repository }))).status).toBe(404);
+  });
+
+  it('returns only a visible verified detail and its bounded verified revision snapshots', async () => {
+    const detailPath = '/v1/memory/' + memoryId + '?' + new URLSearchParams({ repository });
+    showVisibleRecord = true;
+    query.mockClear();
+    try {
+      const detail = await request(detailPath);
+      expect(detail.status).toBe(200);
+      expect(detail.headers.get('cache-control')).toBe('no-store');
+      expect(detail.headers.get('referrer-policy')).toBe('no-referrer');
+      const data = (await detail.json()) as {
+        record: { id: string; status: string; text: string };
+        provenance: { memoryId: string };
+      };
+      expect(data.record).toMatchObject({
+        id: memoryId,
+        status: 'verified',
+        text: visibleRecord.text,
+      });
+      expect(data.provenance.memoryId).toBe(memoryId);
+      const detailsSql = query.mock.calls.map(([sql]) => sql);
+      expect(detailsSql[0]).toContain('memory_repositories');
+      expect(detailsSql[1]).toContain("r.status='VERIFIED'");
+      expect(detailsSql[1]).toContain('r.id=$8::uuid LIMIT 1');
+
+      query.mockClear();
+      const history = await request(detailPath.replace('?', '/revisions?'));
+      expect(history.status).toBe(200);
+      expect(history.headers.get('cache-control')).toBe('no-store');
+      const revisions = (await history.json()) as {
+        memoryId: string;
+        revisions: { revision: number; status: string }[];
+      };
+      expect(revisions).toMatchObject({
+        memoryId,
+        revisions: [{ revision: 2, status: 'verified' }],
+      });
+      const revisionSql = query.mock.calls.map(([sql]) => sql);
+      expect(revisionSql[0]).toContain('memory_repositories');
+      expect(revisionSql[1]).toContain('r.id=$8::uuid LIMIT 1');
+      expect(revisionSql[2]).toContain("status='VERIFIED'");
+      expect(revisionSql[2]).toContain('LIMIT 100');
+    } finally {
+      showVisibleRecord = false;
+    }
+  });
+
+  it('forbids foreign/malformed detail scope and ID, including unexpected query params, before DB', async () => {
+    factory.mockClear();
+    for (const suffix of ['', '/revisions']) {
+      const route = '/v1/memory/' + memoryId + suffix;
+      for (const bad of [
+        route, // missing repository
+        route + '?repository=bad',
+        '/v1/memory/not-a-uuid' + suffix + '?' + new URLSearchParams({ repository }),
+        route + '?' + new URLSearchParams({ repository }) + '&taskId=' + randomUUID(),
+        route + '?' + new URLSearchParams({ repository }) + '&cursor=forbidden',
+      ])
+        expect((await request(bad)).status).toBe(400);
+      const foreign = await request(route + '?repository=sauron9521/gym-platform');
+      expect(foreign.status).toBe(404);
+      const anonymous = await request(route + '?' + new URLSearchParams({ repository }), {
+        origin: 'http://127.0.0.1:3100',
+      });
+      expect(anonymous.status).toBe(401);
+      const spoofedOrigin = await request(route + '?' + new URLSearchParams({ repository }), {
+        ...headers,
+        origin: 'https://attacker.example',
+      });
+      expect(spoofedOrigin.status).toBe(403);
+    }
+    expect(factory).not.toHaveBeenCalled();
+  });
+
+  it('checks revoked bearer and unregistered identity for both detail and revisions', async () => {
+    const token = authorization.provisionReadCredential(secret, {
+      kind: 'agent',
+      repository,
+      agentId: identity,
+      ttlSeconds: 60,
+    });
+    authorization.revokeCredential(secret, token.credentialId);
+    for (const suffix of ['', '/revisions']) {
+      const route = '/v1/memory/' + memoryId + suffix + '?' + new URLSearchParams({ repository });
+      const revoked = await request(route, {
+        ...headers,
+        authorization: 'Bearer ' + token.bearerToken,
+      });
+      expect(revoked.status).toBe(401);
+      dbResult = 'foreign';
+      expect((await request(route)).status).toBe(403);
+      dbResult = 'error';
+      const unavailable = await request(route);
+      expect(unavailable.status).toBe(503);
+      expect(JSON.stringify(await unavailable.json())).not.toContain('private PostgreSQL password');
+      dbResult = 'success';
+    }
+  });
+
+  it('reserved status stays 503 rather than being treated as a record ID', async () => {
+    expect((await request('/v1/memory/status')).status).toBe(503);
   });
 
   it('defaults to 503 without independent read flag, even with valid bearer', async () => {
@@ -195,6 +346,12 @@ describe('actual Nest GET /v1/memory authorization, opt-in and scope', () => {
     try {
       const response = await request();
       expect(response.status).toBe(503);
+      for (const suffix of ['', '/revisions']) {
+        const detail = await request(
+          '/v1/memory/' + memoryId + suffix + '?' + new URLSearchParams({ repository }),
+        );
+        expect(detail.status).toBe(503);
+      }
       expect(factory).not.toHaveBeenCalled();
     } finally {
       env.DEV_HUB_MEMORY_READ_HTTP_ENABLE = 'true';
