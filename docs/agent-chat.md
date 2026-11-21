@@ -37,3 +37,27 @@ The persisted Workspace JSON format is backwards-compatible with sessions from P
 - Prompts can be processed by OpenAI services according to your connected Codex account. Never paste passwords, tokens or other secrets.
 - There are **no code writes, worktree modifications, branch pushes or PR creation endpoints in this milestone**. All merges remain manual.
 - The next PR can introduce an authenticated, OS-isolated execution workspace and explicit user approval gates for development agents.
+
+## Reviewed one-file worktree context (manual draft)
+
+An authorized, successfully hydrated and integrity-verified worktree can provide
+one source file using the existing **one-file scoped Docker read**. That separate
+feature requires its own flags, worker image, recent Docker preflight, operator
+secret and one-time grant; enabling worktree creation alone does not enable
+reading.
+
+After a successful code read, **Підготувати пропозицію зміни в Codex** builds a
+local text draft containing the exact returned file, its relative path and the
+pinned Git commit. It does **not** call the Codex API, execute commands, stage a
+patch, or write source files. In the session's AI Chat, **Вставити чернетку в чат**
+is a second explicit step. The operator must edit the placeholder task and
+press the existing **Надіслати до Codex** button before code is transmitted to
+OpenAI. The current chat limit is 3000 characters; files that do not fit are
+rejected **without truncation**, so a smaller file must be selected. The draft
+is not persisted unless the operator sends it; no tokens or operator secrets
+are included.
+
+The AI response is an **untrusted proposed unified diff**, not an applied
+patch. Human review, deterministic validation, per-worktree code-writing
+authorization, fixed isolated test recipes and GitHub PR creation require
+**separate future changes**. No GitHub push or merge capability is enabled.

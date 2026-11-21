@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { prepareScopedCodexDraft } from './codex-scoped-draft';
 import type {
   WorktreeCodeReadGrant,
   WorktreeCodeReadResult,
@@ -11,14 +12,22 @@ type Props = {
   sessionId: string;
   report: WorktreeIntegrityReport;
   fingerprint: string;
+  onPrepareCodexDraft?: (draft: string) => void;
 };
 
-export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props) {
+export function WorktreeCodeReadPanel({
+  sessionId,
+  report,
+  fingerprint,
+  onPrepareCodexDraft,
+}: Props) {
   const [filePath, setFilePath] = useState('');
   const [operatorSecret, setOperatorSecret] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
   const [grant, setGrant] = useState<WorktreeCodeReadGrant | null>(null);
   const [result, setResult] = useState<WorktreeCodeReadResult | null>(null);
+  const [readCommit, setReadCommit] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const base = `/api/workspace/sessions/${sessionId}/worktree-plans/${report.planId}`;
@@ -28,6 +37,8 @@ export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props)
     setBusy(true);
     setError(null);
     setResult(null);
+    setReadCommit(null);
+    setDraftNotice(false);
     try {
       const response = await fetch(base + '/code-read-authorize', {
         method: 'POST',
@@ -65,12 +76,16 @@ export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props)
         );
       }
       setResult((await response.json()) as WorktreeCodeReadResult);
+      setReadCommit(grant.baseHeadSha);
+      setDraftNotice(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Відмовлено в читанні.');
     } finally {
       setBusy(false);
     }
   }
+
+  const codexDraft = result && readCommit ? prepareScopedCodexDraft(result, readCommit) : null;
 
   return (
     <div className="ws-worktree-authorization" aria-label="Дозвіл на читання одного файла">
@@ -89,6 +104,8 @@ export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props)
           setFilePath(event.target.value);
           setGrant(null);
           setResult(null);
+          setReadCommit(null);
+          setDraftNotice(false);
         }}
         placeholder="apps/api/src/main.ts"
         maxLength={160}
@@ -149,6 +166,32 @@ export function WorktreeCodeReadPanel({ sessionId, report, fingerprint }: Props)
           <pre className="ws-code-read-result">
             <code>{result.content}</code>
           </pre>
+          {onPrepareCodexDraft &&
+            (codexDraft ? (
+              <>
+                <button
+                  type="button"
+                  className="refresh"
+                  onClick={() => {
+                    onPrepareCodexDraft(codexDraft);
+                    setDraftNotice(true);
+                  }}
+                >
+                  Підготувати пропозицію зміни в Codex
+                </button>
+                {draftNotice && (
+                  <small role="status">
+                    Чернетку передано до секції AI Chat. Переглянь та відредагуй її перед
+                    надсиланням. Файли не змінено.
+                  </small>
+                )}
+              </>
+            ) : (
+              <small>
+                Увесь файл не вміщується у 3000 символів чату Codex. Автоматично обрізати код не
+                будемо.
+              </small>
+            ))}
         </div>
       )}
       {error && (
