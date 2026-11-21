@@ -187,3 +187,51 @@ still race directory paths. Do not expose this functionality to untrusted
 local processes or treat it as a hardened multi-user sandbox. No push,
 commit, pull request or merge is performed; all remain separate later steps
 with explicit operator review.
+
+## Post-apply Git diff verification and test preparation (PR #64)
+
+After a successful, separately authorized `patch-apply`, the operator can
+request **Перевірити фактичні зміни та Git diff**. This is a **new read-only
+operation**; it does not use or issue a write capability. Opt in locally by
+setting `DEV_HUB_ENABLE_PATCH_REVIEW=true` in the ignored
+`apps/api/.env`, retaining the existing independent
+`DEV_HUB_PATCH_APPLY_OPERATOR_SECRET` (32–256 bytes). It remains **off by
+default**. Only run this local service on a trusted computer; do not
+publish its ports.
+
+`POST /workspace/sessions/:sessionId/worktree-plans/:planId/patch-review`
+takes a strict object with the successful apply receipt's grant ID,
+fingerprint, pinned commit, one file path, source SHA-256, proposed SHA-256,
+and the operator's write secret. The server opens the bounded private
+`patch-apply/audit.jsonl` using a no-follow handle, requires one matching
+`applied` audit event with **no later rejection for the same grant**, and
+rechecks the allowed session, repository, plan and Git revision.
+
+A dedicated overlay mode on the existing Git integrity service verifies
+that the **one approved tracked file** has exactly the audited post-image
+SHA-256 and safe file metadata; it verifies the original file's SHA-256
+against the pinned raw Git blob and checks **every other tracked file**
+against its exact original Git blob. Missing files, unexpected files or
+directories, symlinks and source drift are rejected. Normal `verify()`
+behavior remains unchanged: an intentionally edited file still fails
+the original baseline check as expected.
+
+After verifying, the service runs **only fixed, read-only Git diff
+commands**, with hooks, textconv, external diff, system/global Git config
+and Git lazy fetch disabled. It requires precisely one changed path
+and returns the real, bounded unified diff for operator review. It
+revalidates all files once again and refuses to review while a patch
+writer lock exists.
+
+The response includes SHA-256 hashes, file/commit, checked-at time, exact
+changed-file count and informational test/typecheck recommendations for
+the known repository/package. The UI displays the diff and next steps.
+**No tests have been run**, no project script has been executed, and no
+commit, push, GitHub PR or merge is created. Recommendations are plain
+text, not executable commands or grants.
+
+This is a point-in-time review and **not** a guarantee of safety against
+hostile same-account processes racing directory paths after verification.
+A future implementation slice may introduce separately approved,
+fixed Docker test recipes for a reviewed changed worktree, followed by
+explicit commit/push/PR steps; none are authorized by this result.

@@ -15,6 +15,7 @@ import { WorktreeMountService } from './worktree-mount.service.js';
 import { WorktreeCodeReadService } from './worktree-code-read.service.js';
 import { WorktreePatchPreflightService } from './worktree-patch-preflight.service.js';
 import { WorktreePatchApplyService } from './worktree-patch-apply.service.js';
+import { WorktreePatchReviewService } from './worktree-patch-review.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './task-execution-grant.service.js';
@@ -33,6 +34,7 @@ import type {
   WorktreePatchPreflightResult,
   WorktreePatchApplyGrant,
   WorktreePatchApplyResult,
+  WorktreePostApplyReview,
 } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
@@ -47,6 +49,7 @@ export class WorktreePlanController {
     private readonly codeRead: WorktreeCodeReadService,
     private readonly patchPreflight: WorktreePatchPreflightService,
     private readonly patchApply: WorktreePatchApplyService,
+    private readonly patchReview: WorktreePatchReviewService,
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
     private readonly taskGrants: TaskExecutionGrantService,
@@ -173,6 +176,16 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreePatchApplyResult> {
     return this.patchApply.apply(sessionId, planId, body);
+  }
+
+  /** Read-only audit + actual working tree Git diff, no scripts or Git mutation. */
+  @Post(':planId/patch-review')
+  patchReviewOneFile(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePostApplyReview> {
+    return this.patchReview.review(sessionId, planId, body);
   }
 
   @Post(':planId/tool-authorize')
