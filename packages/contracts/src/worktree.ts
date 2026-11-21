@@ -205,3 +205,25 @@ export interface WorktreePatchApplyResult {
   mergeEnabled: false;
   githubPushEnabled: false;
 }
+
+/** Read-only post-apply Git snapshot; every response is informational, not permission. */
+export interface WorktreePostApplyReview {
+  sessionId: string;
+  planId: string;
+  grantId: string;
+  sourceCommit: string;
+  filePath: string;
+  sourceSha256: string;
+  proposedSha256: string;
+  checkedAt: string;
+  status: 'verified';
+  changedFiles: 1;
+  trackedFiles: number;
+  diff: string;
+  recommendedChecks: string[];
+  readOnly: true;
+  testsExecuted: false;
+  commitCreated: false;
+  pushEnabled: false;
+  mergeEnabled: false;
+}

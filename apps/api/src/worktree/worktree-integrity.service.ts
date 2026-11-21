@@ -4,6 +4,7 @@ import { constants } from 'node:fs';
 import { open, lstat, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
+import { validateScopedCodePath } from './worktree-mount-probe.js';
 import type { WorktreeIntegrityReport, WorktreePlan } from '@gym-dev-hub/contracts';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeInspectionService, inspectTreeListing } from './worktree-inspection.service.js';
@@ -14,6 +15,11 @@ const KNOWN_NONEMPTY = 'У worktree вже є файли: потрібна ру�
 const shaPattern = /^[0-9a-f]{40,64}$/;
 
 type GitEntry = { name: string; oid: string; size: number };
+export type OneFileOverlay = {
+  filePath: string;
+  sourceSha256: string;
+  proposedSha256: string;
+};
 
 function gitEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
@@ -95,6 +101,112 @@ function parseTree(buffer: Buffer): GitEntry[] {
     });
 }
 
+/** Verify the actual Git worktree HEAD independently of inspection metadata. */
+function currentWorktreeHead(worktree: string): Promise<string> {
+  return new Promise((resolveOutput, reject) => {
+    execFile(
+      'git',
+      [
+        '--no-optional-locks',
+        '-c',
+        'core.fsmonitor=false',
+        '-c',
+        'core.hooksPath=.devhub-disabled-hooks',
+        '-C',
+        worktree,
+        'rev-parse',
+        '--verify',
+        'HEAD^{commit}',
+      ],
+      {
+        shell: false,
+        windowsHide: true,
+        encoding: 'utf8',
+        maxBuffer: 1024,
+        timeout: 12_000,
+        env: gitEnv(),
+      },
+      (error, output) => {
+        if (error || typeof output !== 'string') {
+          reject(new Error('Git worktree HEAD unavailable'));
+        } else {
+          resolveOutput(output.trim());
+        }
+      },
+    );
+  });
+}
+
+/**
+ * Read only the pinned Git blob of the single approved changed file. No
+ * checkout, smudge filters, user-provided command or project scripts.
+ */
+async function gitOriginalSha256(cwd: string, oid: string, expectedSize: number): Promise<string> {
+  if (!shaPattern.test(oid) || expectedSize > 8_192) throw new Error('Unsafe Git blob');
+  const buffer = await new Promise<Buffer>((resolveOutput, reject) => {
+    execFile(
+      'git',
+      [
+        '--no-optional-locks',
+        '-c',
+        'core.fsmonitor=false',
+        '-c',
+        'core.hooksPath=.devhub-disabled-hooks',
+        '-C',
+        cwd,
+        'cat-file',
+        'blob',
+        oid,
+      ],
+      {
+        shell: false,
+        windowsHide: true,
+        encoding: 'buffer',
+        maxBuffer: 8_193,
+        timeout: 12_000,
+        env: gitEnv(),
+      },
+      (error, output) => {
+        if (error || !Buffer.isBuffer(output) || output.length !== expectedSize) {
+          reject(new Error('Git blob cannot be safely verified'));
+        } else resolveOutput(output);
+      },
+    );
+  });
+  return createHash('sha256').update(buffer).digest('hex');
+}
+
+/** SHA-256 of the actual changed file, no-follow, with bounded metadata checks. */
+async function hashChangedFile(path: string): Promise<{ sha256: string; size: number }> {
+  const fd = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const before = await fd.stat();
+    if (
+      !before.isFile() ||
+      before.nlink !== 1 ||
+      ![0o600, 0o644].includes(before.mode & 0o777) ||
+      before.size > 12_288 ||
+      before.size < 1
+    )
+      throw new Error('Unsafe modified file');
+    const bytes = await fd.readFile();
+    const after = await fd.stat();
+    if (
+      bytes.length !== before.size ||
+      before.dev !== after.dev ||
+      before.ino !== after.ino ||
+      before.mtimeMs !== after.mtimeMs ||
+      before.ctimeMs !== after.ctimeMs ||
+      before.size !== after.size ||
+      before.mode !== after.mode
+    )
+      throw new Error('Modified file changed while reading');
+    return { sha256: createHash('sha256').update(bytes).digest('hex'), size: bytes.length };
+  } finally {
+    await fd.close();
+  }
+}
+
 /** Hash the actual file as an exact Git blob, without relying on Git filters/index. */
 async function hashFile(path: string, size: number, oidLength: number): Promise<string> {
   const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
@@ -156,7 +268,33 @@ export class WorktreeIntegrityService {
     return this.inspectPlan(plan);
   }
 
-  async inspectPlan(plan: WorktreePlan): Promise<WorktreeIntegrityReport> {
+  /**
+   * Read-only inspection of one applied patch, still verifies all other Git
+   * blobs and rejects extra/missing files. Does not weaken normal verify().
+   */
+  async verifyOneAppliedFile(
+    sessionId: string,
+    planId: string,
+    overlay: OneFileOverlay,
+  ): Promise<WorktreeIntegrityReport> {
+    validateScopedCodePath(overlay.filePath);
+    if (
+      !/^[0-9a-f]{64}$/.test(overlay.sourceSha256) ||
+      !/^[0-9a-f]{64}$/.test(overlay.proposedSha256) ||
+      overlay.sourceSha256 === overlay.proposedSha256
+    ) {
+      throw new Error('Invalid approved overlay');
+    }
+    const plans = await this.plans.list(sessionId);
+    const plan = plans.find((item) => item.id === planId);
+    if (!plan) throw new NotFoundException('План worktree не знайдено.');
+    return this.inspectPlan(plan, overlay);
+  }
+
+  async inspectPlan(
+    plan: WorktreePlan,
+    overlay?: OneFileOverlay,
+  ): Promise<WorktreeIntegrityReport> {
     const failures: string[] = [];
     let fileCount = 0;
     let verifiedBytes = 0;
@@ -188,8 +326,21 @@ export class WorktreeIntegrityService {
         failures.push('Git metadata, шляхи або вміст worktree не пройшли передперевірку.');
         return report('mismatch');
       }
+      if ((await currentWorktreeHead(plan.targetPath)) !== plan.baseHeadSha) {
+        throw new Error('Worktree HEAD changed since the approved base commit');
+      }
       const tree = parseTree(await gitTree(plan.sourcePath, plan.baseHeadSha));
       const expected = new Map(tree.map((entry) => [entry.name, entry]));
+      const changedEntry = overlay ? expected.get(overlay.filePath) : undefined;
+      if (
+        overlay &&
+        (!changedEntry ||
+          changedEntry.size > 8_192 ||
+          (await gitOriginalSha256(plan.sourcePath, changedEntry.oid, changedEntry.size)) !==
+            overlay.sourceSha256)
+      ) {
+        throw new Error('Approved preimage not in the pinned Git commit');
+      }
       const expectedDirectories = new Set<string>();
       for (const entry of tree) {
         const parts = entry.name.split('/');
@@ -213,12 +364,26 @@ export class WorktreeIntegrityService {
             await visit(filePath, relativeName);
           } else if (stat.isFile()) {
             const entry = expected.get(relativeName);
-            if (!entry || stat.size !== entry.size) throw new Error('Unknown or changed file');
-            const actualOid = await hashFile(filePath, entry.size, entry.oid.length);
-            if (actualOid !== entry.oid) throw new Error('File bytes differ from Git object');
+            if (!entry) throw new Error('Unknown file');
+            if (overlay && relativeName === overlay.filePath) {
+              const observedFile = await hashChangedFile(filePath);
+              if (
+                observedFile.sha256 !== overlay.proposedSha256 ||
+                stat.size !== observedFile.size ||
+                stat.isSymbolicLink() ||
+                stat.nlink !== 1
+              ) {
+                throw new Error('Changed file not identical to approved postimage');
+              }
+              verifiedBytes += observedFile.size;
+            } else {
+              if (stat.size !== entry.size) throw new Error('Changed file size');
+              const actualOid = await hashFile(filePath, entry.size, entry.oid.length);
+              if (actualOid !== entry.oid) throw new Error('File bytes differ from Git object');
+              verifiedBytes += entry.size;
+            }
             observed.add(relativeName);
             fileCount++;
-            verifiedBytes += entry.size;
           } else {
             throw new Error('Unsupported filesystem object');
           }
@@ -228,7 +393,12 @@ export class WorktreeIntegrityService {
       if (
         observed.size !== expected.size ||
         fileCount !== plan.hydrationFiles ||
-        verifiedBytes !== plan.hydrationBytes
+        verifiedBytes !==
+          (overlay && changedEntry
+            ? plan.hydrationBytes! -
+              changedEntry.size +
+              (await lstat(join(plan.targetPath, overlay.filePath))).size
+            : plan.hydrationBytes)
       ) {
         throw new Error('Missing Git file or manifest counter mismatch');
       }

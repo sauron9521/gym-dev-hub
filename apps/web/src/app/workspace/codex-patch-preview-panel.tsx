@@ -6,6 +6,7 @@ import type {
   WorktreePatchPreflightResult,
   WorktreePatchApplyGrant,
   WorktreePatchApplyResult,
+  WorktreePostApplyReview,
 } from '@gym-dev-hub/contracts';
 import { MAX_PATCH_CHARS, reviewCodexPatch, type PatchReviewResult } from './codex-patch-review';
 
@@ -34,6 +35,64 @@ export function CodexPatchPreviewPanel({ source, sourceCommit, fingerprint }: Pr
   const [writeGrant, setWriteGrant] = useState<WorktreePatchApplyGrant | null>(null);
   const [writeResult, setWriteResult] = useState<WorktreePatchApplyResult | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
+  const [postApplySecret, setPostApplySecret] = useState('');
+  const [postApplyBusy, setPostApplyBusy] = useState(false);
+  const [postApplyReport, setPostApplyReport] = useState<WorktreePostApplyReview | null>(null);
+  const [postApplyError, setPostApplyError] = useState<string | null>(null);
+
+  async function reviewAppliedChanges() {
+    if (!writeResult || postApplyBusy || postApplySecret.length < 32) return;
+    const secret = postApplySecret;
+    setPostApplySecret('');
+    setPostApplyBusy(true);
+    setPostApplyError(null);
+    setPostApplyReport(null);
+    try {
+      const response = await fetch(
+        `/api/workspace/sessions/${source.sessionId}/worktree-plans/${source.planId}/patch-review`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({
+            grantId: writeResult.grantId,
+            fingerprint,
+            sourceCommit,
+            filePath: writeResult.filePath,
+            sourceSha256: writeResult.sourceSha256,
+            proposedSha256: writeResult.proposedSha256,
+            operatorSecret: secret,
+          }),
+        },
+      );
+      if (!response.ok)
+        throw new Error(
+          'Git review відхилено: перевір секрет, audit, Git або інші локальні зміни.',
+        );
+      const received = (await response.json()) as WorktreePostApplyReview;
+      if (
+        received.status !== 'verified' ||
+        received.grantId !== writeResult.grantId ||
+        received.filePath !== writeResult.filePath ||
+        received.sourceCommit !== sourceCommit ||
+        received.sourceSha256 !== writeResult.sourceSha256 ||
+        received.proposedSha256 !== writeResult.proposedSha256 ||
+        received.changedFiles !== 1 ||
+        received.readOnly !== true ||
+        received.testsExecuted !== false ||
+        received.commitCreated !== false ||
+        received.pushEnabled !== false ||
+        received.mergeEnabled !== false
+      ) {
+        throw new Error('Небезпечний або невідповідний звіт Git review.');
+      }
+      setPostApplyReport(received);
+    } catch (error) {
+      setPostApplyError(error instanceof Error ? error.message : 'Помилка Git review.');
+    } finally {
+      setPostApplyBusy(false);
+    }
+  }
 
   async function authorizeOneFileWrite() {
     if (
@@ -403,6 +462,63 @@ export function CodexPatchPreviewPanel({ source, sourceCommit, fingerprint }: Pr
               <small>
                 Злиття, push і commit не виконано. Перевір diff і тести перед створенням PR.
               </small>
+              <div className="ws-worktree-authorization">
+                <h4>Перевірити реальний Git diff після запису</h4>
+                <p>
+                  Сервер звірить audit, вихідний Git commit, усі файли worktree та рівно один
+                  погоджений змінений файл. Тести не запускаються.
+                </p>
+                <label htmlFor="ws-patch-review-secret">
+                  Секрет оператора для read-only review
+                </label>
+                <input
+                  id="ws-patch-review-secret"
+                  type="password"
+                  autoComplete="off"
+                  disabled={postApplyBusy}
+                  value={postApplySecret}
+                  onChange={(event) => setPostApplySecret(event.target.value)}
+                  placeholder="DEV_HUB_PATCH_APPLY_OPERATOR_SECRET"
+                />
+                <button
+                  type="button"
+                  className="refresh"
+                  disabled={postApplyBusy || postApplySecret.length < 32}
+                  onClick={() => void reviewAppliedChanges()}
+                >
+                  {postApplyBusy ? 'Перевірка Git…' : 'Перевірити фактичні зміни та Git diff'}
+                </button>
+                {postApplyError && (
+                  <p role="alert" className="ws-chat-error">
+                    {postApplyError}
+                  </p>
+                )}
+                {postApplyReport && (
+                  <div role="status" className="ws-worktree-inspection-result">
+                    <strong>Git review: перевірено рівно один змінений файл.</strong>
+                    <p>
+                      {postApplyReport.filePath} · {postApplyReport.changedFiles} змінений з{' '}
+                      {postApplyReport.trackedFiles} файлів ·
+                      {new Date(postApplyReport.checkedAt).toLocaleString('uk-UA')}
+                    </p>
+                    <pre className="ws-code-read-result" aria-label="Фактичний Git diff">
+                      <code>{postApplyReport.diff}</code>
+                    </pre>
+                    <p>Рекомендовані наступні перевірки (ще не виконані):</p>
+                    <ul>
+                      {postApplyReport.recommendedChecks.map((check) => (
+                        <li key={check}>
+                          <code>{check}</code>
+                        </li>
+                      ))}
+                    </ul>
+                    <small>
+                      Це read-only звіт про один момент часу. Перед PR ще потрібні тести, перевірка
+                      diff, окремий commit/push та ручний merge.
+                    </small>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

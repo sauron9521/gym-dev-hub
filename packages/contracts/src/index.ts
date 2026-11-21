@@ -72,6 +72,7 @@ export type {
   WorktreePatchPreflightResult,
   WorktreePatchApplyGrant,
   WorktreePatchApplyResult,
+  WorktreePostApplyReview,
   WorktreeToolCapability,
   WorktreeToolGrant,
   WorktreeToolResult,
