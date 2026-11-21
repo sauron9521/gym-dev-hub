@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { MemoryPrincipal } from '../src/security/memory-authorization.service.js';
 import { resolveMemoryDatabaseConfiguration } from '../src/database/memory-database-policy.js';
 import { verifyMemoryPrincipalBinding } from '../src/security/memory-principal-binding.js';
+import { MemoryAuthorizationService } from '../src/security/memory-authorization.service.js';
+import { MemoryOperatorCredentialService } from '../src/security/memory-operator-credential.service.js';
 
 const enabled =
   process.env.DEV_HUB_MEMORY_ENABLE === 'true' &&
@@ -101,6 +103,48 @@ describe.skipIf(!enabled)('real DB memory bearer-scope membership (isolated Post
     await expect(verifyMemoryPrincipalBinding(principal(repoA), db)).resolves.toMatchObject({
       repository: repoA,
     });
+  });
+
+  it('mints only DB-registered scoped operator credentials and revokes them (real PostgreSQL)', async () => {
+    const operatorSecret = 'ci-isolated-operator-secret-over-thirty-two-characters';
+    const env: NodeJS.ProcessEnv = {
+      DEV_HUB_MEMORY_ENABLE: 'true',
+      DEV_HUB_MEMORY_SECURITY_ENABLE: 'true',
+      DEV_HUB_MEMORY_OPERATOR_SECRET: operatorSecret,
+      DEV_HUB_MEMORY_ALLOWED_REPOSITORIES: repoA,
+      DEV_HUB_MEMORY_TRUSTED_ORIGIN: 'http://127.0.0.1:3100',
+    };
+    const authorization = new MemoryAuthorizationService(env);
+    const credentials = new MemoryOperatorCredentialService(authorization, env, async (scope) => {
+      await verifyMemoryPrincipalBinding(scope, db);
+    });
+    const valid = {
+      kind: 'agent',
+      repository: repoA,
+      taskId: taskA,
+      sessionId: sessionA,
+      agentId: agentA,
+      ttlSeconds: 60,
+    };
+    const issued = await credentials.issue(operatorSecret, valid);
+    expect(authorization.authenticateReadBearer(issued.bearerToken).readContext).toEqual({
+      repository: repoA,
+      taskId: taskA,
+      sessionId: sessionA,
+      agentId: agentA,
+    });
+    for (const bad of [
+      { ...valid, sessionId: sessionB },
+      { ...valid, taskId: taskB },
+      { ...valid, agentId: agentB },
+      { ...valid, agentId: randomUUID() },
+    ]) {
+      await expect(credentials.issue(operatorSecret, bad)).rejects.toMatchObject({
+        code: 'forbidden',
+      });
+    }
+    expect(credentials.revoke(operatorSecret, issued.credentialId)).toEqual({ revoked: true });
+    expect(() => authorization.authenticateReadBearer(issued.bearerToken)).toThrow();
   });
 
   it('denies foreign repo IDs, unrelated agent-task pairing and a mismatched session', async () => {

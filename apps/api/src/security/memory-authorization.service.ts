@@ -62,8 +62,8 @@ const hash = (value: string): Buffer => createHash('sha256').update(value, 'utf8
 const key = (value: string): string => hash(value).toString('hex');
 
 /**
- * Local process-only auth primitives for the future memory control plane.
- * No Nest provider, API endpoints or DB capabilities are attached by this PR.
+ * Process-local auth primitives shared by the opt-in operator credential HTTP
+ * controller. Read routes, memory DB mutations, approval HTTP and MCP remain disabled.
  * Restart/disable/operator-secret rotation invalidates all active tokens.
  */
 export class MemoryAuthorizationService {
@@ -152,6 +152,11 @@ export class MemoryAuthorizationService {
       at: new Date(this.clock()).toISOString(),
     });
     if (this.events.length > MAX_AUDIT) this.events.shift();
+  }
+
+  /** Dedicated memory control-plane authentication; no shell, Git or worktree grants. */
+  assertOperatorForCredentialRequest(secret: unknown): void {
+    this.authenticateOperator(this.config(), secret);
   }
 
   /** Exposes only non-secret, bounded metadata; does not write credentials to disk. */
