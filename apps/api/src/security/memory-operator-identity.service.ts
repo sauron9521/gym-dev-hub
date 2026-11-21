@@ -57,7 +57,7 @@ type IdentityRow = {
   expires_at: Date;
   revoked_at: Date | null;
 };
-const digest = (token: string) =>
+export const operatorTokenDigest = (token: string) =>
   createHash('sha256')
     .update('gym-dev-hub:operator-identity:v1\0', 'utf8')
     .update(token, 'utf8')
@@ -147,7 +147,7 @@ export class MemoryOperatorIdentityService {
            (repository,handle,role,token_digest,expires_at)
          VALUES ($1,$2,$3,$4,NOW() + ($5::int * interval '1 second'))
          RETURNING id,repository,handle,role,expires_at,revoked_at`,
-        [repository, handle, role, digest(bearerToken), ttlSeconds],
+        [repository, handle, role, operatorTokenDigest(bearerToken), ttlSeconds],
       );
       const identity = row.rows[0];
       if (!identity || row.rowCount !== 1) throw Error('Failed identity creation');
@@ -280,7 +280,7 @@ export class MemoryOperatorIdentityService {
          WHERE repository=$1 AND token_digest=$2
            AND revoked_at IS NULL AND expires_at > NOW()
          LIMIT 1`,
-        [repo.data, digest(token)],
+        [repo.data, operatorTokenDigest(token)],
       );
       const identity = result.rows[0];
       if (!identity || result.rows.length !== 1)
