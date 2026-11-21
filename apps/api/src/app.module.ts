@@ -22,6 +22,7 @@ import { WorktreeHydrationService } from './worktree/worktree-hydration.service.
 import { WorktreeIntegrityService } from './worktree/worktree-integrity.service.js';
 import { WorktreeMountService } from './worktree/worktree-mount.service.js';
 import { WorktreeCodeReadService } from './worktree/worktree-code-read.service.js';
+import { WorktreePatchPreflightService } from './worktree/worktree-patch-preflight.service.js';
 import { WorktreeToolService } from './worktree/worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './worktree/task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './worktree/task-execution-grant.service.js';
@@ -54,6 +55,7 @@ import { TaskTypecheckService } from './worktree/task-typecheck.service.js';
     WorktreeIntegrityService,
     WorktreeMountService,
     WorktreeCodeReadService,
+    WorktreePatchPreflightService,
     WorktreeToolService,
     TaskRunnerPolicyService,
     TaskExecutionGrantService,

@@ -160,3 +160,22 @@ export interface WorktreePlan {
   hydrationFiles?: number;
   hydrationBytes?: number;
 }
+
+/** Non-authorizing, read-only server revalidation of a proposed one-file diff. */
+export interface WorktreePatchPreflightResult {
+  sessionId: string;
+  planId: string;
+  filePath: string;
+  sourceCommit: string;
+  fingerprint: string;
+  checkedAt: string;
+  sourceSha256: string;
+  patchSha256: string;
+  proposedSha256: string;
+  added: number;
+  removed: number;
+  integrity: 'verified';
+  writeEnabled: false;
+  authorizationGranted: false;
+  readOnly: true;
+}

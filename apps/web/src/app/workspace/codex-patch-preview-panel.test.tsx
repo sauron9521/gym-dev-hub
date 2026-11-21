@@ -18,7 +18,11 @@ const source: WorktreeCodeReadResult = {
 describe('Codex patch preview UI', () => {
   it('starts empty and only offers a local review button without apply controls', () => {
     const markup = renderToStaticMarkup(
-      <CodexPatchPreviewPanel source={source} sourceCommit={'a'.repeat(40)} />,
+      <CodexPatchPreviewPanel
+        source={source}
+        sourceCommit={'a'.repeat(40)}
+        fingerprint={'sha256:' + 'b'.repeat(64)}
+      />,
     );
     expect(markup).toContain('Перевірити запропонований AI-патч');
     expect(markup).toContain('Перевірити і переглянути diff');
