@@ -267,3 +267,38 @@ sg docker -c 'cd /path/to/gym-dev-hub && pnpm --filter @gym-dev-hub/api start'
 
 This preserves existing audit and interruption semantics. No changes are
 made to tracked NestJS watch configuration, CI or regular `pnpm dev`.
+
+## Stable local operator workflow for audited Docker checks (Issue #79 mitigation)
+
+`pnpm dev` remains the full hot-reload development workflow. For long-running
+audited checks on Linux, use the stable API with Next.js Web HMR:
+
+```bash
+cd ~/Projects/gym-dev-hub
+sg docker -c 'pnpm dev:operator'
+```
+
+The trusted-host command checks Linux/Node 24, pnpm 12.18.0, the current
+process's Docker socket access, and free localhost ports **3101 (API)** and
+**3100 (Web)**. It builds the contracts and API once and starts the compiled
+API with `node apps/api/dist/main.js` **without Nest `--watch`**, while
+starting Next.js `dev` with HMR and a localhost-only API proxy. Shutdown
+signals terminate only the two spawned process groups; unexpected child exits
+terminate the whole operator session with a nonzero status. It does not mutate
+Git, `.env`, Docker images, authorizations or audit receipts. It refuses to
+start if ports are occupied; stop previous servers yourself instead of
+letting this command terminate unrelated processes.
+
+For an independent test session, alternate localhost ports are supported:
+
+```bash
+DEV_HUB_OPERATOR_API_PORT=3211 DEV_HUB_OPERATOR_WEB_PORT=3210 \
+  sg docker -c 'pnpm dev:operator'
+```
+
+This should make the API reachable at `http://127.0.0.1:3211/health/live` and
+Web at `http://127.0.0.1:3210/workspace`; the Web proxy points at 3211.
+This **prevents watch-triggered API restarts while operator checks run** by
+not enabling API watch, but does **not** identify the initial triggering file.
+Keep #79 open for root-cause investigation via the diagnostic PR #84 and
+keep the existing fail-closed `interrupted` audit semantics.
