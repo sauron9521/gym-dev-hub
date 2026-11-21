@@ -17,6 +17,7 @@ import { WorktreePatchPreflightService } from './worktree-patch-preflight.servic
 import { WorktreePatchApplyService } from './worktree-patch-apply.service.js';
 import { WorktreePatchReviewService } from './worktree-patch-review.service.js';
 import { WorktreePatchChecksService } from './worktree-patch-checks.service.js';
+import { WorktreeCommitCandidateService } from './worktree-commit-candidate.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './task-execution-grant.service.js';
@@ -40,6 +41,8 @@ import type {
   WorktreePatchCheckResult,
   WorktreePatchCheckCancel,
   WorktreePatchCheckHistory,
+  WorktreeCommitCandidatePreview,
+  WorktreeCommitCandidateAcknowledgement,
 } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
@@ -56,6 +59,7 @@ export class WorktreePlanController {
     private readonly patchApply: WorktreePatchApplyService,
     private readonly patchReview: WorktreePatchReviewService,
     private readonly patchChecks: WorktreePatchChecksService,
+    private readonly commitCandidate: WorktreeCommitCandidateService,
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
     private readonly taskGrants: TaskExecutionGrantService,
@@ -231,6 +235,26 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreePatchCheckHistory> {
     return this.patchChecks.history(sessionId, planId, body);
+  }
+
+  /** Opt-in read-only preview of an audited one-file commit candidate. */
+  @Post(':planId/commit-candidate-preview')
+  commitCandidatePreview(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeCommitCandidatePreview> {
+    return this.commitCandidate.preview(sessionId, planId, body);
+  }
+
+  /** One-time human acknowledgement, deliberately never a Git permission. */
+  @Post(':planId/commit-candidate-acknowledge')
+  commitCandidateAcknowledge(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeCommitCandidateAcknowledgement> {
+    return this.commitCandidate.acknowledge(sessionId, planId, body);
   }
 
   @Post(':planId/tool-authorize')

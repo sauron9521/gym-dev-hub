@@ -352,3 +352,10 @@ Workspace panel. The new history is a bounded projection of the existing
 private PR #65 audit: statuses, timestamps, elapsed time and byte counts
 only, with no raw logs or replay. The existing opt-in and authorization
 requirements still apply to **new** Docker runs.
+
+## Read-only Git commit candidate review (PR #67)
+
+See [commit-candidate-preview.md](./commit-candidate-preview.md) for the
+**disabled-by-default** commit message, diff hash and Docker-check
+evidence preview. It has a separate manual one-time acknowledgement,
+but no Git staging, commit, push, PR creation or merge authority.

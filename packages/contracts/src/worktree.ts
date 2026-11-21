@@ -307,3 +307,41 @@ export interface WorktreePatchCheckHistory {
   pushEnabled: false;
   mergeEnabled: false;
 }
+
+/** A descriptive, ephemeral proposal only; never an authorization to run Git. */
+export interface WorktreeCommitCandidatePreview {
+  candidateId: string;
+  candidateSha256: string;
+  sessionId: string;
+  planId: string;
+  sourceCommit: string;
+  filePath: string;
+  sourceSha256: string;
+  proposedSha256: string;
+  diffSha256: string;
+  diff: string;
+  commitSubject: string;
+  verifiedRecipes: WorktreePatchCheckRecipe[];
+  missingRecipes: WorktreePatchCheckRecipe[];
+  checkedAt: string;
+  expiresAt: string;
+  status: 'review-required';
+  readOnly: true;
+  commitCreated: false;
+  stagingEnabled: false;
+  pushEnabled: false;
+  mergeEnabled: false;
+}
+
+export interface WorktreeCommitCandidateAcknowledgement {
+  candidateId: string;
+  candidateSha256: string;
+  commitSubject: string;
+  acknowledgedAt: string;
+  status: 'operator-reviewed';
+  previewOnly: true;
+  commitCreated: false;
+  stagingEnabled: false;
+  pushEnabled: false;
+  mergeEnabled: false;
+}
