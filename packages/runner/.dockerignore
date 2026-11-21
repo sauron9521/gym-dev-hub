@@ -17,4 +17,5 @@
 !native-runtime-fixture.mjs
 !api-typecheck-ci.mjs
 !api-typecheck-local.mjs
+!patch-checks-local.mjs
 !.dockerignore
