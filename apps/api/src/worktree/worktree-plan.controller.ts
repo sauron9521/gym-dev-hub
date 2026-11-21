@@ -16,6 +16,7 @@ import { WorktreeCodeReadService } from './worktree-code-read.service.js';
 import { WorktreePatchPreflightService } from './worktree-patch-preflight.service.js';
 import { WorktreePatchApplyService } from './worktree-patch-apply.service.js';
 import { WorktreePatchReviewService } from './worktree-patch-review.service.js';
+import { WorktreePatchChecksService } from './worktree-patch-checks.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './task-execution-grant.service.js';
@@ -35,6 +36,9 @@ import type {
   WorktreePatchApplyGrant,
   WorktreePatchApplyResult,
   WorktreePostApplyReview,
+  WorktreePatchCheckGrant,
+  WorktreePatchCheckResult,
+  WorktreePatchCheckCancel,
 } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
@@ -50,6 +54,7 @@ export class WorktreePlanController {
     private readonly patchPreflight: WorktreePatchPreflightService,
     private readonly patchApply: WorktreePatchApplyService,
     private readonly patchReview: WorktreePatchReviewService,
+    private readonly patchChecks: WorktreePatchChecksService,
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
     private readonly taskGrants: TaskExecutionGrantService,
@@ -186,6 +191,35 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreePostApplyReview> {
     return this.patchReview.review(sessionId, planId, body);
+  }
+
+  /** Explicit operator-approved single fixed Docker recipe, default OFF. */
+  @Post(':planId/patch-check-authorize')
+  patchCheckAuthorize(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePatchCheckGrant> {
+    return this.patchChecks.authorize(sessionId, planId, body);
+  }
+
+  /** Consumes the grant and executes a bounded isolated Docker check only. */
+  @Post(':planId/patch-check-execute')
+  patchCheckExecute(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePatchCheckResult> {
+    return this.patchChecks.execute(sessionId, planId, body);
+  }
+
+  @Post(':planId/patch-check-cancel')
+  patchCheckCancel(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): WorktreePatchCheckCancel {
+    return this.patchChecks.cancel(sessionId, planId, body);
   }
 
   @Post(':planId/tool-authorize')

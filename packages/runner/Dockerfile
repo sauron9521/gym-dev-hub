@@ -9,7 +9,7 @@ LABEL org.gym-dev-hub.runner.protocol="1" \
 
 # Build-time network only: install a trusted runtime, NEVER project packages.
 # --ignore-scripts disables package lifecycle scripts while provisioning pnpm.
-RUN apk add --no-cache nodejs npm \
+RUN apk add --no-cache nodejs npm git \
     && test "$(node -p 'process.versions.node.split(".")[0]')" = "24" \
     && npm install --global --ignore-scripts --no-audit --no-fund pnpm@12.18.0 \
     && test "$(pnpm --version)" = "12.18.0" \
@@ -48,5 +48,7 @@ COPY --chown=65534:65534 native-runtime-fixture.mjs /opt/gym-dev-hub/native-runt
 COPY --chown=65534:65534 api-typecheck-ci.mjs /opt/gym-dev-hub/api-typecheck-ci.mjs
 # Gated local wrapper uses the same CI recipe but never receives operator credentials.
 COPY --chown=65534:65534 api-typecheck-local.mjs /opt/gym-dev-hub/api-typecheck-local.mjs
+# Opt-in fixed post-apply recipes: only host-authorized API/Web typecheck/test.
+COPY --chown=65534:65534 patch-checks-local.mjs /opt/gym-dev-hub/patch-checks-local.mjs
 USER 65534:65534
 ENTRYPOINT ["/usr/bin/node", "/opt/gym-dev-hub/runner.mjs"]

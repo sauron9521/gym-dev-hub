@@ -25,6 +25,7 @@ import { WorktreeCodeReadService } from './worktree/worktree-code-read.service.j
 import { WorktreePatchPreflightService } from './worktree/worktree-patch-preflight.service.js';
 import { WorktreePatchApplyService } from './worktree/worktree-patch-apply.service.js';
 import { WorktreePatchReviewService } from './worktree/worktree-patch-review.service.js';
+import { WorktreePatchChecksService } from './worktree/worktree-patch-checks.service.js';
 import { WorktreeToolService } from './worktree/worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './worktree/task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './worktree/task-execution-grant.service.js';
@@ -60,6 +61,7 @@ import { TaskTypecheckService } from './worktree/task-typecheck.service.js';
     WorktreePatchPreflightService,
     WorktreePatchApplyService,
     WorktreePatchReviewService,
+    WorktreePatchChecksService,
     WorktreeToolService,
     TaskRunnerPolicyService,
     TaskExecutionGrantService,
