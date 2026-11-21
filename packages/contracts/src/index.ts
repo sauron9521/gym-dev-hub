@@ -82,6 +82,8 @@ export type {
   WorktreePatchCheckHistory,
   WorktreeCommitCandidatePreview,
   WorktreeCommitCandidateAcknowledgement,
+  WorktreeCommitWriteGrant,
+  WorktreeCommitWriteResult,
   WorktreeToolCapability,
   WorktreeToolGrant,
   WorktreeToolResult,

@@ -359,3 +359,11 @@ See [commit-candidate-preview.md](./commit-candidate-preview.md) for the
 **disabled-by-default** commit message, diff hash and Docker-check
 evidence preview. It has a separate manual one-time acknowledgement,
 but no Git staging, commit, push, PR creation or merge authority.
+
+## Operator-only local one-file Git commit (PR #68)
+
+See [local-git-commit.md](./local-git-commit.md). The explicit one-use
+local commit grant is **disabled by default**, requires its own Git
+secret and configured author identity, and is separate from reviewing
+a PR #67 candidate. Only the approved task ref can advance; no push,
+GitHub PR creation or merge is provided.

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CodexCommitWritePanel } from './codex-commit-write-panel';
 import type {
   WorktreePatchApplyResult,
   WorktreePostApplyReview,
@@ -303,6 +304,7 @@ export function CodexCommitCandidatePanel({
           </p>
           <small>Підтверджено: {new Date(receipt.acknowledgedAt).toLocaleString('uk-UA')}</small>
           <p>Жодного файла не додано до Git index. Commit, push і merge не виконані.</p>
+          <CodexCommitWritePanel sessionId={sessionId} planId={planId} reviewed={receipt} />
         </div>
       )}
       {error && (

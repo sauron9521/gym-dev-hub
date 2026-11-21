@@ -60,6 +60,12 @@ const acknowledgeSchema = previewSchema.extend({
   confirmation: z.literal('I_REVIEWED_THIS_COMMIT_CANDIDATE_ONLY'),
 });
 type Request = z.infer<typeof baseSchema>;
+export type ReviewedCommitRequest = Request;
+export interface ReviewedCommitEvidence {
+  request: ReviewedCommitRequest;
+  candidateSha256: string;
+  expiresAt: number;
+}
 type Stored = {
   sessionId: string;
   planId: string;
@@ -105,6 +111,9 @@ function signature(value: {
 @Injectable()
 export class WorktreeCommitCandidateService {
   private readonly pending = new Map<string, Stored>();
+  // Human acknowledgement is not a Git grant; it is just evidence for a
+  // later separately authorized, one-time Git operation.
+  private readonly reviewed = new Map<string, Stored>();
   private lastSecret: Buffer | null = null;
 
   constructor(
@@ -116,13 +125,19 @@ export class WorktreeCommitCandidateService {
     try {
       assertFeature(secret);
     } catch (error) {
-      if (error instanceof ServiceUnavailableException) this.pending.clear();
+      if (error instanceof ServiceUnavailableException) {
+        this.pending.clear();
+        this.reviewed.clear();
+      }
       throw error;
     }
     const digest = createHash('sha256')
       .update(process.env.DEV_HUB_COMMIT_CANDIDATE_OPERATOR_SECRET!)
       .digest();
-    if (this.lastSecret && !timingSafeEqual(this.lastSecret, digest)) this.pending.clear();
+    if (this.lastSecret && !timingSafeEqual(this.lastSecret, digest)) {
+      this.pending.clear();
+      this.reviewed.clear();
+    }
     this.lastSecret = digest;
   }
 
@@ -308,6 +323,10 @@ export class WorktreeCommitCandidateService {
     if (latestSha !== candidateSha256) {
       throw new ConflictException('Git diff чи статус перевірок змінився. Створи новий preview.');
     }
+    this.reviewed.set(candidateId, {
+      ...stored,
+      expiresAt: Math.min(stored.expiresAt, Date.now() + 120_000),
+    });
     return {
       candidateId,
       candidateSha256,
@@ -320,5 +339,66 @@ export class WorktreeCommitCandidateService {
       pushEnabled: false,
       mergeEnabled: false,
     };
+  }
+
+  /** Consume one human-reviewed receipt, not a standalone Git write grant. */
+  async takeReviewedForCommit(
+    sessionId: string,
+    planId: string,
+    candidateId: string,
+    candidateSha256: string,
+    candidateOperatorSecret: string,
+    reviewOperatorSecret: string,
+  ): Promise<ReviewedCommitEvidence> {
+    const saved = this.reviewed.get(candidateId);
+    this.reviewed.delete(candidateId); // Consume before any await.
+    this.authenticate(candidateOperatorSecret);
+    if (
+      !saved ||
+      saved.sessionId !== sessionId ||
+      saved.planId !== planId ||
+      saved.candidateSha256 !== candidateSha256 ||
+      Date.now() >= saved.expiresAt
+    ) {
+      throw new ConflictException('Переглянутий кандидат відсутній, змінився або протермінований.');
+    }
+    await this.assertEvidenceCurrent(
+      sessionId,
+      planId,
+      saved.request,
+      candidateSha256,
+      candidateOperatorSecret,
+      reviewOperatorSecret,
+    );
+    return {
+      request: { ...saved.request },
+      candidateSha256,
+      expiresAt: saved.expiresAt,
+    };
+  }
+
+  /** Repeat exact Git/diff/Docker evidence validation before a privileged write. */
+  async assertEvidenceCurrent(
+    sessionId: string,
+    planId: string,
+    request: ReviewedCommitRequest,
+    candidateSha256: string,
+    candidateOperatorSecret: string,
+    reviewOperatorSecret: string,
+  ): Promise<void> {
+    this.authenticate(candidateOperatorSecret);
+    const latest = await this.revalidate(sessionId, planId, request, reviewOperatorSecret);
+    this.authenticate(candidateOperatorSecret);
+    if (
+      signature({
+        sessionId,
+        planId,
+        ...request,
+        diffSha256: latest.diffSha256,
+        verifiedRecipes: latest.recipes,
+      }) !== candidateSha256
+    ) {
+      throw new ConflictException('Git diff або Docker-докази змінилися.');
+    }
   }
 }

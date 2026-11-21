@@ -27,6 +27,7 @@ import { WorktreePatchApplyService } from './worktree/worktree-patch-apply.servi
 import { WorktreePatchReviewService } from './worktree/worktree-patch-review.service.js';
 import { WorktreePatchChecksService } from './worktree/worktree-patch-checks.service.js';
 import { WorktreeCommitCandidateService } from './worktree/worktree-commit-candidate.service.js';
+import { WorktreeCommitWriteService } from './worktree/worktree-commit-write.service.js';
 import { WorktreeToolService } from './worktree/worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './worktree/task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './worktree/task-execution-grant.service.js';
@@ -64,6 +65,7 @@ import { TaskTypecheckService } from './worktree/task-typecheck.service.js';
     WorktreePatchReviewService,
     WorktreePatchChecksService,
     WorktreeCommitCandidateService,
+    WorktreeCommitWriteService,
     WorktreeToolService,
     TaskRunnerPolicyService,
     TaskExecutionGrantService,

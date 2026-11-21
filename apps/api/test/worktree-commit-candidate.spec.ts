@@ -139,6 +139,102 @@ describe('operator-reviewed read-only Git commit candidate', () => {
     await expect(service.acknowledge(SESSION, PLAN, approval)).rejects.toThrow('вже підтверджений');
   });
 
+  it('preserves only a short-lived, one-time human review proof for a separate Git grant', async () => {
+    await recordPassed('API_TYPECHECK');
+    const candidate = await service.preview(SESSION, PLAN, request());
+    const proof = {
+      ...request(),
+      candidateId: candidate.candidateId,
+      candidateSha256: candidate.candidateSha256,
+      confirmation: 'I_REVIEWED_THIS_COMMIT_CANDIDATE_ONLY',
+    };
+    await service.acknowledge(SESSION, PLAN, proof);
+    const evidence = await service.takeReviewedForCommit(
+      SESSION,
+      PLAN,
+      candidate.candidateId,
+      candidate.candidateSha256,
+      SECRET,
+      REVIEW_SECRET,
+    );
+    expect(evidence).toMatchObject({
+      candidateSha256: candidate.candidateSha256,
+      request: {
+        sourceCommit: COMMIT,
+        proposedSha256: PROPOSED,
+        filePath: FILE,
+        commitSubject: request().commitSubject,
+      },
+    });
+    await expect(
+      service.takeReviewedForCommit(
+        SESSION,
+        PLAN,
+        candidate.candidateId,
+        candidate.candidateSha256,
+        SECRET,
+        REVIEW_SECRET,
+      ),
+    ).rejects.toThrow('відсутній');
+  });
+
+  it('rejects an unreviewed candidate, wrong SHA and changed diff at Git grant time', async () => {
+    await recordPassed('API_TYPECHECK');
+    const candidate = await service.preview(SESSION, PLAN, request());
+    await expect(
+      service.takeReviewedForCommit(
+        SESSION,
+        PLAN,
+        candidate.candidateId,
+        candidate.candidateSha256,
+        SECRET,
+        REVIEW_SECRET,
+      ),
+    ).rejects.toThrow('відсутній');
+    const reviewed = await service.preview(SESSION, PLAN, request());
+    await service.acknowledge(SESSION, PLAN, {
+      ...request(),
+      candidateId: reviewed.candidateId,
+      candidateSha256: reviewed.candidateSha256,
+      confirmation: 'I_REVIEWED_THIS_COMMIT_CANDIDATE_ONLY',
+    });
+    await expect(
+      service.takeReviewedForCommit(
+        SESSION,
+        PLAN,
+        reviewed.candidateId,
+        'f'.repeat(64),
+        SECRET,
+        REVIEW_SECRET,
+      ),
+    ).rejects.toThrow('змінився');
+    const another = await service.preview(SESSION, PLAN, request());
+    await service.acknowledge(SESSION, PLAN, {
+      ...request(),
+      candidateId: another.candidateId,
+      candidateSha256: another.candidateSha256,
+      confirmation: 'I_REVIEWED_THIS_COMMIT_CANDIDATE_ONLY',
+    });
+    review.review.mockResolvedValueOnce({
+      status: 'verified',
+      changedFiles: 1,
+      sourceCommit: COMMIT,
+      filePath: FILE,
+      proposedSha256: PROPOSED,
+      diff: DIFF + '+not-reviewed\n',
+    });
+    await expect(
+      service.takeReviewedForCommit(
+        SESSION,
+        PLAN,
+        another.candidateId,
+        another.candidateSha256,
+        SECRET,
+        REVIEW_SECRET,
+      ),
+    ).rejects.toThrow('Docker-докази змінилися');
+  });
+
   it('reports both verified checks without running tests or Git writes', async () => {
     await recordPassed('API_TYPECHECK');
     await recordPassed('API_TEST');
