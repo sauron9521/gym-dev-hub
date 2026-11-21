@@ -120,3 +120,46 @@ Each failed one-time check remains **rejected** in the audit; do not replay
 its grant. Start a fresh authorization after the code change is deployed.
 Successful source staging alone is not proof of pnpm store hydration,
 TypeScript checks, tests, or GitHub PR readiness.
+
+## Reproducible bounded pnpm store for fixed Docker checks (Issue #74)
+
+The host's shared pnpm v11 cache can be much larger than the Docker
+runner's 80,000-file / 1.6 GiB safety limit. Do not mount the global
+cache, prune it, or raise the runner limits. Run this operator-only,
+trusted-host preparation from the **updated Gym Dev Hub checkout**:
+
+```bash
+pnpm provision:patch-check-store
+pnpm provision:patch-check-store:verify
+```
+
+The command requires Linux x64, Node 24 and pnpm **12.18.0**. It creates a
+metadata-only temporary workspace with the locked API/Web package manifests
+and fetches dependencies into an **isolated ignored** pnpm store. The sole
+network-enabled operation is a host-side `pnpm fetch` against the fixed npm
+registry, with a frozen lockfile, no pnpmfile and no package scripts. A full
+`pnpm install --offline --frozen-lockfile --ignore-scripts` validates the
+closure and integrity before the store is published. The tool refuses an
+unsupported file type, symlink, incomplete index, excessive size/count or
+changed lockfile and records a deterministic digest of every accepted file.
+It neither reads the main pnpm store nor runs package lifecycle scripts.
+
+The command prints the final absolute `path`. In the **ignored**
+`apps/api/.env`, set:
+
+```dotenv
+DEV_HUB_PATCH_CHECK_PNPM_STORE=/absolute/path/printed/by/provisioner
+```
+
+Restart the local API and verify the store before executing any new
+single-use `WEB_TYPECHECK` or `WEB_TEST` grant. The runtime still mounts
+this store read-only, stages it to private Docker tmpfs, has networking
+disabled and retains the unchanged 80,000-file / 1.6 GiB bounds. The
+manifest stays outside the mounted store. If the lockfile changes,
+provision a new path. The host-side dependency fetch is **not** a task
+that agents or the API can invoke. This provisioner currently supports
+Linux x64; Windows performance/transport is tracked separately in #59.
+
+The E2E on 2026-11-21 verified `WEB_TYPECHECK` using an isolated 25,364-file
+store; `WEB_TEST` reached `FIXED_CHECK` and returned nonzero. That test
+runner failure is a separate issue, not proof of a complete workflow.
