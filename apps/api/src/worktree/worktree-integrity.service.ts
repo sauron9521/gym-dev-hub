@@ -101,6 +101,42 @@ function parseTree(buffer: Buffer): GitEntry[] {
     });
 }
 
+/** Verify the actual Git worktree HEAD independently of inspection metadata. */
+function currentWorktreeHead(worktree: string): Promise<string> {
+  return new Promise((resolveOutput, reject) => {
+    execFile(
+      'git',
+      [
+        '--no-optional-locks',
+        '-c',
+        'core.fsmonitor=false',
+        '-c',
+        'core.hooksPath=.devhub-disabled-hooks',
+        '-C',
+        worktree,
+        'rev-parse',
+        '--verify',
+        'HEAD^{commit}',
+      ],
+      {
+        shell: false,
+        windowsHide: true,
+        encoding: 'utf8',
+        maxBuffer: 1024,
+        timeout: 12_000,
+        env: gitEnv(),
+      },
+      (error, output) => {
+        if (error || typeof output !== 'string') {
+          reject(new Error('Git worktree HEAD unavailable'));
+        } else {
+          resolveOutput(output.trim());
+        }
+      },
+    );
+  });
+}
+
 /**
  * Read only the pinned Git blob of the single approved changed file. No
  * checkout, smudge filters, user-provided command or project scripts.
@@ -289,6 +325,9 @@ export class WorktreeIntegrityService {
       if (!initial.targetExists || initial.findings.some((finding) => finding !== KNOWN_NONEMPTY)) {
         failures.push('Git metadata, шляхи або вміст worktree не пройшли передперевірку.');
         return report('mismatch');
+      }
+      if ((await currentWorktreeHead(plan.targetPath)) !== plan.baseHeadSha) {
+        throw new Error('Worktree HEAD changed since the approved base commit');
       }
       const tree = parseTree(await gitTree(plan.sourcePath, plan.baseHeadSha));
       const expected = new Map(tree.map((entry) => [entry.name, entry]));
