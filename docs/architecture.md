@@ -18,6 +18,7 @@ This repository owns the orchestration tooling. Target repositories (including `
 - Moving Codex into a constrained isolated worker, full authenticated access control and safe checkout/mounts: separate permission-gated PRs
 - Persistence and worker queues: planned, separate from target repositories
 - Proposed shared multi-agent memory / coordination: [Shared Agent Memory ADR](architecture/shared-agent-memory.md) (docs-only; no runtime storage or permissions enabled)
+- Planned opt-in database storage: [PostgreSQL/Prisma memory foundation](database.md), still disabled by default with no authenticated memory API
 
 ## Invariants
 

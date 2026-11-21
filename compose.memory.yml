@@ -1,0 +1,27 @@
+name: gym-dev-hub-memory
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: 'no'
+    environment:
+      POSTGRES_USER: gym_dev_hub
+      POSTGRES_DB: gym_dev_hub_memory
+      POSTGRES_PASSWORD: ${DEV_HUB_MEMORY_DB_PASSWORD:?Set a generated local password in the ignored apps/api/.env}
+    ports:
+      - '127.0.0.1:${DEV_HUB_MEMORY_DB_PORT:-55441}:5432'
+    volumes:
+      - hub_memory_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gym_dev_hub -d gym_dev_hub_memory']
+      interval: 3s
+      timeout: 3s
+      retries: 15
+      start_period: 3s
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    mem_limit: 768m
+
+volumes:
+  hub_memory_pgdata:

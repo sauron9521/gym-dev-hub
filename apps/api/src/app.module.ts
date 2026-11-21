@@ -35,6 +35,7 @@ import { WorktreeToolService } from './worktree/worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './worktree/task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './worktree/task-execution-grant.service.js';
 import { TaskTypecheckService } from './worktree/task-typecheck.service.js';
+import { MemoryStatusController } from './database/memory-status.controller.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -46,6 +47,7 @@ import { TaskTypecheckService } from './worktree/task-typecheck.service.js';
     BoundaryController,
     WorkerController,
     WorktreePlanController,
+    MemoryStatusController,
   ],
   providers: [
     GitHubService,

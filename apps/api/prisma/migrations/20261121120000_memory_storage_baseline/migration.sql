@@ -1,0 +1,2 @@
+-- Empty initial migration. Memory tables are introduced only in Issue #37.
+-- The migration ledger is independent from gym-platform's database and migrations.
