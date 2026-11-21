@@ -4,9 +4,10 @@
  * No caller-supplied command, image, flags, env or volumes are supported.
  */
 import { randomUUID, createHash } from 'node:crypto';
+import { constants } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { dirname, isAbsolute, resolve } from 'node:path';
-import { lstat, realpath } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { lstat, open, realpath } from 'node:fs/promises';
 import { callDocker, dockerEnvironment } from '../boundary/boundary.service.js';
 import { validateRunnerIsolation, validateRunnerMounts } from './task-typecheck-docker.js';
 
@@ -23,6 +24,25 @@ const RECIPES = new Set([
 ]);
 const SHA = /^[a-f0-9]{64}$/;
 const RUN_TIMEOUT = 570_000;
+const STORE_KEY_PREFIX = Buffer.from(
+  'gym-dev-hub:patch-check:pnpm12.18.0:linux-x64+linux-x64-musl:v2\0',
+);
+const RUNNER_PHASES = new Set([
+  'ARGUMENTS',
+  'STAGING',
+  'STORE_STAGE',
+  'OFFLINE_INSTALL',
+  'FIXED_FORMAT',
+  'CONTRACTS_BUILD',
+  'FIXED_CHECK',
+  'RECEIPT',
+]);
+
+/** Only the runner-owned fixed terminal phase marker may cross the log boundary. */
+export function extractFixedCheckFailureStage(tail: string): string | null {
+  const marker = /(?:^|\n)Fixed patch check rejected at stage: ([A-Z_]+)\.\r?\n?$/.exec(tail);
+  return marker && RUNNER_PHASES.has(marker[1]!) ? marker[1]! : null;
+}
 
 export type FixedPatchRecipe =
   'API_FORMAT' | 'API_TYPECHECK' | 'API_TEST' | 'WEB_FORMAT' | 'WEB_TYPECHECK' | 'WEB_TEST';
@@ -106,6 +126,78 @@ export function validatePatchCheckSecurity(raw: string): void {
   }
 }
 
+/** Fail before Docker when operator's pinned offline store belongs to another lockfile. */
+export function validatePinnedStoreManifest(
+  raw: string,
+  lockBytes: Buffer,
+  storeName: string,
+): void {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error('Malformed pinned pnpm store manifest');
+  }
+  const m = value as Record<string, unknown> | null;
+  const expectedLock = createHash('sha256').update(lockBytes).digest('hex');
+  const expectedKey = createHash('sha256')
+    .update(Buffer.concat([STORE_KEY_PREFIX, lockBytes]))
+    .digest('hex');
+  if (
+    !m ||
+    typeof m !== 'object' ||
+    Array.isArray(m) ||
+    m.protocol !== 2 ||
+    m.pnpmVersion !== '12.18.0' ||
+    m.lockSha256 !== expectedLock ||
+    m.storeKey !== expectedKey ||
+    storeName !== expectedKey ||
+    JSON.stringify(m.targetPlatforms) !== JSON.stringify(['linux-x64', 'linux-x64-musl']) ||
+    typeof m.storeDigest !== 'string' ||
+    !SHA.test(m.storeDigest) ||
+    !Number.isSafeInteger(m.files) ||
+    (m.files as number) < 1 ||
+    (m.files as number) > 80_000 ||
+    !Number.isSafeInteger(m.bytes) ||
+    (m.bytes as number) < 1 ||
+    (m.bytes as number) > 1_600 * 1024 * 1024
+  )
+    throw new Error(
+      'Pinned pnpm store does not match this source lockfile; re-provision on trusted host',
+    );
+}
+
+async function smallRegularFile(path: string, max: number, privateOnly = false): Promise<Buffer> {
+  const before = await lstat(path);
+  if (
+    !before.isFile() ||
+    before.isSymbolicLink() ||
+    before.nlink !== 1 ||
+    before.size > max ||
+    (privateOnly && process.platform !== 'win32' && (before.mode & 0o077) !== 0)
+  ) {
+    throw new Error('Unsafe pinned store metadata or source lockfile');
+  }
+  const fd = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const info = await fd.stat();
+    if (info.dev !== before.dev || info.ino !== before.ino || info.size !== before.size)
+      throw new Error('Pinned store metadata changed during inspection');
+    const bytes = await fd.readFile();
+    const after = await fd.stat();
+    if (
+      bytes.length !== before.size ||
+      after.size !== before.size ||
+      after.mtimeMs !== before.mtimeMs ||
+      after.ctimeMs !== before.ctimeMs
+    )
+      throw new Error('Pinned store metadata changed during inspection');
+    return bytes;
+  } finally {
+    await fd.close();
+  }
+}
+
 export async function preparePatchCheckRunner(worktree: string): Promise<PreparedPatchChecks> {
   const imageId = process.env.DEV_HUB_PATCH_CHECK_IMAGE_ID;
   const store = process.env.DEV_HUB_PATCH_CHECK_PNPM_STORE;
@@ -123,6 +215,9 @@ export async function preparePatchCheckRunner(worktree: string): Promise<Prepare
   ) {
     throw new Error('Unsafe overlapping patch checks mounts');
   }
+  const lock = await smallRegularFile(join(mounts[0]!.source, 'pnpm-lock.yaml'), 5 * 1024 * 1024);
+  const manifest = await smallRegularFile(mounts[1]!.source + '.json', 4096, true);
+  validatePinnedStoreManifest(manifest.toString('utf8'), lock, basename(mounts[1]!.source));
   const endpoint = await callDocker(
     ['context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'],
     8000,
@@ -225,6 +320,7 @@ function attached(name: string, signal: AbortSignal): Promise<string> {
     });
     let stdout = '';
     let stderrBytes = 0;
+    let stderrTail = '';
     let stopped = false;
     let done = false;
     const fail = () => {
@@ -240,6 +336,9 @@ function attached(name: string, signal: AbortSignal): Promise<string> {
     });
     child.stderr.on('data', (chunk: Buffer) => {
       stderrBytes += chunk.length;
+      // Keep only a bounded tail to recognize the runner's static phase.
+      // Never expose untrusted process stderr or source/test output.
+      stderrTail = (stderrTail + chunk.toString('utf8')).slice(-256);
       if (stderrBytes > MAX_OUTPUT) fail();
     });
     const finish = (error?: Error) => {
@@ -251,13 +350,17 @@ function attached(name: string, signal: AbortSignal): Promise<string> {
       else resolveResult(stdout.trim());
     };
     child.on('error', () => finish(new Error('Docker check transport failed')));
-    child.on('close', (code) =>
+    child.on('close', (code) => {
+      const stage =
+        stopped || signal.aborted
+          ? 'INTERRUPTED_OR_LIMIT'
+          : (extractFixedCheckFailureStage(stderrTail) ?? 'UNKNOWN');
       finish(
         stopped || signal.aborted || code !== 0
-          ? new Error('Fixed Docker check rejected, failed or exceeded limits')
+          ? new Error('Fixed Docker check rejected at stage: ' + stage)
           : undefined,
-      ),
-    );
+      );
+    });
   });
 }
 

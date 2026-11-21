@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 import {
   validatePatchCheckReceipt,
   validatePatchCheckSecurity,
+  extractFixedCheckFailureStage,
+  validatePinnedStoreManifest,
   runPatchChecksDocker,
 } from '../src/worktree/worktree-patch-checks-docker.js';
 
@@ -28,6 +30,65 @@ const basic = {
 };
 
 describe('pinned Docker one-file check receipt/security policy', () => {
+  it('rejects stale pinned store manifest before Docker execution', () => {
+    const lock = Buffer.from('verified test pnpm-lock fixture');
+    const key = createHash('sha256')
+      .update(
+        Buffer.concat([
+          Buffer.from('gym-dev-hub:patch-check:pnpm12.18.0:linux-x64+linux-x64-musl:v2\0'),
+          lock,
+        ]),
+      )
+      .digest('hex');
+    const manifest = {
+      protocol: 2,
+      pnpmVersion: '12.18.0',
+      lockSha256: createHash('sha256').update(lock).digest('hex'),
+      storeKey: key,
+      targetPlatforms: ['linux-x64', 'linux-x64-musl'],
+      storeDigest: 'a'.repeat(64),
+      files: 10,
+      bytes: 1200,
+    };
+    expect(() => validatePinnedStoreManifest(JSON.stringify(manifest), lock, key)).not.toThrow();
+    for (const bad of [
+      { lockSha256: 'b'.repeat(64) },
+      { storeKey: 'b'.repeat(64) },
+      { targetPlatforms: ['linux-x64'] },
+      { pnpmVersion: '99' },
+      { storeDigest: 'bad' },
+      { files: 90_000 },
+    ])
+      expect(() =>
+        validatePinnedStoreManifest(JSON.stringify({ ...manifest, ...bad }), lock, key),
+      ).toThrow();
+    expect(() =>
+      validatePinnedStoreManifest(JSON.stringify(manifest), Buffer.from('new lock'), key),
+    ).toThrow();
+    expect(() =>
+      validatePinnedStoreManifest(JSON.stringify(manifest), lock, 'other-key'),
+    ).toThrow();
+    expect(() => validatePinnedStoreManifest('{', lock, key)).toThrow();
+  });
+
+  it('reports only allowlisted runner failure stages, never untrusted stderr', () => {
+    expect(
+      extractFixedCheckFailureStage('Fixed patch check rejected at stage: OFFLINE_INSTALL.\n'),
+    ).toBe('OFFLINE_INSTALL');
+    expect(
+      extractFixedCheckFailureStage(
+        'untrusted stderr\nFixed patch check rejected at stage: FIXED_CHECK.\n',
+      ),
+    ).toBe('FIXED_CHECK');
+    for (const raw of [
+      'oops token=very-private',
+      'Fixed patch check rejected at stage: SECRET_DUMP.\n',
+      'Fixed patch check rejected at stage: FIXED_CHECK.\nuser-controlled suffix',
+      'Fixed patch check rejected at stage: FIXED_CHECK; unexpected.\n',
+    ])
+      expect(extractFixedCheckFailureStage(raw)).toBeNull();
+  });
+
   it('accepts only matching bounded immutable check receipt', () => {
     expect(
       validatePatchCheckReceipt(JSON.stringify(basic), 'API_TYPECHECK', path, sha),
