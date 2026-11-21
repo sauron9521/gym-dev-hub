@@ -36,9 +36,10 @@ import { TaskRunnerPolicyService } from './worktree/task-runner-policy.service.j
 import { TaskExecutionGrantService } from './worktree/task-execution-grant.service.js';
 import { TaskTypecheckService } from './worktree/task-typecheck.service.js';
 import { MemoryStatusController } from './database/memory-status.controller.js';
+import { MemoryModule } from './memory/memory.module.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true })],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), MemoryModule],
   controllers: [
     AppController,
     GitHubController,
