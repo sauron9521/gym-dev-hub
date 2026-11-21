@@ -517,3 +517,62 @@ real Docker interruption → cold HTTP restart → durable
 `interrupted`**. It is **not** a live owner-approved production
 plan, production grant or production audit acceptance. Keep #107
 open until these separate operational prerequisites are verified.
+
+## Launch #107 — read-only live operator readiness gate
+
+Before issuing **any real production** patch/check grant, run
+`scripts/launch-live-operator-readiness.mjs` in an isolated clean checkout
+of the **exact reviewed and owner-merged main commit**. It performs
+**read-only** checks, without starting/stopping Hub, inspecting raw
+audit records, writing state, creating an auth grant or running Docker
+recipes. It only reads local repository, image, manifest, socket and
+filesystem **metadata**, and verifies the full content-addressed
+**public package store** against its existing SHA-256 manifest.
+
+With a trusted owner-managed private env file (never `source` it as
+shell commands), use the pinned full main SHA and the actual operator's
+checkout directory:
+
+```sh
+sg docker -c 'cd /path/to/clean/latest/gym-dev-hub && node --env-file=/path/to/owner/apps/api/.env scripts/launch-live-operator-readiness.mjs --expected-main=REPLACE_WITH_40_CHAR_MAIN_SHA --operator-checkout=/path/to/actual/live/gym-dev-hub'
+```
+
+Replace the SHA with the **verified, actual owner-merged main HEAD**;
+it is an external pin, not fetched or assumed by this command. Use the
+original main checkout, **not** the temporary PR worktree, for
+`--operator-checkout`. This does not attempt a Git fast-forward, reset,
+restart or dirty-file cleanup.
+
+Checks include:
+
+- Non-root Linux Node 24+, opt-in gates and independent strong
+  operator secrets (only their **validity**, never their contents).
+- The examined source and **actual operator checkout** both at the
+  externally pinned main SHA, with trusted Git origin.
+- **Explicit**, already existing, canonical, owner-private audit
+  directories for patch apply and Docker checks. Default cwd-derived
+  audit folders do not count as production readiness.
+- Configured offline store key tied to the exact committed
+  `pnpm-lock.yaml`, a private owner-owned manifest and full store digest,
+  with strict bounded file inventory. Never chmod the original store.
+- A genuinely accessible local private Docker Unix socket and the
+  exact pinned, non-root, Linux network-disabled recipe runner image
+  metadata. No Docker container is started.
+
+Returns only fixed-code JSON reasons/checks; exits **2** when blocked,
+**0** only for `prerequisites-checked-only`. Do **not** interpret
+exit 0 as an owner authorization, a verified running API image, a
+reviewed business patch, or proof of production audit receipts. In
+particular, **a currently running API can still use an earlier compiled
+build even if its checkout HEAD was updated**. Real runtime provenance,
+explicit owner review of the selected worktree, grants, actual Docker
+FORMAT/TEST/TYPECHECK, audited results, and controlled production
+restart need separate acceptance. Never merge, restart, edit
+`.env`, or mutate the primary dirty checkout based on this report.
+
+For the current Linux Mint installation, the previously observed
+runtime checkout was behind `main`, the configured private store had
+an outdated lockfile key, and audit directories were not explicitly
+configured. The gate reports those discrepancies rather than silently
+correcting them. After the owner separately reconciles source and
+private configuration, rerun preflight before planning a live grant.
