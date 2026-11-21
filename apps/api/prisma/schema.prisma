@@ -211,6 +211,8 @@ model MemoryMutationAudit {
   action          String              @db.VarChar(40)
   previousDigest  String?             @map("previous_digest") @db.Char(64)
   resultingDigest String              @map("resulting_digest") @db.Char(64)
+  operatorActorId String?             @map("operator_actor_id") @db.VarChar(80)
+  grantId         String?             @map("grant_id") @db.Uuid
   createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   project         MemoryRepository    @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
   agent           MemoryAgentIdentity @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)

@@ -158,11 +158,11 @@ describe.skipIf(!enabled)(
     it('ensures only one of two concurrent CAS writes advances the revision', async () => {
       const [a, b] = await Promise.all([
         pool.query(
-          "UPDATE memory_records SET revision=revision+1,text='approved-A',status='VERIFIED',verified_by='operator',verified_at=NOW(),updated_at=NOW() WHERE repository=$1 AND id=$2 AND revision=1 RETURNING revision",
+          "UPDATE memory_records SET revision=revision+1,status='VERIFIED',verified_by='operator',verified_at=NOW(),updated_at=NOW() WHERE repository=$1 AND id=$2 AND revision=1 RETURNING revision",
           [REPO_A, recordA],
         ),
         pool.query(
-          "UPDATE memory_records SET revision=revision+1,text='approved-B',status='VERIFIED',verified_by='operator',verified_at=NOW(),updated_at=NOW() WHERE repository=$1 AND id=$2 AND revision=1 RETURNING revision",
+          "UPDATE memory_records SET revision=revision+1,status='VERIFIED',verified_by='operator',verified_at=NOW(),updated_at=NOW() WHERE repository=$1 AND id=$2 AND revision=1 RETURNING revision",
           [REPO_A, recordA],
         ),
       ]);
@@ -175,6 +175,7 @@ describe.skipIf(!enabled)(
       expect(r.rows[0]).toEqual({ revision: 1, status: 'PROPOSED', text: 'Initial proposed note' });
       expect(r.rows[1].revision).toBe(2);
       expect(r.rows[1].status).toBe('VERIFIED');
+      expect(r.rows[1].text).toBe('Initial proposed note');
     });
     it('rejects revision skip, historical UPDATE/DELETE and preserves approval on supersede', async () => {
       await expect(

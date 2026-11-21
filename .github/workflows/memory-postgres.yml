@@ -18,6 +18,8 @@ on:
       - 'apps/api/test/memory-controller.spec.ts'
       - 'apps/api/test/memory-authenticated-read-http.e2e.spec.ts'
       - 'apps/api/test/memory-proposal.integration.spec.ts'
+      - 'apps/api/test/memory-approval.integration.spec.ts'
+      - 'apps/api/test/memory-approval-http.e2e.spec.ts'
       - 'apps/api/test/memory-proposal-http.e2e.spec.ts'
       - 'apps/api/test/memory-proposal-authorization.spec.ts'
       - 'packages/contracts/src/memory-read*'
@@ -47,6 +49,8 @@ on:
       - 'apps/api/test/memory-controller.spec.ts'
       - 'apps/api/test/memory-authenticated-read-http.e2e.spec.ts'
       - 'apps/api/test/memory-proposal.integration.spec.ts'
+      - 'apps/api/test/memory-approval.integration.spec.ts'
+      - 'apps/api/test/memory-approval-http.e2e.spec.ts'
       - 'apps/api/test/memory-proposal-http.e2e.spec.ts'
       - 'apps/api/test/memory-proposal-authorization.spec.ts'
       - 'packages/contracts/src/memory-read*'
@@ -106,6 +110,6 @@ jobs:
       - name: Build shared contracts for standalone integration tests
         run: pnpm --filter @gym-dev-hub/contracts build
       - name: Run actual PostgreSQL integration and negative tests
-        run: pnpm --filter @gym-dev-hub/api exec vitest run test/memory-database-policy.spec.ts test/memory-database-integration.spec.ts test/memory-records.integration.spec.ts test/memory-read.integration.spec.ts test/memory-principal-binding.integration.spec.ts test/memory-proposal.integration.spec.ts test/memory-controller.spec.ts test/memory-status.controller.spec.ts
+        run: pnpm --filter @gym-dev-hub/api exec vitest run test/memory-database-policy.spec.ts test/memory-database-integration.spec.ts test/memory-records.integration.spec.ts test/memory-read.integration.spec.ts test/memory-principal-binding.integration.spec.ts test/memory-proposal.integration.spec.ts test/memory-approval.integration.spec.ts test/memory-controller.spec.ts test/memory-status.controller.spec.ts
       - name: Complete frozen repository checks
         run: pnpm check

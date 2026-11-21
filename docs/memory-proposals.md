@@ -1,6 +1,6 @@
 # Shared Agent Memory — proposal-only intake (Issue #40, first slice)
 
-**Default off.** This adds only a _proposed/untrusted_ memory record intake, not operator approval, verification, modification, context injection or MCP access. Existing read endpoints keep their independent `DEV_HUB_MEMORY_READ_HTTP_ENABLE` flag and only expose **VERIFIED** records. Gym Platform is not involved.
+**Default off.** This page describes only the agent's _proposed/untrusted_ memory intake. A separate operator-only CAS approval workflow can now be opted in independently; see [operator-reviewed approval](memory-approval.md). It adds no automatic approval, context injection or MCP access. Existing read endpoints keep their independent `DEV_HUB_MEMORY_READ_HTTP_ENABLE` flag and only expose **VERIFIED** records. Gym Platform is not involved.
 
 ## Separate opt-in and authorization
 
@@ -36,7 +36,7 @@ Successful HTTP **201** replies contain only `{ "recordId": "UUID", "status": "P
 
 A single local PostgreSQL transaction validates the scoped principal again, serializes the idempotency key with a transaction advisory lock, writes `memory_records` as `SESSION/PROPOSED`, links an immutable `AGENT` source, creates the first source-linked immutable revision via the database trigger, inserts the unique idempotency key and writes metadata-only `memory_mutation_audit` (agent/task/session, before/after SHA-256 digest, fixed operation, time). The initial revision source foreign key is deferred **only to the end of the transaction**, not omitted. Any failed step rolls back every mutation, including the revision. Concurrent identical retries have exactly one creator; changed-content collisions fail 409. Historical rows and audit cannot be updated or deleted.
 
-**No** approve/reject/supersede HTTP endpoint, record `VERIFIED` transition, external MCP writer, AI-instruction injection, durable per-human operator approval audit or record ownership modification is introduced. Future Issue #40 slices require separate operator-only grant consumption, CAS `expectedRevision`, real-source verification, permanent operator identity and audit, transition invariants, parallel approval tests and negative review before activation. Keep Issues #40 and #39 open until their actual criteria are fulfilled.
+This proposal intake **never** approves, rejects, supersedes or modifies records. A separate operator-only [approval slice](memory-approval.md) now implements explicit grant consumption and CAS `expectedRevision=1` to `VERIFIED` with durable approval metadata and immutable ownership. Per-human operator identity, independently verified source trust and reject/revoke/supersede transition rules remain outstanding in #40. Keep Issues #40 and #39 open until their actual criteria are fulfilled. Keep Issues #40 and #39 open until their actual criteria are fulfilled.
 
 ## Validation
 
