@@ -13,6 +13,7 @@ import type {
 } from '@gym-dev-hub/contracts';
 import { WorktreeMountService } from './worktree-mount.service.js';
 import { WorktreeCodeReadService } from './worktree-code-read.service.js';
+import { WorktreePatchPreflightService } from './worktree-patch-preflight.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './task-execution-grant.service.js';
@@ -25,7 +26,11 @@ import type {
   TaskTypecheckCancelResult,
 } from '@gym-dev-hub/contracts';
 import type { WorktreeToolGrant, WorktreeToolResult } from '@gym-dev-hub/contracts';
-import type { WorktreeCodeReadGrant, WorktreeCodeReadResult } from '@gym-dev-hub/contracts';
+import type {
+  WorktreeCodeReadGrant,
+  WorktreeCodeReadResult,
+  WorktreePatchPreflightResult,
+} from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
 export class WorktreePlanController {
@@ -37,6 +42,7 @@ export class WorktreePlanController {
     private readonly integrity: WorktreeIntegrityService,
     private readonly mount: WorktreeMountService,
     private readonly codeRead: WorktreeCodeReadService,
+    private readonly patchPreflight: WorktreePatchPreflightService,
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
     private readonly taskGrants: TaskExecutionGrantService,
@@ -133,6 +139,16 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreeCodeReadResult> {
     return this.codeRead.read(sessionId, planId, body);
+  }
+
+  /** Rechecks Git and diff only. No write capability or grants issued. */
+  @Post(':planId/patch-preflight')
+  patchPreflightCheck(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePatchPreflightResult> {
+    return this.patchPreflight.preview(sessionId, planId, body);
   }
 
   @Post(':planId/tool-authorize')

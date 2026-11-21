@@ -172,6 +172,7 @@ export function WorktreeCodeReadPanel({
               key={readCommit + ':' + result.checkedAt + ':' + result.filePath}
               source={result}
               sourceCommit={readCommit}
+              fingerprint={fingerprint}
             />
           )}
           {onPrepareCodexDraft &&

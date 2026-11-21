@@ -91,3 +91,41 @@ patch-application PR must re-check worktree provenance and the exact current
 Git/source revision, prevent races, and provide its own authenticated,
 single-use write capability. No applied code, tests, branches, pushes,
 or pull requests are produced by this preview.
+
+## Operator patch preflight — PR #62
+
+After a successful local browser diff preview, the operator can explicitly ask
+NestJS to re-check the source and diff **without any write grant**. This is a
+separate opt-in. In local ignored `apps/api/.env` enable
+`DEV_HUB_ENABLE_PATCH_PREFLIGHT=true` **only after** configuring the existing
+`DEV_HUB_ENABLE_SCOPED_CODE_READ=true`,
+`DEV_HUB_ENABLE_WORKTREE_MOUNT=true` and strong
+`DEV_HUB_WORKTREE_OPERATOR_SECRET`. The feature is off by default, and
+the existing one-file read still requires its own separate approval, Docker
+preflight and pinned worker as documented above.
+
+`POST /workspace/sessions/:sessionId/worktree-plans/:planId/patch-preflight`
+takes a strict bounded body containing `fingerprint`, `sourceCommit`,
+`filePath`, `expectedSourceSha256`, `patch`, and `operatorSecret`.
+The Next same-origin proxy has an explicit allowlist and a 30k character cap
+only for this route (10k for other routes). No browser persistence of the
+secret or patch is added. The API checks the operator secret, allowed session
+and hydrated plan, pinned Git commit and fingerprint; performs **full worktree
+Git integrity checks before and after** a bounded no-follow file read;
+verifies the exact source SHA-256; and validates the diff using the _same pure
+unified-diff parser_ used by the browser (shared `@gym-dev-hub/contracts`).
+
+The result includes commit, fingerprint, path, timestamp, SHA-256 hashes of
+source/patch/proposed content, +/- counts, and the literal fields
+`writeEnabled: false`, `authorizationGranted: false`,
+`readOnly: true`. It deliberately does **not** return file content,
+create an operator token, change the worktree, stage a patch, run a script,
+start a worker, or submit a PR. The endpoint itself is only safe for the
+local-only Hub; there is no general account authentication.
+
+**Critical:** even a successful second integrity check is a _point-in-time_
+diagnostic and cannot prevent a subsequent local process from modifying files.
+A later patch-write implementation must revalidate its own state atomically,
+with an independently issued, single-use operator grant, bounded write target,
+race-safe file operations, audit and cleanup. Never convert this response into
+permission to modify files.

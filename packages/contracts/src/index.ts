@@ -69,7 +69,11 @@ export type {
   WorktreeMountProbeResult,
   WorktreeCodeReadGrant,
   WorktreeCodeReadResult,
+  WorktreePatchPreflightResult,
   WorktreeToolCapability,
   WorktreeToolGrant,
   WorktreeToolResult,
 } from './worktree.js';
+
+export { MAX_PATCH_CHARS, reviewCodexPatch } from './codex-patch-review.js';
+export type { PatchReviewLine, PatchReview, PatchReviewResult } from './codex-patch-review.js';
