@@ -65,8 +65,8 @@ const key = (value: string): string => hash(value).toString('hex');
 
 /**
  * Process-local auth primitives shared by the opt-in operator credential HTTP
- * controller. Proposal capability is separate from read; approvals and MCP
- * transport remain disabled and all write routes require independent opt-in.
+ * controller. Proposal and operator-approved CAS have distinct explicit opt-ins;
+ * MCP transport and non-operator approval remain disabled.
  * Restart/disable/operator-secret rotation invalidates all active tokens.
  */
 export class MemoryAuthorizationService {
@@ -103,6 +103,7 @@ export class MemoryAuthorizationService {
         config.trustedOrigin,
         config.externalReadEnabled,
         config.proposalWriteEnabled,
+        config.approvalWriteEnabled,
       ]),
     );
     if (this.previousConfigDigest !== null && this.previousConfigDigest !== fingerprint) {
@@ -324,12 +325,26 @@ export class MemoryAuthorizationService {
     };
   }
 
-  /** Synchronous, one-use CAS for future #40 guarded DB mutation. No DB write here. */
+  /** Keep existing boolean API for earlier security tests and future callers. */
   consumeOperatorApprovalGrant(
     operatorSecret: string,
     token: unknown,
     rawIntent: unknown,
   ): boolean {
+    this.consumeOperatorApprovalGrantWithId(operatorSecret, token, rawIntent);
+    return true;
+  }
+
+  /**
+   * One-use, short-lived grant with a durable opaque grant ID for DB audit.
+   * Consumption is synchronous and happens before any asynchronous database
+   * operation. A failed/colliding approval cannot reuse this capability.
+   */
+  consumeOperatorApprovalGrantWithId(
+    operatorSecret: string,
+    token: unknown,
+    rawIntent: unknown,
+  ): string {
     const config = this.config();
     this.authenticateOperator(config, operatorSecret);
     if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
@@ -353,7 +368,7 @@ export class MemoryAuthorizationService {
       throw new MemorySecurityError('forbidden');
     }
     this.audit('grant-consumed', grant.repository, grant.id);
-    return true;
+    return grant.id;
   }
 
   revokeOperatorGrant(operatorSecret: string, grantId: string): boolean {
