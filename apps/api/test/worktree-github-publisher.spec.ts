@@ -19,6 +19,23 @@ const FILE = 'apps/api/src/main.ts';
 const BRANCH = 'devhub/task-' + 'f'.repeat(32);
 const identity = { name: 'Fixture Author', email: 'fixture@example.invalid' };
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
+/** Emulate GitHub's raw Git commit object for a fixed Git Data API payload. */
+function gitHubCommitHash(input: Record<string, unknown>): string {
+  const person = (value: unknown) => {
+    const person = value as { name: string; email: string; date: string };
+    const match = /([+-]\d\d):(\d\d)$/.exec(person.date);
+    if (!match) throw new Error('Expected explicit ISO-8601 Git timezone');
+    return `${person.name} <${person.email}> ${Math.floor(Date.parse(person.date) / 1000)} ${match[1]}${match[2]}`;
+  };
+  const body = Buffer.from(
+    `tree ${input.tree}\nparent ${(input.parents as string[])[0]}\nauthor ${person(input.author)}\ncommitter ${person(input.committer)}\n\n${input.message}`,
+  );
+  return createHash('sha1')
+    .update(Buffer.from(`commit ${body.length}\0`))
+    .update(body)
+    .digest('hex');
+}
+
 function git(cwd: string, ...args: string[]): string {
   const p = spawnSync('git', ['-C', cwd, ...args], {
     encoding: 'utf8',
@@ -143,7 +160,9 @@ describe('GitHub publish exact local Git commit via create-ref-only API', () => 
       if (pathname.endsWith('/git/trees') && method === 'POST')
         return result(201, { sha: options.wrongTree ? '0'.repeat(40) : evidence.treeSha });
       if (pathname.endsWith('/git/commits') && method === 'POST')
-        return result(201, { sha: options.wrongCommit ? '0'.repeat(40) : evidence.commitSha });
+        return result(201, {
+          sha: options.wrongCommit ? '0'.repeat(40) : gitHubCommitHash(payload!),
+        });
       if (pathname.endsWith('/git/refs') && method === 'POST') {
         if (options.failRefCreation) return result(422, {});
         created = true;
@@ -217,9 +236,15 @@ describe('GitHub publish exact local Git commit via create-ref-only API', () => 
     )!;
     expect(commit.payload).toMatchObject({
       tree: evidence.treeSha,
-      message: evidence.subject,
+      message: evidence.subject + '\n',
       parents: [evidence.parentSha],
     });
+    expect(gitHubCommitHash(commit.payload!)).toBe(evidence.commitSha);
+    // GitHub without the trailing LF creates an unreferenced, mismatching
+    // object. The real localhost E2E caught precisely this old behavior.
+    expect(gitHubCommitHash({ ...commit.payload, message: evidence.subject })).not.toBe(
+      evidence.commitSha,
+    );
     expect(git(source, 'rev-parse', 'HEAD')).toBe(evidence.parentSha);
     expect(git(task, 'rev-parse', 'HEAD')).toBe(evidence.commitSha);
   });
