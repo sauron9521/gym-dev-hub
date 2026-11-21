@@ -56,6 +56,8 @@ type ProposalRow = {
   source_ref: string;
   verified_by?: string | null;
   verified_at?: Date | null;
+  superseded_by_id?: string | null;
+  expires_at?: Date | null;
 };
 type DecisionRow = { revision: number; verified_at: Date };
 type Decision = 'approve' | 'reject' | 'revoke';
@@ -67,7 +69,7 @@ const decisionAction = (decision: Decision) =>
       : 'REVOKE_MEMORY_RECORD';
 const decisionStatus = (decision: Decision) => (decision === 'approve' ? 'VERIFIED' : 'REVOKED');
 const sha = (input: string) => createHash('sha256').update(input).digest('hex');
-const fingerprint = (row: ProposalRow) =>
+export const fingerprint = (row: ProposalRow) =>
   'sha256:' +
   sha(
     JSON.stringify([
@@ -117,10 +119,11 @@ const PROPOSAL_QUERY = `
 /** Independently re-validate full history before revoking a VERIFIED revision 2.
  * The verified record must originate from this exact audited agent proposal.
  */
-const VERIFIED_QUERY = `
+export const VERIFIED_QUERY = `
   SELECT r.id,r.repository,r.kind::text,r.scope::text,r.status::text,
     r.revision,r.text,r.session_id,r.agent_id,ms.task_id,
-    s.id AS source_id,s.source_ref,r.verified_by,r.verified_at
+    s.id AS source_id,s.source_ref,r.verified_by,r.verified_at,
+    r.superseded_by_id,r.expires_at
   FROM memory_records r
   JOIN memory_sessions ms ON ms.repository=r.repository
     AND ms.id=r.session_id AND ms.agent_id=r.agent_id AND ms.task_id IS NOT NULL

@@ -52,9 +52,13 @@ describe.skipIf(!eligible)('opt-in Hub memory PostgreSQL integration (test DB on
             migration_name: '20261121202000_memory_operator_verified_revocation',
             finished_at: expect.any(Date),
           }),
+          expect.objectContaining({
+            migration_name: '20261121214500_memory_operator_supersede',
+            finished_at: expect.any(Date),
+          }),
         ]),
       );
-      expect(migrations.rowCount).toBe(6);
+      expect(migrations.rowCount).toBe(7);
     } finally {
       await client.end();
     }

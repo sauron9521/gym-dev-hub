@@ -8,7 +8,7 @@ type LocalRequest = IncomingMessage & { originalUrl?: string };
 const onlyString = (value: string | string[] | undefined): string | undefined =>
   typeof value === 'string' ? value : undefined;
 
-function requireOperatorRequest(request: LocalRequest, approvals: MemoryApprovalService) {
+export function requireOperatorRequest(request: LocalRequest, approvals: MemoryApprovalService) {
   try {
     approvals.assertLocalOperatorHttp({
       method: request.method ?? '',
