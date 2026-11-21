@@ -43,6 +43,32 @@ describe('pinned Docker one-file check receipt/security policy', () => {
     ).toMatchObject({ stageBytes: 2000 });
   });
 
+  it('accepts a pinned Prettier receipt only when neither tests nor typecheck were executed', () => {
+    const receipt = {
+      ...basic,
+      recipeId: 'API_FORMAT',
+      testsExecuted: false,
+      typecheckExecuted: false,
+    };
+    expect(
+      validatePatchCheckReceipt(JSON.stringify(receipt), 'API_FORMAT', path, sha),
+    ).toMatchObject({ stageFiles: 10 });
+    for (const invalid of [
+      { testsExecuted: true },
+      { typecheckExecuted: true },
+      { proposedSha256: 'f'.repeat(64) },
+    ]) {
+      expect(() =>
+        validatePatchCheckReceipt(
+          JSON.stringify({ ...receipt, ...invalid }),
+          'API_FORMAT',
+          path,
+          sha,
+        ),
+      ).toThrow();
+    }
+  });
+
   it('rejects mismatched recipe, changed SHA, unexpected privileges and unbounded data', () => {
     for (const change of [
       { sourceReadOnly: false },

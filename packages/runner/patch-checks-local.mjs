@@ -10,6 +10,8 @@ import { copyFile, lstat, mkdir, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const RECIPES = Object.freeze({
+  API_FORMAT: { package: '@gym-dev-hub/api', command: 'prettier', args: [] },
+  WEB_FORMAT: { package: '@gym-dev-hub/web', command: 'prettier', args: [] },
   API_TYPECHECK: { package: '@gym-dev-hub/api', command: 'tsc', args: ['--noEmit'] },
   API_TEST: {
     package: '@gym-dev-hub/api',
@@ -205,6 +207,31 @@ async function main() {
     180_000,
   );
   if (install.status !== 0) throw new Error('Offline dependency closure missing');
+  // Use a fixed, pinned Prettier binary with the tracked repository config.
+  // Exactly one SHA-verified source file is checked: no glob, shell or argv
+  // supplied by the caller. Do not accept an ignored source as a successful
+  // check. The file cannot be in .prettierignore: the approved scope is src.
+  if (request.recipeId.endsWith('_FORMAT')) {
+    failingPhase = 'FIXED_FORMAT';
+    const entry = join(PROJECT, 'node_modules/prettier/bin/prettier.cjs');
+    const formatted = checkedRun(
+      '/usr/bin/node',
+      [
+        entry,
+        '--check',
+        '--config',
+        join(PROJECT, '.prettierrc.json'),
+        '--ignore-path',
+        join(PROJECT, '.prettierignore'),
+        request.path,
+      ],
+      PROJECT,
+      90_000,
+    );
+    if (formatted.status !== 0) throw new Error('Pinned formatting check returned nonzero');
+    failingPhase = 'RECEIPT';
+    return writeSuccessReceipt(request, staged, formatted);
+  }
   // Build only the common TypeScript declaration package, from an exact Node
   // executable path. This avoids running pnpm script hooks or binaries out of
   // noexec scratch, and preserves strict command provenance.
@@ -229,6 +256,10 @@ async function main() {
   );
   if (outcome.status !== 0) throw new Error('Pinned check returned nonzero');
   failingPhase = 'RECEIPT';
+  writeSuccessReceipt(request, staged, outcome);
+}
+
+function writeSuccessReceipt(request, staged, outcome) {
   process.stdout.write(
     JSON.stringify({
       protocol: 1,

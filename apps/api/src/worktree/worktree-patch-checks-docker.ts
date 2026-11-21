@@ -13,11 +13,19 @@ import { validateRunnerIsolation, validateRunnerMounts } from './task-typecheck-
 const IMAGE = 'gym-dev-hub-node-runner:v1';
 const ENTRY = '/opt/gym-dev-hub/patch-checks-local.mjs';
 const MAX_OUTPUT = 65_536;
-const RECIPES = new Set(['API_TYPECHECK', 'API_TEST', 'WEB_TYPECHECK', 'WEB_TEST']);
+const RECIPES = new Set([
+  'API_FORMAT',
+  'API_TYPECHECK',
+  'API_TEST',
+  'WEB_FORMAT',
+  'WEB_TYPECHECK',
+  'WEB_TEST',
+]);
 const SHA = /^[a-f0-9]{64}$/;
 const RUN_TIMEOUT = 570_000;
 
-export type FixedPatchRecipe = 'API_TYPECHECK' | 'API_TEST' | 'WEB_TYPECHECK' | 'WEB_TEST';
+export type FixedPatchRecipe =
+  'API_FORMAT' | 'API_TYPECHECK' | 'API_TEST' | 'WEB_FORMAT' | 'WEB_TYPECHECK' | 'WEB_TEST';
 export interface PreparedPatchChecks {
   imageId: string;
   mounts: readonly { source: string; target: string }[];
@@ -169,6 +177,7 @@ export function validatePatchCheckReceipt(
   }
   const r = object as Record<string, unknown>;
   const expectType = recipeId.endsWith('_TEST');
+  const expectTypecheck = recipeId.endsWith('_TYPECHECK');
   if (
     r.protocol !== 1 ||
     r.event !== 'one-file-post-apply-check-executed' ||
@@ -176,7 +185,7 @@ export function validatePatchCheckReceipt(
     r.filePathSha256 !== createHash('sha256').update(filePath).digest('hex') ||
     r.proposedSha256 !== proposedSha256 ||
     r.testsExecuted !== expectType ||
-    r.typecheckExecuted !== !expectType ||
+    r.typecheckExecuted !== expectTypecheck ||
     r.exitCode !== 0 ||
     r.sourceReadOnly !== true ||
     r.networkEnabled !== false ||

@@ -50,6 +50,7 @@ describe('post-apply fixed Docker checks panel', () => {
   it('shows only API recipes for an approved API source file, no execution by default', () => {
     const html = renderToStaticMarkup(<CodexPatchChecksPanel {...props} />);
     expect(html).toContain('Ізольовані Docker checks після патча');
+    expect(html).toContain('API · Prettier');
     expect(html).toContain('API: TypeScript');
     expect(html).toContain('API: Vitest');
     expect(html).not.toContain('Web: Vitest');

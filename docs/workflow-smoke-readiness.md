@@ -188,3 +188,36 @@ store. After merging the fix, run `pnpm provision:patch-check-store` and
 `pnpm provision:patch-check-store:verify` again, update the ignored
 `DEV_HUB_PATCH_CHECK_PNPM_STORE` path, and restart the API. Do not replay
 consumed one-time Docker grants.
+
+## Mandatory Prettier gate before audited Git commit (Issue #81)
+
+During the first real operator E2E on Draft PR #80, `WEB_TYPECHECK` and
+`WEB_TEST` both passed but GitHub CI rejected a valid TSX text change at
+`Formatting`: it did not respect the repository's root `.prettierrc.json`
+(`printWidth: 100`). The successful corrected E2E in PR #82 confirms that
+formatting must be enforced **before** the one-time Git commit grant.
+
+A new **fixed `API_FORMAT` / `WEB_FORMAT` recipe** checks exactly the
+approved SHA-pinned source file using the installed lockfile-pinned
+Prettier binary and an explicit root `.prettierrc.json`. It executes inside
+the same non-root, networkless, read-only-source Docker runner as the
+existing fixed checks. The recipe is never an arbitrary command. Its
+receipt has both `testsExecuted=false` and `typecheckExecuted=false`, is
+validated against the approved source SHA, and is kept in the same append-
+only, single-use-grant audit as the other Docker checks. A non-zero
+Prettier result is not a successful receipt.
+
+**Commit candidate preview/acknowledgement and commit write** now require
+a matching `*_FORMAT: passed` audit receipt **and** at least one matching
+TypeScript or Vitest pass. Missing or failed format is a hard 409, not a
+warning. Previously created unmerged candidates without a matching
+format receipt do not acquire new Git write authorization by default.
+
+The Docker recipe changes the existing immutable runner script; after
+merging, rebuild the fixed runner from the **approved updated source** and
+update the trusted, ignored `DEV_HUB_PATCH_CHECK_IMAGE_ID` to its verified
+new `sha256:...` image ID **before** authorizing fresh formatting checks.
+Do not disable the image hash pin, change `.env` secrets or reuse already
+consumed grants. A new isolated recipe `API_FORMAT` / `WEB_FORMAT` may
+require re-provisioning the pinned store only when the lockfile changes;
+this PR does not change the lockfile.

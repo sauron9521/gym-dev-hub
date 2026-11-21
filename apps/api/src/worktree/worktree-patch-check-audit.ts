@@ -23,7 +23,14 @@ const sha = z.string().regex(/^[a-f0-9]{64}$/);
 const fingerprint = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 const commit = z.string().regex(/^[a-f0-9]{40,64}$/);
 const eventSchema = z.enum(['issued', 'attempted', 'passed', 'rejected', 'cancel-requested']);
-const recipeSchema = z.enum(['API_TYPECHECK', 'API_TEST', 'WEB_TYPECHECK', 'WEB_TEST']);
+const recipeSchema = z.enum([
+  'API_FORMAT',
+  'API_TYPECHECK',
+  'API_TEST',
+  'WEB_FORMAT',
+  'WEB_TYPECHECK',
+  'WEB_TEST',
+]);
 const recordSchema = z.strictObject({
   at: z.iso.datetime({ offset: true }),
   event: eventSchema,

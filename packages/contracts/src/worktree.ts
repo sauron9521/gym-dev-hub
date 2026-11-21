@@ -228,7 +228,8 @@ export interface WorktreePostApplyReview {
   mergeEnabled: false;
 }
 
-export type WorktreePatchCheckRecipe = 'API_TYPECHECK' | 'API_TEST' | 'WEB_TYPECHECK' | 'WEB_TEST';
+export type WorktreePatchCheckRecipe =
+  'API_FORMAT' | 'API_TYPECHECK' | 'API_TEST' | 'WEB_FORMAT' | 'WEB_TYPECHECK' | 'WEB_TEST';
 
 export interface WorktreePatchCheckGrant {
   grantId: string;
