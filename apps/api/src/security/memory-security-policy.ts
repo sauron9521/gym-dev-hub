@@ -12,6 +12,7 @@ export type MemorySecurityConfiguration = {
   supersedeEnabled: boolean;
   operatorIdentityEnabled: boolean;
   personalRejectionEnabled: boolean;
+  personalApprovalEnabled: boolean;
 };
 
 /** Independent, opt-in memory identity namespace, never existing worktree grants. */
@@ -105,6 +106,13 @@ export function memorySecurityConfig(env: NodeJS.ProcessEnv): MemorySecurityConf
     personalRejectionFlag !== 'false'
   )
     throw new MemorySecurityError('disabled');
+  const personalApprovalFlag = env.DEV_HUB_MEMORY_PERSONAL_APPROVAL_HTTP_ENABLE;
+  if (
+    personalApprovalFlag !== undefined &&
+    personalApprovalFlag !== 'true' &&
+    personalApprovalFlag !== 'false'
+  )
+    throw new MemorySecurityError('disabled');
   return {
     operatorSecret,
     repositories,
@@ -117,6 +125,7 @@ export function memorySecurityConfig(env: NodeJS.ProcessEnv): MemorySecurityConf
     supersedeEnabled: supersedeFlag === 'true',
     operatorIdentityEnabled: operatorIdentityFlag === 'true',
     personalRejectionEnabled: personalRejectionFlag === 'true',
+    personalApprovalEnabled: personalApprovalFlag === 'true',
   };
 }
 

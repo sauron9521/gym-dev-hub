@@ -98,6 +98,7 @@ export class MemoryPersonalRejectionService {
         config.repositories,
         config.trustedOrigin,
         config.personalRejectionEnabled,
+        config.personalApprovalEnabled,
         config.operatorIdentityEnabled,
         config.rejectionWriteEnabled,
       ]),

@@ -139,7 +139,7 @@ export const VERIFIED_QUERY = `
     AND verified.memory_id=r.id AND verified.revision=2
     AND verified.status='VERIFIED' AND verified.source_id=s.id
     AND verified.scope=r.scope AND verified.kind=r.kind AND verified.text=r.text
-    AND verified.changed_by='local-operator'
+    AND verified.changed_by=r.verified_by
   JOIN memory_proposal_requests pr ON pr.repository=r.repository
     AND pr.memory_id=r.id AND pr.agent_id=r.agent_id AND pr.session_id=r.session_id
   JOIN memory_mutation_audit proposed_audit ON proposed_audit.repository=r.repository
@@ -150,10 +150,13 @@ export const VERIFIED_QUERY = `
     AND approval_audit.memory_id=r.id AND approval_audit.action='APPROVE_MEMORY_PROPOSAL'
     AND approval_audit.agent_id=r.agent_id AND approval_audit.session_id=r.session_id
     AND approval_audit.task_id=ms.task_id
-    AND approval_audit.operator_actor_id='local-operator' AND approval_audit.grant_id IS NOT NULL
+    AND approval_audit.operator_actor_id=r.verified_by AND approval_audit.grant_id IS NOT NULL
+    AND ((r.verified_by='local-operator' AND approval_audit.operator_identity_id IS NULL)
+      OR (approval_audit.operator_identity_id IS NOT NULL
+        AND r.verified_by='operator:' || approval_audit.operator_identity_id::text))
   WHERE r.repository=$1 AND r.id=$2::uuid AND r.revision=$3
     AND r.revision=2 AND r.status='VERIFIED' AND r.scope='SESSION'
-    AND r.verified_by='local-operator' AND r.verified_at IS NOT NULL
+    AND r.verified_by IS NOT NULL AND r.verified_at IS NOT NULL
     AND (SELECT count(*) FROM memory_sources s2
       WHERE s2.repository=r.repository AND s2.memory_id=r.id)=1
     AND (SELECT count(*) FROM memory_revisions rv
@@ -195,6 +198,8 @@ export class MemoryApprovalService {
     // No shared-root fallback after opting into personal rejection.
     if (decision === 'reject' && this.env.DEV_HUB_MEMORY_PERSONAL_REJECTION_HTTP_ENABLE === 'true')
       throw new ServiceUnavailableException('Legacy rejection disabled by personal operator mode');
+    if (decision === 'approve' && this.env.DEV_HUB_MEMORY_PERSONAL_APPROVAL_HTTP_ENABLE === 'true')
+      throw new ServiceUnavailableException('Legacy approval disabled by personal operator mode');
     const flag =
       decision === 'approve'
         ? this.env.DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE
@@ -408,7 +413,7 @@ export class MemoryApprovalService {
             : `UPDATE memory_records SET
            status='REVOKED',revision=revision+1,updated_at=NOW()
          WHERE repository=$1 AND id=$2::uuid AND revision=$3
-           AND status='VERIFIED' AND scope='SESSION' AND verified_by='local-operator'
+           AND status='VERIFIED' AND scope='SESSION' AND verified_by IS NOT NULL
          RETURNING revision,updated_at AS verified_at`,
         [repository, recordId, expectedRevision],
       );
