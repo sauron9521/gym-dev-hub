@@ -6,6 +6,10 @@ on:
       - 'apps/api/prisma/**'
       - 'apps/api/prisma.config.ts'
       - 'apps/api/src/database/**'
+      - 'apps/api/src/memory/**'
+      - 'apps/api/test/memory-read.integration.spec.ts'
+      - 'apps/api/test/memory-controller.spec.ts'
+      - 'packages/contracts/src/memory-read*'
       - 'apps/api/test/memory-database-*.spec.ts'
       - 'apps/api/test/memory-status.controller.spec.ts'
       - 'apps/api/scripts/memory-db-control.mjs'
@@ -20,6 +24,10 @@ on:
       - 'apps/api/prisma/**'
       - 'apps/api/prisma.config.ts'
       - 'apps/api/src/database/**'
+      - 'apps/api/src/memory/**'
+      - 'apps/api/test/memory-read.integration.spec.ts'
+      - 'apps/api/test/memory-controller.spec.ts'
+      - 'packages/contracts/src/memory-read*'
       - 'apps/api/package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/memory-postgres.yml'
@@ -74,6 +82,6 @@ jobs:
       - name: Verify migration ledger / test target / connection
         run: pnpm --filter @gym-dev-hub/api db:health:test
       - name: Run actual PostgreSQL integration and negative tests
-        run: pnpm --filter @gym-dev-hub/api exec vitest run test/memory-database-policy.spec.ts test/memory-database-integration.spec.ts test/memory-status.controller.spec.ts
+        run: pnpm --filter @gym-dev-hub/api exec vitest run test/memory-database-policy.spec.ts test/memory-database-integration.spec.ts test/memory-records.integration.spec.ts test/memory-read.integration.spec.ts test/memory-controller.spec.ts test/memory-status.controller.spec.ts
       - name: Complete frozen repository checks
         run: pnpm check
