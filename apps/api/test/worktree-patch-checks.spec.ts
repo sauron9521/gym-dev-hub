@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   execute: vi.fn(),
 }));
+vi.mock('../src/worktree/worktree-patch-check-stage.js', () => ({
+  withPatchCheckSourceStage: (_source: string, action: (path: string) => Promise<unknown>) =>
+    action('/staged-source'),
+}));
+
 vi.mock('../src/worktree/worktree-patch-checks-docker.js', () => ({
   preparePatchCheckRunner: mocks.prepare,
   runPatchChecksDocker: mocks.execute,
