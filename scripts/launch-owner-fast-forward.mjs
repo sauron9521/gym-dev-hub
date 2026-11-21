@@ -11,6 +11,7 @@ import { createConnection } from 'node:net';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspectSource, parseStatus } from './launch-source-reconcile.mjs';
+import { inspectOperatorProcesses } from './launch-operator-process-provenance.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
 const HASH = /^[a-f0-9]{64}$/;
@@ -250,6 +251,7 @@ export async function runOwnerFastForward({
   checkout,
   backup,
   ports = operatorPorts(process.env),
+  processInspector = inspectOperatorProcesses,
 }) {
   if (process.platform !== 'linux' || process.getuid?.() === 0)
     throw new Error('Nonroot Linux owner required');
@@ -280,6 +282,28 @@ export async function runOwnerFastForward({
       gitWritesPerformed: false,
       runtimeRestarted: false,
     };
+  const runtime = await processInspector(checkout);
+  if (
+    !runtime ||
+    !Number.isSafeInteger(runtime.totalBlocking) ||
+    runtime.totalBlocking < 0 ||
+    runtime.status !==
+      (runtime.totalBlocking === 0
+        ? 'no-known-operator-processes-at-scan-time'
+        : 'operator-processes-not-confirmed-stopped')
+  )
+    throw new Error('Untrusted operator process inspection result');
+  if (runtime.totalBlocking)
+    return {
+      status: 'blocked-operator-processes-active',
+      mayFastForward: false,
+      backupVerified: true,
+      sourceHeadSha: before.localSha,
+      targetMainSha: expectedMain,
+      gitWritesPerformed: false,
+      runtimeRestarted: false,
+      detectedOperatorProcesses: runtime.totalBlocking,
+    };
   if (mode === '--check-only')
     return {
       status: 'owner-cutover-preflight-passed',
@@ -295,6 +319,14 @@ export async function runOwnerFastForward({
   // Recheck HEAD/index and source bytes immediately before the sole Git write.
   eligible(inspectSource(checkout, expectedMain));
   statusUntracked(checkout);
+  const latestRuntime = await processInspector(checkout);
+  if (
+    !latestRuntime ||
+    latestRuntime.status !== 'no-known-operator-processes-at-scan-time' ||
+    latestRuntime.totalBlocking !== 0 ||
+    !(await portsAvailable(ports))
+  )
+    throw new Error('Operator process or port became active before source update');
   for (const path of FILES)
     if (hash(await stablePrivateFile(join(checkout, path))) !== bytes.get(path))
       throw new Error('Local source changed since verified backup');
@@ -333,7 +365,11 @@ export async function main(argv = process.argv.slice(2)) {
   const args = parseOwnerFastForwardArgs(argv);
   const report = await runOwnerFastForward(args);
   process.stdout.write(JSON.stringify(report) + '\n');
-  if (report.status === 'blocked-operator-ports-active') process.exitCode = 2;
+  if (
+    report.status === 'blocked-operator-ports-active' ||
+    report.status === 'blocked-operator-processes-active'
+  )
+    process.exitCode = 2;
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch(() => {

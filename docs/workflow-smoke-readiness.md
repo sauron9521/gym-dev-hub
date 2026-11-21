@@ -703,3 +703,43 @@ fast-forward would **not** establish the provenance of the already
 compiled running API, the new pinned pnpm store, explicit private
 audit directories or real production Docker audit. Keep Issue #107
 open and complete these as separate, owner-approved steps.
+
+## Launch #107 — live Linux process-provenance gate before owner cutover
+
+**PR #130 adds a second read-only guard to the owner-controlled
+fast-forward from #129.** A localhost port that refuses connections
+does **not** demonstrate that the existing Nest API, Next.js dev
+worker, `dev-operator` supervisor or another Node toolchain has
+actually stopped. They may still hold files, write outputs, or begin
+listening again.
+
+`scripts/launch-operator-process-provenance.mjs` reads Linux
+`/proc` metadata belonging to the current non-root user and checks
+only processes whose working directory is the exact primary Hub root,
+`apps/api`, or `apps/web`. It recognizes Node, pnpm, npm, Next.js
+and explicit Hub supervisor commands. For Linux processes whose cwd
+cannot be inspected, it uses available command-line metadata **only
+to identify a plausible Hub linkage**, and fails closed if the
+relevant identity cannot be determined. It does **not** inspect
+environment variables or emit process IDs, raw command-line arguments,
+source paths, credentials, or any per-process information. Nothing
+sends a signal, changes permissions, reads audit files or modifies Git.
+
+The existing `launch-owner-fast-forward.mjs` now checks **both**
+localhost operator ports **and** this process inventory, including a
+second scan and port check immediately before its one manually
+authorized `git merge --ff-only`. A positive finding yields
+`blocked-operator-processes-active` with a count only; a failed
+inventory fails closed. The owner must review service shutdown
+**outside** this script and retry manually. The inventory is a
+snapshot, not a transaction or OS-level process exclusion lock: a
+brand-new process starting immediately afterward is still possible,
+so perform the cutover only in a separately agreed maintenance
+window with no concurrent operator launch.
+
+These checks are tested against synthetic Linux `/proc` records,
+unreadable-cwd cases and real isolated Git fast-forward fixtures.
+On the actual running operator, they identify remaining Hub-linked
+processes but **do not stop any**. PR merge does not update the dirty
+primary checkout, provision new dependencies, change the production
+audit folders, or restart API/Web. Issue #107 remains OPEN.
