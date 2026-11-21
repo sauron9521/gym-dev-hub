@@ -309,3 +309,32 @@ This **prevents watch-triggered API restarts while operator checks run** by
 not enabling API watch, but does **not** identify the initial triggering file.
 Keep #79 open for root-cause investigation via the diagnostic PR #84 and
 keep the existing fail-closed `interrupted` audit semantics.
+
+## Launch #107 — trusted local Docker endpoint preflight
+
+The operator now fails closed **before starting API/Web** when Docker's
+effective context is not `unix:///var/run/docker.sock`, when
+`DOCKER_HOST` points elsewhere, a custom `DOCKER_CONTEXT` or TLS credentials
+are configured, or the socket path is not an actual Unix socket with no
+world-access bits. A successful `docker info` alone was previously
+insufficient: it can succeed against a **remote** Docker daemon.
+
+Use the existing non-root launch from the trusted Linux Mint checkout:
+
+```bash
+cd ~/Projects/gym-dev-hub
+sg docker -c 'pnpm dev:operator'
+```
+
+Do not work around a rejected context with `sudo`, `chmod 666`, an SSH/TCP
+Docker daemon or a new bind address. Review the active Docker context and
+local socket permissions outside of the Hub first. The default local
+daemon must be accessible to the **operator process**, not merely the
+interactive shell.
+
+This is a **startup safety check**, not an executed isolated Docker
+FORMAT/WEB_TEST/TYPECHECK audit or an end-to-end proof. #107 stays open
+until the actual fixed non-networked recipes produce durable
+`passed` receipts without a Nest API restart, with interrupted attempts
+still recorded as `interrupted`. #79 root-cause watch investigation is
+independent; the stable compiled API intentionally disables watch.
