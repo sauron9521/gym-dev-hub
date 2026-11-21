@@ -4,6 +4,11 @@ import { MemoryProposalController } from './memory-proposal.controller.js';
 import { MemoryProposalService } from './memory-proposal.service.js';
 import { MemoryApprovalService } from './memory-approval.service.js';
 import { MemoryPersonalRejectionService } from './memory-personal-rejection.service.js';
+import { MemoryPersonalApprovalService } from './memory-personal-approval.service.js';
+import {
+  MemoryPersonalApprovalController,
+  MemoryPersonalApprovalGrantController,
+} from './memory-personal-approval.controller.js';
 import {
   MemoryPersonalRejectionController,
   MemoryPersonalRejectionGrantController,
@@ -39,6 +44,8 @@ import { MemoryOperatorIdentityController } from '../security/memory-operator-id
     MemoryApprovalController,
     MemoryPersonalRejectionGrantController,
     MemoryPersonalRejectionController,
+    MemoryPersonalApprovalGrantController,
+    MemoryPersonalApprovalController,
     MemorySupersedeGrantController,
     MemorySupersedeController,
   ],
@@ -70,6 +77,12 @@ import { MemoryOperatorIdentityController } from '../security/memory-operator-id
       useFactory: (authorization: MemoryAuthorizationService) =>
         new MemoryProposalService(authorization),
       inject: [MemoryAuthorizationService],
+    },
+    {
+      provide: MemoryPersonalApprovalService,
+      useFactory: (identities: MemoryOperatorIdentityService) =>
+        new MemoryPersonalApprovalService(identities),
+      inject: [MemoryOperatorIdentityService],
     },
     {
       provide: MemoryPersonalRejectionService,
