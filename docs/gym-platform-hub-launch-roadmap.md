@@ -40,6 +40,8 @@ The owner selects a small Gym Platform task and reviews its scope, current GitHu
 
 ### M0 operator acceptance
 
+For #106 follow the [safe local checkout reconciliation runbook](launch-checkout-reconcile.md). Its inspector is read-only and does **not** fast-forward Git, back up private state, restart services or establish end-to-end readiness.
+
 1. Take a **read-only** inventory of Git HEAD/branch, dirty files, local worktrees, ignored `.env`, Workspace JSON/audit journals and running services. Back them up **outside Git** without printing or pasting secrets.
 2. Bring **only** the trusted operator checkout to actual current `main` using a **reviewed**, non-destructive update. Never use a source mismatch as permission to discard local work. Stop/restart Web/API at the new checkout after all safety checks.
 3. Set up `pnpm dev:operator` correctly. **Stop the currently running local ports** only after verifying they belong to this Hub, and only with operator consent. Do not use `sudo pnpm`, world-readable Docker socket mode or public bind.
