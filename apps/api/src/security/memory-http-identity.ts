@@ -87,3 +87,23 @@ export async function authenticateMemoryHttpReadWithDatabase(
     throw toMemoryHttpException(error);
   }
 }
+/**
+ * Never re-purpose READ_VERIFIED as a write capability. Only a separately
+ * operator-issued session-bound PROPOSE_MEMORY Bearer may enter proposal intake.
+ */
+export function authenticateMemoryHttpProposal(
+  request: MemoryHttpReadRequest,
+  authorization: MemoryAuthorizationService,
+  env: NodeJS.ProcessEnv,
+): MemoryPrincipal {
+  try {
+    const config = memorySecurityConfig(env);
+    assertMemoryLocalBoundary(request, config.trustedOrigin);
+    const header = request.authorization;
+    if (!header || !/^Bearer [A-Za-z0-9_-]{43}$/.test(header))
+      throw new MemorySecurityError('unauthorized');
+    return authorization.authenticateProposalBearer(header.slice('Bearer '.length));
+  } catch (error) {
+    throw toMemoryHttpException(error);
+  }
+}

@@ -18,7 +18,10 @@ export async function verifyMemoryPrincipalBinding(
   const parsed = MemoryReadContextSchema.safeParse(principal.readContext);
   if (
     !parsed.success ||
-    principal.permission !== 'READ_VERIFIED' ||
+    !(
+      principal.permission === 'READ_VERIFIED' ||
+      (principal.permission === 'PROPOSE_MEMORY' && principal.type === 'agent')
+    ) ||
     principal.repository !== parsed.data.repository ||
     !['agent', 'external'].includes(principal.type) ||
     (principal.type === 'agent' &&

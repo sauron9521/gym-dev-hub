@@ -19,13 +19,15 @@ const agentCredentialSchema = z.strictObject({
   taskId: z.uuid(),
   sessionId: z.uuid(),
   ttlSeconds: z.number().int().min(1).max(900),
+  permission: z.enum(['READ_VERIFIED', 'PROPOSE_MEMORY']).optional(),
 });
 
 type ScopeVerifier = (principal: MemoryPrincipal) => Promise<void>;
 
 /**
  * Opt-in operator-only credentials for registered Hub memory agents.
- * Never issues external MCP credentials, approval grants or DB writes;
+ * Never issues external MCP credentials or approval grants; can issue an
+ * explicitly opt-in, scope-verified PROPOSE_MEMORY token distinct from READ_VERIFIED;
  * agent read routes are independently guarded and explicitly opt-in.
  * The shared authorization instance lives in MemoryModule until restart.
  */
@@ -63,7 +65,7 @@ export class MemoryOperatorCredentialService {
     credentialId: string;
     bearerToken: string;
     expiresAt: string;
-    permission: 'READ_VERIFIED';
+    permission: 'READ_VERIFIED' | 'PROPOSE_MEMORY';
   }> {
     // Authenticate the operator BEFORE parsing untrusted input or opening the DB.
     this.authorization.assertOperatorForCredentialRequest(operatorSecret);
@@ -73,12 +75,14 @@ export class MemoryOperatorCredentialService {
     const scope = parsed.data;
     const config = memorySecurityConfig(this.env);
     if (!config.repositories.includes(scope.repository)) throw new MemorySecurityError('forbidden');
+    if (scope.permission === 'PROPOSE_MEMORY' && !config.proposalWriteEnabled)
+      throw new MemorySecurityError('disabled');
 
     const principal: MemoryPrincipal = {
       type: 'agent',
       actorId: 'operator-credential-preflight',
       repository: scope.repository,
-      permission: 'READ_VERIFIED',
+      permission: scope.permission ?? 'READ_VERIFIED',
       readContext: {
         repository: scope.repository,
         agentId: scope.agentId,
