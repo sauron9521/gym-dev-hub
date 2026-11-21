@@ -45,7 +45,11 @@ type ProposalRow = {
   source_id: string;
   source_ref: string;
 };
-type ApprovedRow = { revision: number; verified_at: Date };
+type DecisionRow = { revision: number; verified_at: Date };
+type Decision = 'approve' | 'reject';
+const decisionAction = (decision: Decision) =>
+  decision === 'approve' ? 'APPROVE_MEMORY_PROPOSAL' : 'REJECT_MEMORY_PROPOSAL';
+const decisionStatus = (decision: Decision) => (decision === 'approve' ? 'VERIFIED' : 'REVOKED');
 const sha = (input: string) => createHash('sha256').update(input).digest('hex');
 const fingerprint = (row: ProposalRow) =>
   'sha256:' +
@@ -122,16 +126,21 @@ export class MemoryApprovalService {
     if (request.path.includes('?')) throw new MemorySecurityError('forbidden');
   }
 
-  private assertEnabled(): void {
-    if (this.env.DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE !== 'true')
-      throw new ServiceUnavailableException('Memory approval disabled');
+  private assertEnabled(decision: Decision): void {
+    const flag =
+      decision === 'approve'
+        ? this.env.DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE
+        : this.env.DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE;
+    if (flag !== 'true') throw new ServiceUnavailableException('Memory operator decision disabled');
   }
 
-  private assertOperator(operatorSecret: unknown, repository: string): string {
+  private assertOperator(operatorSecret: unknown, repository: string, decision: Decision): string {
     this.authorization.assertOperatorForCredentialRequest(operatorSecret);
     if (typeof operatorSecret !== 'string') throw new MemorySecurityError('unauthorized');
     const config = memorySecurityConfig(this.env);
-    if (!config.approvalWriteEnabled || !config.repositories.includes(repository))
+    const allowed =
+      decision === 'approve' ? config.approvalWriteEnabled : config.rejectionWriteEnabled;
+    if (!allowed || !config.repositories.includes(repository))
       throw new MemorySecurityError('forbidden');
     return operatorSecret;
   }
@@ -143,13 +152,21 @@ export class MemoryApprovalService {
   }
 
   async reviewAndGrant(operatorSecret: unknown, rawInput: unknown) {
-    this.assertEnabled();
+    return this.reviewForDecision(operatorSecret, rawInput, 'approve');
+  }
+
+  async reviewRejectionAndGrant(operatorSecret: unknown, rawInput: unknown) {
+    return this.reviewForDecision(operatorSecret, rawInput, 'reject');
+  }
+
+  private async reviewForDecision(operatorSecret: unknown, rawInput: unknown, decision: Decision) {
+    this.assertEnabled(decision);
     // Authenticate operator before parsing caller's record scope or opening DB.
     this.authorization.assertOperatorForCredentialRequest(operatorSecret);
     const parsed = reviewSchema.safeParse(rawInput);
     if (!parsed.success) throw new BadRequestException('Invalid approval review request');
     const { repository, recordId, expectedRevision } = parsed.data;
-    const secret = this.assertOperator(operatorSecret, repository);
+    const secret = this.assertOperator(operatorSecret, repository, decision);
 
     let pool: pg.Pool | undefined;
     try {
@@ -165,7 +182,7 @@ export class MemoryApprovalService {
       const digest = fingerprint(row);
       const grant = this.authorization.issueOperatorApprovalGrant(secret, {
         repository,
-        action: 'APPROVE_MEMORY_PROPOSAL',
+        action: decisionAction(decision),
         recordId,
         expectedRevision,
         fingerprint: digest,
@@ -200,13 +217,46 @@ export class MemoryApprovalService {
     recordId: string,
     rawInput: unknown,
   ): Promise<{ recordId: string; status: 'VERIFIED'; revision: number }> {
-    this.assertEnabled();
+    return this.transition(operatorSecret, grantToken, recordId, rawInput, 'approve');
+  }
+
+  async reject(
+    operatorSecret: unknown,
+    grantToken: unknown,
+    recordId: string,
+    rawInput: unknown,
+  ): Promise<{ recordId: string; status: 'REVOKED'; revision: number }> {
+    return this.transition(operatorSecret, grantToken, recordId, rawInput, 'reject');
+  }
+
+  private async transition(
+    operatorSecret: unknown,
+    grantToken: unknown,
+    recordId: string,
+    rawInput: unknown,
+    decision: 'approve',
+  ): Promise<{ recordId: string; status: 'VERIFIED'; revision: number }>;
+  private async transition(
+    operatorSecret: unknown,
+    grantToken: unknown,
+    recordId: string,
+    rawInput: unknown,
+    decision: 'reject',
+  ): Promise<{ recordId: string; status: 'REVOKED'; revision: number }>;
+  private async transition(
+    operatorSecret: unknown,
+    grantToken: unknown,
+    recordId: string,
+    rawInput: unknown,
+    decision: Decision,
+  ): Promise<{ recordId: string; status: 'VERIFIED' | 'REVOKED'; revision: number }> {
+    this.assertEnabled(decision);
     this.authorization.assertOperatorForCredentialRequest(operatorSecret);
     const id = z.uuid().safeParse(recordId);
     const parsed = approveSchema.safeParse(rawInput);
     if (!id.success || !parsed.success) throw new BadRequestException('Invalid approval');
     const { repository, expectedRevision, fingerprint: approvalFingerprint } = parsed.data;
-    const secret = this.assertOperator(operatorSecret, repository);
+    const secret = this.assertOperator(operatorSecret, repository, decision);
 
     // Consume before any await/DB operation. Wrong action/scope/expired/replayed
     // tokens are rejected and cannot be reused. A failed SQL transaction NEVER
@@ -215,7 +265,7 @@ export class MemoryApprovalService {
     try {
       grantId = this.authorization.consumeOperatorApprovalGrantWithId(secret, grantToken, {
         repository,
-        action: 'APPROVE_MEMORY_PROPOSAL',
+        action: decisionAction(decision),
         recordId: id.data,
         expectedRevision,
         fingerprint: approvalFingerprint,
@@ -246,16 +296,22 @@ export class MemoryApprovalService {
         throw new ConflictException('Proposal unavailable or revision changed');
 
       await client.query(
-        "SELECT set_config('hub.memory.actor_id',$1,true),set_config('hub.memory.source_id',$2,true)",
-        ['local-operator', row.source_id],
+        "SELECT set_config('hub.memory.actor_id',$1,true),set_config('hub.memory.source_id',$2,true),set_config('hub.memory.operator_action',$3,true)",
+        ['local-operator', row.source_id, decisionAction(decision)],
       );
-      const result = await client.query<ApprovedRow>(
-        `UPDATE memory_records SET
+      const result = await client.query<DecisionRow>(
+        decision === 'approve'
+          ? `UPDATE memory_records SET
            status='VERIFIED',revision=revision+1,
            verified_by='local-operator',verified_at=NOW(),updated_at=NOW()
          WHERE repository=$1 AND id=$2::uuid AND revision=$3
            AND status='PROPOSED' AND scope='SESSION'
-         RETURNING revision,verified_at`,
+         RETURNING revision,verified_at`
+          : `UPDATE memory_records SET
+           status='REVOKED',revision=revision+1,updated_at=NOW()
+         WHERE repository=$1 AND id=$2::uuid AND revision=$3
+           AND status='PROPOSED' AND scope='SESSION'
+         RETURNING revision,updated_at AS verified_at`,
         [repository, recordId, expectedRevision],
       );
       if (result.rowCount !== 1 || !result.rows[0])
@@ -265,7 +321,7 @@ export class MemoryApprovalService {
       const afterDigest = sha(
         JSON.stringify([
           beforeDigest,
-          'VERIFIED',
+          decisionStatus(decision),
           after.revision,
           'local-operator',
           new Date(after.verified_at).toISOString(),
@@ -276,7 +332,7 @@ export class MemoryApprovalService {
          (repository,memory_id,agent_id,task_id,session_id,action,
           previous_digest,resulting_digest,operator_actor_id,grant_id)
          VALUES ($1,$2::uuid,$3::uuid,$4::uuid,$5::uuid,
-          'APPROVE_MEMORY_PROPOSAL',$6,$7,'local-operator',$8::uuid)`,
+          $8,$6,$7,'local-operator',$9::uuid)`,
         [
           repository,
           recordId,
@@ -285,12 +341,13 @@ export class MemoryApprovalService {
           row.session_id,
           beforeDigest,
           afterDigest,
+          decisionAction(decision),
           grantId,
         ],
       );
       await client.query('COMMIT');
       inTransaction = false;
-      return { recordId, status: 'VERIFIED', revision: after.revision };
+      return { recordId, status: decisionStatus(decision), revision: after.revision };
     } catch (error) {
       if (inTransaction && client) {
         try {

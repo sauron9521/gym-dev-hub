@@ -64,6 +64,27 @@ export class MemoryApprovalController {
     private readonly approvals: MemoryApprovalService,
   ) {}
 
+  @Post(':id/reject')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async reject(@Req() request: LocalRequest, @Param('id') id: string, @Body() input: unknown) {
+    try {
+      const secret = requireOperatorRequest(request, this.approvals);
+      return await this.approvals.reject(
+        secret,
+        onlyString(request.headers['x-dev-hub-memory-approval-grant']),
+        id,
+        input,
+      );
+    } catch (error) {
+      if (error instanceof MemorySecurityError) throw toMemoryHttpException(error);
+      throw error;
+    }
+  }
+
   @Post(':id/approve')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
@@ -77,6 +98,33 @@ export class MemoryApprovalController {
         secret,
         onlyString(request.headers['x-dev-hub-memory-approval-grant']),
         id,
+        input,
+      );
+    } catch (error) {
+      if (error instanceof MemorySecurityError) throw toMemoryHttpException(error);
+      throw error;
+    }
+  }
+}
+
+/** Rejection grants are distinct from approval grants and cannot be exchanged. */
+@Controller('v1/memory/operator/rejection-grants')
+export class MemoryRejectionGrantController {
+  constructor(
+    @Inject(MemoryApprovalService)
+    private readonly approvals: MemoryApprovalService,
+  ) {}
+
+  @Post()
+  @HttpCode(201)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async reviewAndGrant(@Req() request: LocalRequest, @Body() input: unknown) {
+    try {
+      return await this.approvals.reviewRejectionAndGrant(
+        requireOperatorRequest(request, this.approvals),
         input,
       );
     } catch (error) {

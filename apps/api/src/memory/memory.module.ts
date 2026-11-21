@@ -6,6 +6,7 @@ import { MemoryApprovalService } from './memory-approval.service.js';
 import {
   MemoryApprovalController,
   MemoryApprovalGrantController,
+  MemoryRejectionGrantController,
 } from './memory-approval.controller.js';
 import { MemoryAuthenticatedReadService } from './memory-authenticated-read.service.js';
 import { MemoryAuthorizationService } from '../security/memory-authorization.service.js';
@@ -19,6 +20,7 @@ import { MemoryOperatorCredentialController } from '../security/memory-operator-
     MemoryOperatorCredentialController,
     MemoryProposalController,
     MemoryApprovalGrantController,
+    MemoryRejectionGrantController,
     MemoryApprovalController,
   ],
   providers: [
