@@ -7,6 +7,7 @@ interface Props {
   sessionId: string;
   enabled: boolean;
   completed: boolean;
+  draftToReview?: string | null;
 }
 
 async function getChat(sessionId: string): Promise<ChatSnapshot> {
@@ -15,7 +16,7 @@ async function getChat(sessionId: string): Promise<ChatSnapshot> {
   return (await response.json()) as ChatSnapshot;
 }
 
-export function CodexChatPanel({ sessionId, enabled, completed }: Props) {
+export function CodexChatPanel({ sessionId, enabled, completed, draftToReview }: Props) {
   const [snapshot, setSnapshot] = useState<ChatSnapshot | null>(null);
   const [prompt, setPrompt] = useState('');
   const [sending, setSending] = useState(false);
@@ -147,6 +148,23 @@ export function CodexChatPanel({ sessionId, enabled, completed }: Props) {
         <p className="ws-chat-error" role="alert">
           {error}
         </p>
+      )}
+      {draftToReview && (
+        <div className="ws-chat-disclaimer" role="status">
+          Пропозиція з перевіреного Git-файла готова. Перенесення в поле вводу не надсилає її до
+          Codex.
+          <button
+            type="button"
+            className="refresh"
+            disabled={completed || sending || running || Boolean(prompt)}
+            onClick={() => setPrompt(draftToReview)}
+          >
+            Вставити чернетку в чат
+          </button>
+          {prompt && (
+            <small>Спочатку очисти поточну чернетку, щоб не втратити введений текст.</small>
+          )}
+        </div>
       )}
       <form className="ws-compose ws-chat-compose" onSubmit={(event) => void send(event)}>
         <label htmlFor="ws-codex-input">Повідомлення до Codex</label>

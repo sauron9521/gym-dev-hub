@@ -74,6 +74,7 @@ export function WorkspaceClient({ initial, initialError }: Props) {
   const [task, setTask] = useState('');
   const [repository, setRepository] = useState(initial.repositories[0] ?? '');
   const [note, setNote] = useState('');
+  const [scopedDraft, setScopedDraft] = useState<{ sessionId: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialError);
   const [codexNotice, setCodexNotice] = useState<string | null>(null);
@@ -536,12 +537,15 @@ export function WorkspaceClient({ initial, initialError }: Props) {
                 sessionId={active.id}
                 repository={active.repository}
                 completed={active.status === 'completed'}
+                onPrepareCodexDraft={(text) => setScopedDraft({ sessionId: active.id, text })}
               />
 
               <CodexChatPanel
+                key={active.id}
                 sessionId={active.id}
                 enabled={codexStatus.state === 'ready' && Boolean(active.codexThreadId)}
                 completed={active.status === 'completed'}
+                draftToReview={scopedDraft?.sessionId === active.id ? scopedDraft.text : null}
               />
 
               <section className="ws-thread">

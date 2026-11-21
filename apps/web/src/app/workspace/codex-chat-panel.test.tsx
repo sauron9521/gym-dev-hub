@@ -13,6 +13,20 @@ describe('CodexChatPanel', () => {
     expect(markup).toContain('maxLength="3000"');
   });
 
+  it('shows a separate manual action for a reviewed scoped-code draft', () => {
+    const markup = renderToStaticMarkup(
+      <CodexChatPanel
+        sessionId="00000000-0000-4000-8000-000000000001"
+        enabled
+        completed={false}
+        draftToReview="Test worktree draft"
+      />,
+    );
+    expect(markup).toContain('Вставити чернетку в чат');
+    expect(markup).toContain('не надсилає її до Codex');
+    expect(markup).toContain('Надіслати до Codex');
+  });
+
   it('disables prompts before thread linking and for completed sessions', () => {
     const locked = renderToStaticMarkup(
       <CodexChatPanel

@@ -9,12 +9,19 @@ interface Props {
   plan: WorktreePlan;
   completed: boolean;
   onRefresh: () => Promise<void>;
+  onPrepareCodexDraft?: (draft: string) => void;
 }
 
 const base = (sessionId: string, id: string) =>
   `/api/workspace/sessions/${sessionId}/worktree-plans/${id}`;
 
-export function WorktreeHydrationPanel({ sessionId, plan, completed, onRefresh }: Props) {
+export function WorktreeHydrationPanel({
+  sessionId,
+  plan,
+  completed,
+  onRefresh,
+  onPrepareCodexDraft,
+}: Props) {
   const [operatorSecret, setOperatorSecret] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [grant, setGrant] = useState<WorktreeHydrationGrant | null>(null);
@@ -152,6 +159,7 @@ export function WorktreeHydrationPanel({ sessionId, plan, completed, onRefresh }
           sessionId={sessionId}
           planId={plan.id}
           fingerprint={plan.fingerprint}
+          onPrepareCodexDraft={onPrepareCodexDraft}
         />
       )}
       {error && (

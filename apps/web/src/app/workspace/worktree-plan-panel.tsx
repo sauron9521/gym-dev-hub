@@ -23,6 +23,7 @@ type Props = {
   sessionId: string;
   repository: string;
   completed: boolean;
+  onPrepareCodexDraft?: (draft: string) => void;
 };
 
 const base = (sessionId: string) => `/api/workspace/sessions/${sessionId}/worktree-plans`;
@@ -50,7 +51,12 @@ async function fetchPlans(
   return Array.isArray(result) ? result : [result];
 }
 
-export function WorktreePlanPanel({ sessionId, repository, completed }: Props) {
+export function WorktreePlanPanel({
+  sessionId,
+  repository,
+  completed,
+  onPrepareCodexDraft,
+}: Props) {
   const [plans, setPlans] = useState<WorktreePlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -309,6 +315,7 @@ export function WorktreePlanPanel({ sessionId, repository, completed }: Props) {
           sessionId={sessionId}
           completed={completed}
           onRefresh={refreshPlans}
+          onPrepareCodexDraft={onPrepareCodexDraft}
         />
       )}
       <small className="ws-plan-note">

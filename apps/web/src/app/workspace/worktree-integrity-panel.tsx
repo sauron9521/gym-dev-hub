@@ -7,7 +7,12 @@ import { WorktreeCodeReadPanel } from './worktree-code-read-panel';
 import { WorktreeToolPanel } from './worktree-tool-panel';
 import { TaskRunnerPreviewPanel } from './task-runner-preview-panel';
 
-type Props = { sessionId: string; planId: string; fingerprint?: string };
+type Props = {
+  sessionId: string;
+  planId: string;
+  fingerprint?: string;
+  onPrepareCodexDraft?: (draft: string) => void;
+};
 
 const labels: Record<WorktreeIntegrityReport['status'], string> = {
   verified: 'Усі файли збігаються з Git',
@@ -15,7 +20,12 @@ const labels: Record<WorktreeIntegrityReport['status'], string> = {
   'not-ready': 'Worktree ще не готовий до перевірки',
 };
 
-export function WorktreeIntegrityPanel({ sessionId, planId, fingerprint }: Props) {
+export function WorktreeIntegrityPanel({
+  sessionId,
+  planId,
+  fingerprint,
+  onPrepareCodexDraft,
+}: Props) {
   const [report, setReport] = useState<WorktreeIntegrityReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +112,7 @@ export function WorktreeIntegrityPanel({ sessionId, planId, fingerprint }: Props
                 sessionId={sessionId}
                 report={report}
                 fingerprint={fingerprint}
+                onPrepareCodexDraft={onPrepareCodexDraft}
               />
               <WorktreeToolPanel
                 key={report.checkedAt + '-tool'}
