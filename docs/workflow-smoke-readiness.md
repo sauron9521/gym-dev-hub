@@ -410,3 +410,46 @@ HTTP → Docker → audit run. Simulated interruption followed by a fresh Nest
 instance is **not** proof of a real SIGKILL and operator restart. Keep #107
 open until those specific live checks pass, with no production audit/secret
 mutation by these tests.
+
+## Launch #107 — manual integrated real HTTP → Docker → audit probe
+
+The optional Vitest scenario in
+`apps/api/test/worktree-patch-checks-live-http-docker.e2e.spec.ts` is **skipped
+by default**, including in CI and `pnpm check`. It runs only when the operator
+sets the **exact** `DEV_HUB_LIVE_HTTP_DOCKER_PROBE=I_APPROVE_ISOLATED_REAL_HTTP_DOCKER_PROBE`
+flag. It requires non-root Linux, a pinned Docker image and a verified
+offline pnpm store matching the current committed source lockfile.
+
+From a **clean, disposable worktree**, not the live Hub checkout, use the
+owner-managed trusted env file solely to load the pinned image setting.
+Do not source the env file as shell code; pass a matching **newly provisioned
+store absolute path** as `DEV_HUB_PATCH_CHECK_PNPM_STORE` to this one command.
+For example, with the actual absolute values substituted locally:
+
+```sh
+sg docker -c 'cd /path/to/clean/gym-dev-hub/apps/api && DEV_HUB_LIVE_HTTP_DOCKER_PROBE=I_APPROVE_ISOLATED_REAL_HTTP_DOCKER_PROBE DEV_HUB_PATCH_CHECK_PNPM_STORE=/path/to/verified/pnpm-store node --env-file=/path/to/owner-private/apps/api/.env node_modules/vitest/vitest.mjs run test/worktree-patch-checks-live-http-docker.e2e.spec.ts'
+```
+
+It creates an **ephemeral Nest server bound only to 127.0.0.1**, uses
+the real `WorktreePlanController`, single-use grant service, private
+durable audit, verified private-store stage, fixed Docker runner and
+source-stage helpers. It archives only the exact committed Git tree into
+a disposable temporary checkout and generates fresh, **fixture-only**
+operator/review secrets. The test HTTP client explicitly authorizes one
+`WEB_FORMAT` check, executes the real non-networked Docker recipe,
+denies token reuse, inspects sanitized disk audit, then creates a fresh
+Nest server to prove durable history survives restart. All owned fixture
+files are cleaned up; the private original store stays unchanged.
+
+**Important boundary:** plan, reviewed diff and boundary-preflight are
+**fixtures**, NOT a real owner-reviewed post-apply worktree. The source file
+is unchanged in this probe, so this cannot prove the actual post-apply
+review requirement. It does NOT use the running Hub, production
+`.env` operator secret, production grant maps or production audit.
+The restart is a fresh test HTTP app, not a SIGKILL of the running API.
+A hard process crash during staging may leave a public-only temporary
+snapshot under `/tmp` that requires owner inspection; do not automatically
+prune unrelated directories. A green probe is integrated real HTTP+Docker
+evidence, **not** final production operator acceptance. Keep Issue #107 open until an actual
+reviewed operator grant with real production audit, and controlled
+in-flight API kill/restart, are verified.
