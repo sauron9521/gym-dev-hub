@@ -1,10 +1,14 @@
 /** Explicit, non-default NestJS watch diagnostics. Never used by the API runtime. */
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { createNestCompilerMarker } from './nest-watch-compiler-marker.mjs';
 import { open, mkdir, realpath, stat } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+const { boundedRecord } = require('./nest-watch-fs-probe.cjs');
 if (process.platform !== 'linux' || Number(process.versions.node.split('.')[0]) < 24) {
   throw new Error('Opt-in NestJS watch diagnostics require Linux and Node >=24');
 }
@@ -40,16 +44,57 @@ console.log('Only changed paths and watcher process IDs are captured; no file co
 const child = spawn(process.execPath, [nestCli, 'start', '--watch', '--preserveWatchOutput'], {
   cwd: join(ROOT, 'apps/api'),
   env,
-  stdio: 'inherit',
+  // Stream console output back to the terminal without recording it on disk.
+  // Only the fixed compiler-rebuild marker is appended to the private log.
+  stdio: ['inherit', 'pipe', 'pipe'],
+  // Nest CLI spawns the live API child: give the diagnostic tree its own
+  // process group so Ctrl+C cannot leave an orphan API on the probe port.
+  detached: true,
 });
-for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.once(signal, () => child.kill(signal));
+const compilerMarker = createNestCompilerMarker(() => {
+  try {
+    boundedRecord(logFile, {
+      timestamp: new Date().toISOString(),
+      pid: child.pid,
+      event: 'compiler-rebuild',
+      path: 'nest-typescript',
+    });
+  } catch {
+    // Diagnostic failures must never change watch/restart behaviour.
+  }
+});
+child.stdout.on('data', (chunk) => {
+  compilerMarker(chunk);
+  process.stdout.write(chunk);
+});
+child.stderr.on('data', (chunk) => {
+  compilerMarker(chunk);
+  process.stderr.write(chunk);
+});
+function stopDiagnosticGroup(signal = 'SIGTERM') {
+  if (!child.pid) return;
+  try {
+    process.kill(-child.pid, signal);
+  } catch (error) {
+    if (error.code !== 'ESRCH') console.error('WATCH_DIAGNOSTIC_STOP_FAILED', error.code);
+  }
 }
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.once(signal, () => {
+    stopDiagnosticGroup(signal);
+    const force = setTimeout(() => stopDiagnosticGroup('SIGKILL'), 4_000);
+    force.unref();
+  });
+}
+// If Nest CLI exits but the app child survives, stop only the diagnostics
+// process group. Never signal the parent shell or another operator session.
+process.once('exit', () => stopDiagnosticGroup());
 child.once('error', (error) => {
   console.error('WATCH_DIAGNOSTIC_FAILED', error.code || 'spawn-failed');
   process.exitCode = 1;
 });
 child.once('exit', (code, signal) => {
+  stopDiagnosticGroup();
   console.log('WATCH_DIAGNOSTIC_FINISHED', JSON.stringify({ code, signal, logFile }));
   process.exitCode = code ?? (signal ? 130 : 1);
 });
