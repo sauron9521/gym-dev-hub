@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import type { INestApplication } from '@nestjs/common';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MemoryController } from '../src/memory/memory.controller.js';
+import { MemoryAuthenticatedReadService } from '../src/memory/memory-authenticated-read.service.js';
 import { MemoryAuthorizationService } from '../src/security/memory-authorization.service.js';
 import { MemoryOperatorCredentialController } from '../src/security/memory-operator-credential.controller.js';
 import { MemoryOperatorCredentialService } from '../src/security/memory-operator-credential.service.js';
@@ -24,7 +25,13 @@ const service = new MemoryOperatorCredentialService(authorization, env, verifySc
 
 @Module({
   controllers: [MemoryOperatorCredentialController, MemoryController],
-  providers: [{ provide: MemoryOperatorCredentialService, useValue: service }],
+  providers: [
+    { provide: MemoryOperatorCredentialService, useValue: service },
+    {
+      provide: MemoryAuthenticatedReadService,
+      useValue: new MemoryAuthenticatedReadService(authorization, env),
+    },
+  ],
 })
 class LocalHttpTestModule {}
 
