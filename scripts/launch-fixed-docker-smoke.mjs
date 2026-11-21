@@ -4,7 +4,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { chmod, copyFile, cp, lstat, mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { chmod, lstat, mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -93,128 +93,111 @@ export async function main(argv = process.argv.slice(2)) {
     });
     const fileHash = sha256(await readFile(join(checkout, FILE)));
 
-    // The trusted provisioner retains its private 0700/0600 store. Never chmod
-    // that original. Copy only verified public dependency content into a
-    // disposable Docker-readable mirror, accessible only for this smoke.
+    // Use the production stage adapter, never a weaker smoke-only copy.
     const originalStore = resolve(process.env.DEV_HUB_PATCH_CHECK_PNPM_STORE);
-    const storeName = originalStore.split('/').at(-1);
-    if (!/^[a-f0-9]{64}$/.test(storeName ?? ''))
-      throw new Error('Pinned store must use a deterministic key');
-    const storeParent = join(temp, 'public-store');
-    const storeMirror = join(storeParent, storeName);
-    await mkdir(storeParent, { mode: 0o755 });
-    const skipProjects = join(originalStore, 'v11', 'projects');
-    await cp(originalStore, storeMirror, {
-      recursive: true,
-      force: false,
-      errorOnExist: true,
-      dereference: false,
-      filter: async (source) => {
-        if (source === skipProjects || source.startsWith(skipProjects + '/')) return false;
-        const info = await lstat(source);
-        if (info.isSymbolicLink() || (!info.isDirectory() && !info.isFile()))
-          throw new Error('Untrusted store entry type');
-        return true;
-      },
-    });
-    checked('chmod', ['-R', 'u=rwX,go=rX', storeMirror]);
-    await copyFile(originalStore + '.json', storeMirror + '.json');
-    await chmod(storeMirror + '.json', 0o600);
-    process.env.DEV_HUB_PATCH_CHECK_PNPM_STORE = storeMirror;
 
     const [
       { preparePatchCheckRunner, runPatchChecksDocker },
       { withPatchCheckSourceStage },
+      { withPatchCheckStoreStage },
       { appendPatchCheckAudit, readPatchCheckAudit, projectPatchCheckHistory },
     ] = await Promise.all([
       import('../apps/api/dist/worktree/worktree-patch-checks-docker.js'),
       import('../apps/api/dist/worktree/worktree-patch-check-stage.js'),
+      import('../apps/api/dist/worktree/worktree-patch-check-store-stage.js'),
       import('../apps/api/dist/worktree/worktree-patch-check-audit.js'),
     ]);
     const sessionId = randomUUID();
     const planId = randomUUID();
     const completed = [];
-    for (const recipeId of RECIPES) {
-      currentRecipe = recipeId;
-      const grant = {
-        id: randomUUID(),
-        sessionId,
-        planId,
-        recipeId,
-        filePath: FILE,
-        sourceCommit: commit,
-        sourceSha256: fileHash,
-        proposedSha256: fileHash,
-        fingerprint: 'sha256:' + sha256(recipeId + commit),
-      };
-      const runId = randomUUID();
-      await appendPatchCheckAudit('issued', grant);
-      await appendPatchCheckAudit('attempted', grant, runId);
-      const started = Date.now();
-      const receipt = await withPatchCheckSourceStage(checkout, async (stagePath) => {
-        const prepared = await preparePatchCheckRunner(stagePath);
-        return runPatchChecksDocker(
-          prepared,
-          recipeId,
-          FILE,
-          fileHash,
-          new AbortController().signal,
-        );
-      });
-      await appendPatchCheckAudit('passed', grant, runId, {
-        durationMs: Date.now() - started,
-        stdoutBytes: receipt.stdoutBytes,
-        stderrBytes: receipt.stderrBytes,
-        containerRemoved: receipt.containerRemoved,
-      });
-      const history = projectPatchCheckHistory(
-        await readPatchCheckAudit(),
-        sessionId,
-        planId,
-        null,
-        new Set(),
-      );
-      const entry = history.items.find((item) => item.grantId === grant.id);
-      if (entry?.status !== 'passed' || !receipt.containerRemoved)
-        throw new Error('Real Docker success was not durable in the test-only journal');
-      completed.push(recipeId);
-      process.stdout.write('FIXED_RECIPE_PASSED ' + recipeId + '\n');
-    }
+    await withPatchCheckStoreStage(
+      originalStore,
+      join(checkout, 'pnpm-lock.yaml'),
+      new AbortController().signal,
+      async (stagedStore) => {
+        for (const recipeId of RECIPES) {
+          currentRecipe = recipeId;
+          const grant = {
+            id: randomUUID(),
+            sessionId,
+            planId,
+            recipeId,
+            filePath: FILE,
+            sourceCommit: commit,
+            sourceSha256: fileHash,
+            proposedSha256: fileHash,
+            fingerprint: 'sha256:' + sha256(recipeId + commit),
+          };
+          const runId = randomUUID();
+          await appendPatchCheckAudit('issued', grant);
+          await appendPatchCheckAudit('attempted', grant, runId);
+          const started = Date.now();
+          const receipt = await withPatchCheckSourceStage(checkout, async (stagePath) => {
+            const prepared = await preparePatchCheckRunner(stagePath, stagedStore);
+            return runPatchChecksDocker(
+              prepared,
+              recipeId,
+              FILE,
+              fileHash,
+              new AbortController().signal,
+            );
+          });
+          await appendPatchCheckAudit('passed', grant, runId, {
+            durationMs: Date.now() - started,
+            stdoutBytes: receipt.stdoutBytes,
+            stderrBytes: receipt.stderrBytes,
+            containerRemoved: receipt.containerRemoved,
+          });
+          const history = projectPatchCheckHistory(
+            await readPatchCheckAudit(),
+            sessionId,
+            planId,
+            null,
+            new Set(),
+          );
+          const entry = history.items.find((item) => item.grantId === grant.id);
+          if (entry?.status !== 'passed' || !receipt.containerRemoved)
+            throw new Error('Real Docker success was not durable in the test-only journal');
+          completed.push(recipeId);
+          process.stdout.write('FIXED_RECIPE_PASSED ' + recipeId + '\n');
+        }
 
-    // Simulate an interrupted audit after process loss in TEST-ONLY journal;
-    // never kill production API, overwrite its audit, or fake a success.
-    const interrupted = {
-      id: randomUUID(),
-      sessionId,
-      planId,
-      recipeId: 'WEB_TEST',
-      filePath: FILE,
-      sourceCommit: commit,
-      sourceSha256: fileHash,
-      proposedSha256: fileHash,
-      fingerprint: 'sha256:' + sha256('incomplete-' + commit),
-    };
-    await appendPatchCheckAudit('issued', interrupted);
-    await appendPatchCheckAudit('attempted', interrupted, randomUUID());
-    const history = projectPatchCheckHistory(
-      await readPatchCheckAudit(),
-      sessionId,
-      planId,
-      null,
-      new Set(),
-    );
-    if (history.items.find((item) => item.grantId === interrupted.id)?.status !== 'interrupted')
-      throw new Error('Unfinished test-only audit was incorrectly marked successful');
-    process.stdout.write(
-      JSON.stringify({
-        status: 'isolated-real-docker-fixture-verified',
-        sourceCommit: commit,
-        recipesPassed: completed,
-        temporaryAuditOnly: true,
-        interruptedProjection: 'interrupted',
-        productionGrantsUsed: false,
-        productionAuditWritten: false,
-      }) + '\n',
+        // Simulate an interrupted audit after process loss in TEST-ONLY journal;
+        // never kill production API, overwrite its audit, or fake a success.
+        const interrupted = {
+          id: randomUUID(),
+          sessionId,
+          planId,
+          recipeId: 'WEB_TEST',
+          filePath: FILE,
+          sourceCommit: commit,
+          sourceSha256: fileHash,
+          proposedSha256: fileHash,
+          fingerprint: 'sha256:' + sha256('incomplete-' + commit),
+        };
+        await appendPatchCheckAudit('issued', interrupted);
+        await appendPatchCheckAudit('attempted', interrupted, randomUUID());
+        const history = projectPatchCheckHistory(
+          await readPatchCheckAudit(),
+          sessionId,
+          planId,
+          null,
+          new Set(),
+        );
+        if (history.items.find((item) => item.grantId === interrupted.id)?.status !== 'interrupted')
+          throw new Error('Unfinished test-only audit was incorrectly marked successful');
+        process.stdout.write(
+          JSON.stringify({
+            status: 'isolated-real-docker-fixture-verified',
+            sourceCommit: commit,
+            recipesPassed: completed,
+            temporaryAuditOnly: true,
+            interruptedProjection: 'interrupted',
+            productionGrantsUsed: false,
+            productionAuditWritten: false,
+          }) + '\n',
+        );
+      },
     );
   } finally {
     // Only the freshly created temporary directory belongs to this script.

@@ -27,6 +27,12 @@ production audit receipt** workflow acceptance required before closing #107.
    sg docker -c 'node --env-file=/home/sauron/Projects/gym-dev-hub/apps/api/.env scripts/launch-fixed-docker-smoke.mjs --confirm-isolated-docker-smoke'
    ```
 
+The probe calls the **same bounded `withPatchCheckStoreStage` helper as the
+production operator**, rather than a separate test-only store copier. The
+helper verifies the current lockfile digest before publishing a temporary
+Docker-readable store. The exact original owner-provisioned store remains
+0700/0600; never chmod or chown the original to work around Docker.
+
 The probe refuses root, remote/TLS Docker contexts, nonlocal Unix socket paths,
 world-accessible/non-socket Docker endpoints, missing pin, or missing explicit
 confirmation. It reads only the **committed tracked Git tree** using `git archive`,
