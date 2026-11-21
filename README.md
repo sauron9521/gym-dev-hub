@@ -66,6 +66,10 @@ An independently approved [read-only Docker mount probe](docs/worktree-mount.md)
 
 The Workspace can now connect to a locally installed Codex CLI and create or resume isolated **read-only** Codex threads. PR #6 adds a separate text-only [Codex Agent Chat](docs/agent-chat.md) using these threads, while keeping worktree and PR mutation disabled. See [Codex Adapter setup and security](docs/codex-adapter.md).
 
+## Gym Platform launch plan
+
+For the owner-controlled rollout from local Hub operator mode to actual Gym Platform development (trusted Linux setup → one real Draft PR → daily use), follow the [Gym Platform Hub launch roadmap](docs/gym-platform-hub-launch-roadmap.md) and [Launch Epic #105](https://github.com/sauron9521/gym-dev-hub/issues/105). Do not enable target-repository write permissions until the corresponding launch gates are actually verified.
+
 ## Verification
 
 ```bash

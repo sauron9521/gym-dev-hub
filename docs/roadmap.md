@@ -46,4 +46,6 @@
 44. **PR lifecycle**: task-to-draft-PR workflow, local checks, CI feedback and review gate.
 45. **Orchestration**: task dependencies, safe parallel scheduling, recovery and multi-repo support.
 
+**Gym Platform daily-development launch:** see [the separate M0/M1/M2 operator rollout roadmap](gym-platform-hub-launch-roadmap.md) and [Epic #105](https://github.com/sauron9521/gym-dev-hub/issues/105). These target-repository launch gates are independent from Shared Agent Memory Epic #34 and do not authorize target writes by default.
+
 Deliver each milestone as small, reviewable pull requests. The owner performs every merge manually.
