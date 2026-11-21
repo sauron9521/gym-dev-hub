@@ -221,3 +221,49 @@ Do not disable the image hash pin, change `.env` secrets or reuse already
 consumed grants. A new isolated recipe `API_FORMAT` / `WEB_FORMAT` may
 require re-provisioning the pinned store only when the lockfile changes;
 this PR does not change the lockfile.
+
+## Investigating unexpected NestJS `--watch` restarts (Issue #79)
+
+Normal development (`pnpm --filter @gym-dev-hub/api dev`) uses the NestJS
+TypeScript watcher, which intentionally restarts the API child when the
+compiler sees a source-file change. In the first long-running Docker E2E,
+that restart disconnected HTTP, and the durable receipt was correctly
+recorded as `interrupted`, **not** `passed`. A separate live Nest CLI
+reproduction verified that creating and deleting a full 303-file snapshot
+under `apps/api/.local/worktrees` **did not** trigger a restart; modifying
+`apps/api/src/main.ts` did. Blanket excluding `.local` would therefore
+not be an evidence-backed fix.
+
+For targeted **opt-in** diagnostics (never enabled on the primary API), run:
+
+```bash
+pnpm diagnose:nest-watch             # separate 127.0.0.1:3102 API
+# or: pnpm diagnose:nest-watch 3103
+```
+
+The launcher creates a new local ignored `apps/api/.local/nest-watch-diagnostics/`
+JSONL file (mode `0600`) and starts the same Nest CLI watch compiler under
+Node's diagnostic-only `fs.watch`/`fs.watchFile` preload. Each file-change
+notification records timestamp, process PID, event type and a sanitized
+repository-relative path. Private `.local` and other sensitive/unrelated
+paths are redacted or SHA-256-prefixed; **no file content, keys, environment
+variables or command arguments** are written. High-volume dependency/cache
+notifications are sampled, while owned source-file changes are retained. The
+trace is capped at 256 KiB and closed automatically when Nest exits. Compare timestamps immediately
+preceding `File change detected` with the trace; **correlation alone is not
+proof** of a root cause. Add or remove _only throwaway files_ in a dedicated
+worktree to validate a suspected watcher trigger, and never touch the primary
+Hub service or reuse consumed one-time grants.
+
+Until a specific offending watched path is reproducible and fixed, run
+long-running approved Docker checks with a stable built API:
+
+```bash
+pnpm --filter @gym-dev-hub/contracts build
+pnpm --filter @gym-dev-hub/api build
+sg docker -c 'cd /path/to/gym-dev-hub && pnpm --filter @gym-dev-hub/api start'
+# In another terminal: pnpm --filter @gym-dev-hub/web dev
+```
+
+This preserves existing audit and interruption semantics. No changes are
+made to tracked NestJS watch configuration, CI or regular `pnpm dev`.
