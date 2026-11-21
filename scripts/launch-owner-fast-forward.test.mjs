@@ -132,6 +132,10 @@ test('real busy port blocks even owner-confirmed mode without any Git write', as
       checkout: f.checkout,
       backup: f.backup,
       ports: [port],
+      processInspector: async () => ({
+        status: 'no-known-operator-processes-at-scan-time',
+        totalBlocking: 0,
+      }),
     });
     assert.equal(out.status, 'blocked-operator-ports-active');
     assert.equal(out.gitWritesPerformed, false);
@@ -154,6 +158,10 @@ test('real Git fast-forward preserves the two dirty files, .worktrees and ignore
       checkout: f.checkout,
       backup: f.backup,
       ports: [port],
+      processInspector: async () => ({
+        status: 'no-known-operator-processes-at-scan-time',
+        totalBlocking: 0,
+      }),
     });
     assert.equal(dry.status, 'owner-cutover-preflight-passed');
     assert.equal(dry.gitWritesPerformed, false);
@@ -171,6 +179,10 @@ test('real Git fast-forward preserves the two dirty files, .worktrees and ignore
       checkout: f.checkout,
       backup: f.backup,
       ports: [port],
+      processInspector: async () => ({
+        status: 'no-known-operator-processes-at-scan-time',
+        totalBlocking: 0,
+      }),
     });
     assert.equal(done.status, 'owner-fast-forward-verified');
     assert.equal(done.gitWritesPerformed, true);
@@ -213,6 +225,10 @@ test('fail closed for tampered backups and unexpected untracked files, never cha
         checkout: f.checkout,
         backup: f.backup,
         ports: [port],
+        processInspector: async () => ({
+          status: 'no-known-operator-processes-at-scan-time',
+          totalBlocking: 0,
+        }),
       }),
     );
     assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.oldHead);
@@ -230,6 +246,10 @@ test('fail closed for tampered backups and unexpected untracked files, never cha
         checkout: g.checkout,
         backup: g.backup,
         ports: [port],
+        processInspector: async () => ({
+          status: 'no-known-operator-processes-at-scan-time',
+          totalBlocking: 0,
+        }),
       }),
     );
     assert.equal(git(g.checkout, 'rev-parse', 'HEAD'), g.oldHead);
@@ -251,6 +271,10 @@ test('refuses linked-worktree checkout and symlinked backup before any Git write
         checkout: f.checkout,
         backup: alias,
         ports: [port],
+        processInspector: async () => ({
+          status: 'no-known-operator-processes-at-scan-time',
+          totalBlocking: 0,
+        }),
       }),
     );
     const wt = await mkdtemp(join(tmpdir(), 'owner-ff-linked-'));
@@ -264,6 +288,10 @@ test('refuses linked-worktree checkout and symlinked backup before any Git write
           checkout: wt,
           backup: f.backup,
           ports: [port],
+          processInspector: async () => ({
+            status: 'no-known-operator-processes-at-scan-time',
+            totalBlocking: 0,
+          }),
         }),
       );
     } finally {
@@ -272,6 +300,68 @@ test('refuses linked-worktree checkout and symlinked backup before any Git write
     assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.oldHead);
   } finally {
     await rm(alias, { force: true });
+    await removeFixture(f);
+  }
+});
+
+test('port-free cutover still blocks a surviving Node supervisor detected by process provenance', async () => {
+  const f = await createFixture();
+  try {
+    const port = await freePort();
+    const report = await runOwnerFastForward({
+      mode: '--confirm-owner-fast-forward',
+      expectedMain: f.expectedMain,
+      checkout: f.checkout,
+      backup: f.backup,
+      ports: [port],
+      processInspector: async () => ({
+        status: 'operator-processes-not-confirmed-stopped',
+        totalBlocking: 1,
+      }),
+    });
+    assert.equal(report.status, 'blocked-operator-processes-active');
+    assert.equal(report.backupVerified, true);
+    assert.equal(report.gitWritesPerformed, false);
+    assert.equal(report.runtimeRestarted, false);
+    assert.equal(report.detectedOperatorProcesses, 1);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.oldHead);
+    assert.equal(await readFile(join(f.checkout, 'turbo.json'), 'utf8'), f.originalTurbo);
+  } finally {
+    await removeFixture(f);
+  }
+});
+
+test('refuses inconsistent or unavailable process scanner, never authorizes a write', async () => {
+  const f = await createFixture();
+  try {
+    const port = await freePort();
+    await assert.rejects(
+      runOwnerFastForward({
+        mode: '--confirm-owner-fast-forward',
+        expectedMain: f.expectedMain,
+        checkout: f.checkout,
+        backup: f.backup,
+        ports: [port],
+        processInspector: async () => ({
+          status: 'no-known-operator-processes-at-scan-time',
+          totalBlocking: 9,
+        }),
+      }),
+    );
+    await assert.rejects(
+      runOwnerFastForward({
+        mode: '--confirm-owner-fast-forward',
+        expectedMain: f.expectedMain,
+        checkout: f.checkout,
+        backup: f.backup,
+        ports: [port],
+        processInspector: async () => {
+          throw Error('Unreadable proc');
+        },
+      }),
+    );
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.oldHead);
+  } finally {
     await removeFixture(f);
   }
 });

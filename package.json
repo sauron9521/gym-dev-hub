@@ -18,7 +18,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test && node --test packages/runner/patch-checks-local.test.mjs scripts/prepare-patch-check-store.test.mjs scripts/nest-watch-fs-probe.test.mjs scripts/nest-watch-compiler-marker.test.mjs scripts/dev-operator.test.mjs scripts/launch-source-reconcile.test.mjs scripts/launch-fixed-docker-smoke.test.mjs scripts/launch-sigkill-recovery-smoke.test.mjs scripts/launch-live-operator-readiness.test.mjs scripts/launch-source-owner-backup.test.mjs scripts/launch-owner-fast-forward.test.mjs",
+    "test": "turbo run test && node --test packages/runner/patch-checks-local.test.mjs scripts/prepare-patch-check-store.test.mjs scripts/nest-watch-fs-probe.test.mjs scripts/nest-watch-compiler-marker.test.mjs scripts/dev-operator.test.mjs scripts/launch-source-reconcile.test.mjs scripts/launch-fixed-docker-smoke.test.mjs scripts/launch-sigkill-recovery-smoke.test.mjs scripts/launch-live-operator-readiness.test.mjs scripts/launch-source-owner-backup.test.mjs scripts/launch-owner-fast-forward.test.mjs scripts/launch-operator-process-provenance.test.mjs",
     "diagnose:nest-watch": "node scripts/diagnose-nest-watch.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
