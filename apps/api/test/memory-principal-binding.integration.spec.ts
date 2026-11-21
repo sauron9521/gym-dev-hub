@@ -91,12 +91,12 @@ describe.skipIf(!enabled)('real DB memory bearer-scope membership (isolated Post
     }
   });
 
-  it('allows registered agent session, task-member and external registered-task reads', async () => {
+  it('allows exact registered agent session and separately scoped external reads', async () => {
     const exact = principal(repoA, { agentId: agentA, taskId: taskA, sessionId: sessionA });
     await expect(verifyMemoryPrincipalBinding(exact, db)).resolves.toEqual(exact);
     await expect(
       verifyMemoryPrincipalBinding(principal(repoA, { agentId: agentA, taskId: taskA }), db),
-    ).resolves.toMatchObject({ repository: repoA });
+    ).rejects.toMatchObject({ code: 'forbidden' });
     await expect(
       verifyMemoryPrincipalBinding(principal(repoA, { taskId: taskA }), db),
     ).resolves.toMatchObject({ repository: repoA });
@@ -134,6 +134,8 @@ describe.skipIf(!enabled)('real DB memory bearer-scope membership (isolated Post
       agentId: agentA,
     });
     for (const bad of [
+      { ...valid, sessionId: undefined },
+      { ...valid, taskId: undefined },
       { ...valid, sessionId: sessionB },
       { ...valid, taskId: taskB },
       { ...valid, agentId: agentB },

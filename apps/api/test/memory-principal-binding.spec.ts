@@ -31,7 +31,13 @@ const agent = (context: Partial<MemoryPrincipal['readContext']> = {}): MemoryPri
   actorId: randomUUID(),
   repository,
   permission: 'READ_VERIFIED',
-  readContext: { repository, agentId: randomUUID(), ...context },
+  readContext: {
+    repository,
+    agentId: randomUUID(),
+    taskId: randomUUID(),
+    sessionId: randomUUID(),
+    ...context,
+  },
 });
 const httpRequest = (authorization?: string) => ({
   method: 'GET',
@@ -99,7 +105,7 @@ describe('database-bound memory principal (unmounted)', () => {
       code: 'disabled',
       message: 'Memory security disabled',
     });
-    const malformed = agent({ sessionId: randomUUID() });
+    const malformed = agent({ taskId: undefined, sessionId: randomUUID() });
     await expect(verifyMemoryPrincipalBinding(malformed, db)).rejects.toMatchObject({
       code: 'forbidden',
     });
@@ -144,6 +150,8 @@ describe('database-bound memory principal (unmounted)', () => {
       kind: 'agent',
       repository,
       agentId: randomUUID(),
+      taskId: randomUUID(),
+      sessionId: randomUUID(),
       ttlSeconds: 60,
     }).bearerToken;
     const { db, query } = dbStub({ ...allPresent(), agent_exists: false });

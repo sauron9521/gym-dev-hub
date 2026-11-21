@@ -163,7 +163,14 @@ describe('memory security independent configuration and loopback boundary', () =
 describe('ephemeral memory principals and read-only agent credentials', () => {
   it('refuses token minting without operator authentication', () => {
     const svc = new MemoryAuthorizationService(environment());
-    const payload = { kind: 'agent', repository: repoA, agentId, taskId, ttlSeconds: 60 };
+    const payload = {
+      kind: 'agent',
+      repository: repoA,
+      agentId,
+      taskId,
+      sessionId,
+      ttlSeconds: 60,
+    };
     expect(() => svc.provisionReadCredential('wrong-secret', payload)).toThrowError(/unauthorized/);
     expect(() => svc.provisionReadCredential('', payload)).toThrowError(/unauthorized/);
     expect(svc.auditSnapshot()).toEqual([]);
@@ -199,6 +206,8 @@ describe('ephemeral memory principals and read-only agent credentials', () => {
       { kind: 'agent', repository: repoB, agentId, taskId, ttlSeconds: 60 },
       { kind: 'agent', repository: repoA, taskId, ttlSeconds: 60 },
       { kind: 'agent', repository: repoA, agentId, sessionId, ttlSeconds: 60 },
+      { kind: 'agent', repository: repoA, agentId, taskId, ttlSeconds: 60 },
+      { kind: 'agent', repository: repoA, agentId, ttlSeconds: 60 },
       { kind: 'operator', repository: repoA, agentId, ttlSeconds: 60 },
     ])
       expect(() => svc.provisionReadCredential(operatorSecret, payload)).toThrow(
@@ -247,6 +256,8 @@ describe('ephemeral memory principals and read-only agent credentials', () => {
       kind: 'agent',
       repository: repoA,
       agentId,
+      taskId,
+      sessionId,
       ttlSeconds: 1,
     });
     expect(() =>
@@ -258,6 +269,8 @@ describe('ephemeral memory principals and read-only agent credentials', () => {
       kind: 'agent',
       repository: repoA,
       agentId,
+      taskId,
+      sessionId,
       ttlSeconds: 1,
     });
     now += 1000;
@@ -270,6 +283,8 @@ describe('ephemeral memory principals and read-only agent credentials', () => {
       kind: 'agent',
       repository: repoA,
       agentId,
+      taskId,
+      sessionId,
       ttlSeconds: 120,
     });
     env.DEV_HUB_MEMORY_OPERATOR_SECRET = 'rotated-operator-secret-'.repeat(2);
@@ -278,6 +293,8 @@ describe('ephemeral memory principals and read-only agent credentials', () => {
       kind: 'agent',
       repository: repoA,
       agentId,
+      taskId,
+      sessionId,
       ttlSeconds: 120,
     });
     env.DEV_HUB_MEMORY_ALLOWED_REPOSITORIES = repoB;
@@ -295,6 +312,8 @@ describe('ephemeral memory principals and read-only agent credentials', () => {
           kind: 'agent',
           repository: repoA,
           agentId,
+          taskId,
+          sessionId,
           ttlSeconds: 60,
         });
       } catch (e) {
@@ -307,6 +326,8 @@ describe('ephemeral memory principals and read-only agent credentials', () => {
         kind: 'agent',
         repository: repoA,
         agentId,
+        taskId,
+        sessionId,
         ttlSeconds: 60,
       }),
     ).toThrowError(/rate-limited/);
@@ -316,6 +337,8 @@ describe('ephemeral memory principals and read-only agent credentials', () => {
         kind: 'agent',
         repository: repoA,
         agentId,
+        taskId,
+        sessionId,
         ttlSeconds: 60,
       }).permission,
     ).toBe('READ_VERIFIED');

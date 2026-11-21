@@ -22,11 +22,15 @@ const env: NodeJS.ProcessEnv = {
     'postgresql://gym_dev_hub:fixture-only@127.0.0.1:55441/gym_dev_hub_memory',
 };
 const identity = randomUUID();
+const taskIdentity = randomUUID();
+const sessionIdentity = randomUUID();
 const authorization = new MemoryAuthorizationService(env);
 const issued = authorization.provisionReadCredential(secret, {
   kind: 'agent',
   repository,
   agentId: identity,
+  taskId: taskIdentity,
+  sessionId: sessionIdentity,
   ttlSeconds: 600,
 });
 const valid = {
@@ -162,6 +166,8 @@ describe('actual Nest GET /v1/memory authorization, opt-in and scope', () => {
       kind: 'agent',
       repository,
       agentId: randomUUID(),
+      taskId: taskIdentity,
+      sessionId: sessionIdentity,
       ttlSeconds: 50,
     });
     authorization.revokeCredential(secret, temporary.credentialId);
@@ -316,6 +322,8 @@ describe('actual Nest GET /v1/memory authorization, opt-in and scope', () => {
       kind: 'agent',
       repository,
       agentId: identity,
+      taskId: taskIdentity,
+      sessionId: sessionIdentity,
       ttlSeconds: 60,
     });
     authorization.revokeCredential(secret, token.credentialId);

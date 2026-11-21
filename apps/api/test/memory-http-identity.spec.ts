@@ -52,6 +52,8 @@ describe('reserved memory HTTP auth mapping (no registered routes)', () => {
       kind: 'agent',
       repository: repo,
       agentId,
+      taskId: randomUUID(),
+      sessionId: randomUUID(),
       ttlSeconds: 30,
     }).bearerToken;
     const authenticated = authenticateMemoryHttpRead(request('Bearer ' + bearer), svc, env);
@@ -68,12 +70,30 @@ describe('reserved memory HTTP auth mapping (no registered routes)', () => {
     const spoofed = authenticateMemoryHttpRead(wrongRepoRequest, svc, env);
     expect(spoofed.repository).toBe(repo); // query string NEVER creates principal
   });
+  it('does not allow external MCP bearer tokens through agent HTTP routes even with external opt-in', () => {
+    const externalEnv = { ...env, DEV_HUB_MEMORY_EXTERNAL_READ_ENABLE: 'true' };
+    const svc = new MemoryAuthorizationService(externalEnv);
+    const token = svc.provisionReadCredential(secret, {
+      kind: 'external',
+      repository: repo,
+      ttlSeconds: 60,
+    });
+    // Internal external-reader primitives remain separately provisionable, but
+    // no external MCP principal may use the agent-only HTTP read routes.
+    expect(svc.authenticateReadBearer(token.bearerToken).type).toBe('external');
+    expect(() =>
+      authenticateMemoryHttpRead(request('Bearer ' + token.bearerToken), svc, externalEnv),
+    ).toThrowError(expect.objectContaining({ status: 403 }));
+  });
+
   it('remote request, origin mismatch or token in URL rejected with 403', () => {
     const svc = new MemoryAuthorizationService(env);
     const bearer = svc.provisionReadCredential(secret, {
       kind: 'agent',
       repository: repo,
       agentId: randomUUID(),
+      taskId: randomUUID(),
+      sessionId: randomUUID(),
       ttlSeconds: 30,
     }).bearerToken;
     for (const req of [
