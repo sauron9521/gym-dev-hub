@@ -6,6 +6,7 @@ import { GitHubService } from './github/github.service.js';
 import { ReadinessService } from './github/readiness.service.js';
 import { WorkspaceController } from './workspace/workspace.controller.js';
 import { WorkspaceService } from './workspace/workspace.service.js';
+import { WorkflowReadinessService } from './workspace/workflow-readiness.service.js';
 import { CodexBridgeService } from './codex/codex-bridge.service.js';
 import { CodexController } from './codex/codex.controller.js';
 import { CodexChatService } from './codex/codex-chat.service.js';
@@ -50,6 +51,7 @@ import { TaskTypecheckService } from './worktree/task-typecheck.service.js';
     GitHubService,
     ReadinessService,
     WorkspaceService,
+    WorkflowReadinessService,
     CodexBridgeService,
     CodexChatService,
     BoundaryService,

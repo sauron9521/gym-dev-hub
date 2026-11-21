@@ -19,6 +19,9 @@ function allowedPath(segments: string[], method: string): string | null {
     if (segments[1] === 'status' && method === 'GET') return '/workspace/boundary/status';
     if (segments[1] === 'preflight' && method === 'POST') return '/workspace/boundary/preflight';
   }
+  if (segments.length === 1 && segments[0] === 'workflow-readiness' && method === 'GET') {
+    return '/workspace/sessions/workflow-readiness';
+  }
   if (segments[0] !== 'sessions') return null;
   if (segments.length === 1 && (method === 'GET' || method === 'POST')) {
     return '/workspace/sessions';

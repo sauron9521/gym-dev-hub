@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import type { AgentSession, WorkspaceOverview } from '@gym-dev-hub/contracts';
 import { WorkspaceService } from './workspace.service.js';
+import { WorkflowReadinessService } from './workflow-readiness.service.js';
+import type { WorkflowReadinessReport } from '@gym-dev-hub/contracts';
 import { CodexChatService } from '../codex/codex-chat.service.js';
 import { Sse } from '@nestjs/common';
 import type { ChatSnapshot, ChatStreamEvent } from '@gym-dev-hub/contracts';
@@ -11,7 +13,14 @@ export class WorkspaceController {
   constructor(
     private readonly workspace: WorkspaceService,
     private readonly chat: CodexChatService,
+    private readonly workflowReadiness: WorkflowReadinessService,
   ) {}
+
+  /** Read-only smoke preflight: checks env presence and Git SHA only. */
+  @Get('workflow-readiness')
+  readiness(): Promise<WorkflowReadinessReport> {
+    return this.workflowReadiness.report();
+  }
 
   @Get()
   list(): Promise<WorkspaceOverview> {
