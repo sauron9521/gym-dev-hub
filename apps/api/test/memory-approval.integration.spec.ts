@@ -21,6 +21,7 @@ const env: NodeJS.ProcessEnv = {
   DEV_HUB_MEMORY_SECURITY_ENABLE: 'true',
   DEV_HUB_MEMORY_PROPOSALS_HTTP_ENABLE: 'true',
   DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE: 'true',
+  DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE: 'true',
   DEV_HUB_MEMORY_ALLOWED_REPOSITORIES: repository,
   DEV_HUB_MEMORY_OPERATOR_SECRET: secret,
   DEV_HUB_MEMORY_TRUSTED_ORIGIN: 'http://127.0.0.1:3100',
@@ -272,6 +273,204 @@ describe.skipIf(!enabled)(
       );
       expect(revision.rows[0]?.n).toBe(1);
       await expect(approve(grant)).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('rejects a sourced PROPOSED proposal with immutable revision and durable operator audit, invisible to reads', async () => {
+      const created = await create(randomUUID());
+      const grant = await approvals.reviewRejectionAndGrant(secret, {
+        repository,
+        recordId: created.recordId,
+        expectedRevision: 1,
+      });
+      expect(grant.action).toBe('REJECT_MEMORY_PROPOSAL');
+      expect(grant.preview).toMatchObject({
+        text: created.payload.text,
+        sourceRef: created.payload.sourceRef,
+      });
+      const result = await approvals.reject(secret, grant.grantToken, created.recordId, {
+        repository,
+        expectedRevision: 1,
+        fingerprint: grant.fingerprint,
+      });
+      expect(result).toEqual({ recordId: created.recordId, status: 'REVOKED', revision: 2 });
+      const record = await pool.query(
+        'SELECT status,revision,verified_by,verified_at,text,agent_id,session_id FROM memory_records WHERE id=$1',
+        [created.recordId],
+      );
+      expect(record.rows[0]).toMatchObject({
+        status: 'REVOKED',
+        revision: 2,
+        verified_by: null,
+        verified_at: null,
+        text: created.payload.text,
+        agent_id: agentId,
+        session_id: sessionId,
+      });
+      const revisions = await pool.query(
+        'SELECT revision,status,text,source_id,changed_by FROM memory_revisions WHERE memory_id=$1 ORDER BY revision',
+        [created.recordId],
+      );
+      expect(revisions.rows).toHaveLength(2);
+      expect(revisions.rows.map((x) => x.status)).toEqual(['PROPOSED', 'REVOKED']);
+      expect(revisions.rows[0].source_id).toBe(revisions.rows[1].source_id);
+      expect(revisions.rows[1]).toMatchObject({
+        revision: 2,
+        changed_by: 'local-operator',
+        text: created.payload.text,
+      });
+      const audit = await pool.query(
+        'SELECT action,operator_actor_id,grant_id,previous_digest,resulting_digest,agent_id,task_id,session_id FROM memory_mutation_audit WHERE memory_id=$1',
+        [created.recordId],
+      );
+      expect(audit.rows).toHaveLength(2);
+      expect(audit.rows.find((x) => x.action === 'REJECT_MEMORY_PROPOSAL')).toMatchObject({
+        operator_actor_id: 'local-operator',
+        grant_id: grant.grantId,
+        previous_digest: grant.fingerprint.slice(7),
+        agent_id: agentId,
+        task_id: taskId,
+        session_id: sessionId,
+      });
+      expect(
+        audit.rows.find((x) => x.action === 'REJECT_MEMORY_PROPOSAL')?.resulting_digest,
+      ).toMatch(/^[0-9a-f]{64}$/);
+      const ctx = { repository, agentId, taskId, sessionId };
+      const reader = new MemoryQueryService(pool, randomBytes(32));
+      expect((await reader.list(ctx, { repository })).items.map((x) => x.record.id)).not.toContain(
+        created.recordId,
+      );
+      await expect(
+        approvals.reject(secret, grant.grantToken, created.recordId, {
+          repository,
+          expectedRevision: 1,
+          fingerprint: grant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(
+        pool.query(
+          "UPDATE memory_records SET revision=revision+1,status='VERIFIED',verified_by='local-operator',verified_at=NOW(),updated_at=NOW() WHERE id=$1",
+          [created.recordId],
+        ),
+      ).rejects.toMatchObject({ code: 'P0001' });
+    });
+
+    it('competing approve and reject decisions on revision 1 return exactly one success and one 409', async () => {
+      const created = await create(randomUUID());
+      const [approveGrant, rejectGrant] = await Promise.all([
+        prepare(created.recordId),
+        approvals.reviewRejectionAndGrant(secret, {
+          repository,
+          recordId: created.recordId,
+          expectedRevision: 1,
+        }),
+      ]);
+      const results = await Promise.allSettled([
+        approve(approveGrant),
+        approvals.reject(secret, rejectGrant.grantToken, created.recordId, {
+          repository,
+          expectedRevision: 1,
+          fingerprint: rejectGrant.fingerprint,
+        }),
+      ]);
+      expect(results.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+      const losers = results.filter((x) => x.status === 'rejected');
+      expect(losers).toHaveLength(1);
+      if (losers[0]?.status === 'rejected') expect(losers[0].reason).toMatchObject({ status: 409 });
+      const record = await pool.query('SELECT status,revision FROM memory_records WHERE id=$1', [
+        created.recordId,
+      ]);
+      expect(['VERIFIED', 'REVOKED']).toContain(record.rows[0]?.status);
+      expect(record.rows[0]?.revision).toBe(2);
+      const history = await pool.query(
+        'SELECT count(*)::int AS n FROM memory_revisions WHERE memory_id=$1',
+        [created.recordId],
+      );
+      expect(history.rows[0]?.n).toBe(2);
+      const audit = await pool.query(
+        "SELECT action FROM memory_mutation_audit WHERE memory_id=$1 AND action IN ('APPROVE_MEMORY_PROPOSAL','REJECT_MEMORY_PROPOSAL')",
+        [created.recordId],
+      );
+      expect(audit.rows).toHaveLength(1);
+      await expect(
+        approvals.reject(secret, rejectGrant.grantToken, created.recordId, {
+          repository,
+          expectedRevision: 1,
+          fingerprint: rejectGrant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('rejects direct PROPOSED→REVOKED SQL without transaction-local operator action', async () => {
+      const created = await create(randomUUID());
+      await expect(
+        pool.query(
+          "UPDATE memory_records SET status='REVOKED',revision=revision+1,updated_at=NOW() WHERE id=$1",
+          [created.recordId],
+        ),
+      ).rejects.toMatchObject({ code: 'P0001' });
+      const state = await pool.query('SELECT status,revision FROM memory_records WHERE id=$1', [
+        created.recordId,
+      ]);
+      expect(state.rows[0]).toMatchObject({ status: 'PROPOSED', revision: 1 });
+    });
+
+    it('reject decision audit failure rolls back state/revision and permanently consumes the grant', async () => {
+      const created = await create(randomUUID());
+      const grant = await approvals.reviewRejectionAndGrant(secret, {
+        repository,
+        recordId: created.recordId,
+        expectedRevision: 1,
+      });
+      const failing = new MemoryApprovalService(
+        auth,
+        env,
+        (url) => {
+          const inner = new pg.Pool({ connectionString: url, ssl: false, max: 1 });
+          return {
+            connect: async () => {
+              const client = await inner.connect();
+              return {
+                query: async (sql: string, params?: unknown[]) => {
+                  if (sql.includes('INSERT INTO memory_mutation_audit'))
+                    throw Error('private artificial audit failure');
+                  return client.query(sql, params);
+                },
+                release: () => client.release(),
+              };
+            },
+            end: async () => inner.end(),
+          } as unknown as pg.Pool;
+        },
+        'test',
+      );
+      await expect(
+        failing.reject(secret, grant.grantToken, created.recordId, {
+          repository,
+          expectedRevision: 1,
+          fingerprint: grant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 503 });
+      const rec = await pool.query('SELECT status,revision FROM memory_records WHERE id=$1', [
+        created.recordId,
+      ]);
+      expect(rec.rows[0]).toMatchObject({ status: 'PROPOSED', revision: 1 });
+      const hist = await pool.query(
+        'SELECT count(*)::int AS n FROM memory_revisions WHERE memory_id=$1',
+        [created.recordId],
+      );
+      expect(hist.rows[0]?.n).toBe(1);
+      await expect(
+        approvals.reject(secret, grant.grantToken, created.recordId, {
+          repository,
+          expectedRevision: 1,
+          fingerprint: grant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+      const audit = await pool.query(
+        "SELECT count(*)::int AS n FROM memory_mutation_audit WHERE memory_id=$1 AND action='REJECT_MEMORY_PROPOSAL'",
+        [created.recordId],
+      );
+      expect(audit.rows[0]?.n).toBe(0);
     });
 
     it('rejects unsourced direct records and rejects reassignment of identity/scope/text', async () => {

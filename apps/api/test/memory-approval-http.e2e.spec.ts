@@ -8,6 +8,7 @@ import { MemoryAuthorizationService } from '../src/security/memory-authorization
 import {
   MemoryApprovalController,
   MemoryApprovalGrantController,
+  MemoryRejectionGrantController,
 } from '../src/memory/memory-approval.controller.js';
 import { MemoryApprovalService } from '../src/memory/memory-approval.service.js';
 
@@ -22,6 +23,7 @@ const env: NodeJS.ProcessEnv = {
   DEV_HUB_MEMORY_ENABLE: 'true',
   DEV_HUB_MEMORY_SECURITY_ENABLE: 'true',
   DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE: 'true',
+  DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE: 'true',
   DEV_HUB_MEMORY_OPERATOR_SECRET: secret,
   DEV_HUB_MEMORY_ALLOWED_REPOSITORIES: repository,
   DEV_HUB_MEMORY_TRUSTED_ORIGIN: 'http://127.0.0.1:3100',
@@ -57,7 +59,7 @@ const sql = vi.fn(async (statement: string) => {
     };
   if (statement.includes('UPDATE memory_records')) {
     if (status !== 'PROPOSED') return { rowCount: 0, rows: [] };
-    status = 'VERIFIED';
+    status = statement.includes("status='REVOKED'") ? 'REVOKED' : 'VERIFIED';
     return { rowCount: 1, rows: [{ revision: 2, verified_at: new Date() }] };
   }
   if (statement.includes('INSERT INTO memory_mutation_audit')) auditCount++;
@@ -68,7 +70,11 @@ const pool = { connect: async () => fakeClient, query: sql, end: vi.fn() } as un
 const service = new MemoryApprovalService(auth, env, () => pool);
 
 @Module({
-  controllers: [MemoryApprovalGrantController, MemoryApprovalController],
+  controllers: [
+    MemoryApprovalGrantController,
+    MemoryRejectionGrantController,
+    MemoryApprovalController,
+  ],
   providers: [{ provide: MemoryApprovalService, useValue: service }],
 })
 class TestModule {}
@@ -252,6 +258,131 @@ describe('Nest operator approval two-step HTTP (local-only)', () => {
     expect(response.status).toBe(409);
     expect(status).toBe('PROPOSED');
     expect(auditCount).toBe(0);
+  });
+
+  it('reviews, rejects and permanently consumes only a REJECT_MEMORY_PROPOSAL grant', async () => {
+    const grantResponse = await post(base + '/operator/rejection-grants', reviewBody);
+    expect(grantResponse.status).toBe(201);
+    expect(grantResponse.headers.get('cache-control')).toBe('no-store');
+    const prepared = (await grantResponse.json()) as {
+      grantToken: string;
+      grantId: string;
+      fingerprint: string;
+      action: string;
+      preview: { text: string; sourceRef: string };
+    };
+    expect(prepared).toMatchObject({
+      action: 'REJECT_MEMORY_PROPOSAL',
+      preview: {
+        text: 'Review this untrusted agent suggestion',
+        sourceRef: 'agent-session:source-evidence',
+      },
+    });
+    const headers = { ...commonHeaders, 'x-dev-hub-memory-approval-grant': prepared.grantToken };
+    const target = base + '/' + recordId + '/reject';
+    const input = { repository, expectedRevision: 1, fingerprint: prepared.fingerprint };
+    const rejected = await post(target, input, headers);
+    expect(rejected.status).toBe(200);
+    expect(rejected.headers.get('cache-control')).toBe('no-store');
+    expect(await rejected.json()).toEqual({ recordId, status: 'REVOKED', revision: 2 });
+    expect(auditCount).toBe(1);
+    expect(status).toBe('REVOKED');
+    expect((await post(target, input, headers)).status).toBe(403);
+    expect(auditCount).toBe(1);
+  });
+
+  it('cannot exchange approval and rejection grants across operator actions', async () => {
+    const approval = (await (await review()).json()) as { grantToken: string; fingerprint: string };
+    sql.mockClear();
+    const wrong = await post(
+      base + '/' + recordId + '/reject',
+      {
+        repository,
+        expectedRevision: 1,
+        fingerprint: approval.fingerprint,
+      },
+      { ...commonHeaders, 'x-dev-hub-memory-approval-grant': approval.grantToken },
+    );
+    expect(wrong.status).toBe(403);
+    expect(sql).not.toHaveBeenCalled();
+    expect(
+      (
+        await post(
+          base + '/' + recordId + '/approve',
+          {
+            repository,
+            expectedRevision: 1,
+            fingerprint: approval.fingerprint,
+          },
+          { ...commonHeaders, 'x-dev-hub-memory-approval-grant': approval.grantToken },
+        )
+      ).status,
+    ).toBe(403);
+
+    const rejection = (await (
+      await post(base + '/operator/rejection-grants', reviewBody)
+    ).json()) as { grantToken: string; fingerprint: string };
+    sql.mockClear();
+    const inverse = await post(
+      base + '/' + recordId + '/approve',
+      {
+        repository,
+        expectedRevision: 1,
+        fingerprint: rejection.fingerprint,
+      },
+      { ...commonHeaders, 'x-dev-hub-memory-approval-grant': rejection.grantToken },
+    );
+    expect(inverse.status).toBe(403);
+    expect(sql).not.toHaveBeenCalled();
+    expect(
+      (
+        await post(
+          base + '/' + recordId + '/reject',
+          {
+            repository,
+            expectedRevision: 1,
+            fingerprint: rejection.fingerprint,
+          },
+          { ...commonHeaders, 'x-dev-hub-memory-approval-grant': rejection.grantToken },
+        )
+      ).status,
+    ).toBe(403);
+    expect(status).toBe('PROPOSED');
+  });
+
+  it('independently disables rejection while leaving approval grant reviews available', async () => {
+    env.DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE = 'false';
+    try {
+      expect((await post(base + '/operator/rejection-grants', reviewBody)).status).toBe(503);
+      expect((await review()).status).toBe(201);
+    } finally {
+      env.DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE = 'true';
+    }
+    // Changing an independent opt-in invalidates every earlier in-process grant.
+    const fresh = (await (await post(base + '/operator/rejection-grants', reviewBody)).json()) as {
+      grantToken: string;
+      fingerprint: string;
+    };
+    env.DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE = 'false';
+    try {
+      expect((await review()).status).toBe(503);
+      // Changing either flag revokes existing grants; no silent reuse.
+      expect(
+        (
+          await post(
+            base + '/' + recordId + '/reject',
+            {
+              repository,
+              expectedRevision: 1,
+              fingerprint: fresh.fingerprint,
+            },
+            { ...commonHeaders, 'x-dev-hub-memory-approval-grant': fresh.grantToken },
+          )
+        ).status,
+      ).toBe(403);
+    } finally {
+      env.DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE = 'true';
+    }
   });
 
   it('remains default-off and supports grant revocation before approval', async () => {
