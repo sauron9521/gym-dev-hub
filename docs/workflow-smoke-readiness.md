@@ -338,3 +338,14 @@ until the actual fixed non-networked recipes produce durable
 `passed` receipts without a Nest API restart, with interrupted attempts
 still recorded as `interrupted`. #79 root-cause watch investigation is
 independent; the stable compiled API intentionally disables watch.
+
+## Optional real Docker receipt diagnostics — Launch #107
+
+The [isolated real Docker smoke](launch-fixed-docker-smoke.md) provides an
+**explicitly operator-run** fixture for pinned WEB_FORMAT, WEB_TYPECHECK and
+WEB_TEST execution, plus test-only durable journal projection. It does not
+exercise or mark production grants, does not modify the primary checkout,
+and is not evidence of end-to-end authorized HTTP workflow acceptance.
+The preflight now rejects a stale pinned pnpm store (wrong source lockfile)
+**before starting Docker**, and a failed isolated recipe can report only a
+fixed allowlisted stage identifier, never raw test stderr or secrets.
