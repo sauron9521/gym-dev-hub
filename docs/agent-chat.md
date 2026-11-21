@@ -343,3 +343,12 @@ create their own **temporary** Git repositories inside scratch. The original
 source's `.git` metadata is never mounted into the container. Vitest uses
 a static single-worker/no-file-parallelism recipe to avoid heavy Git fixture
 timeouts under the 2-CPU and 128-process sandbox limits.
+
+## Historical post-apply Docker check reports (PR #66)
+
+See [patch-check-history.md](./patch-check-history.md) for the
+independent-secret-protected, local-only read-only history endpoint and
+Workspace panel. The new history is a bounded projection of the existing
+private PR #65 audit: statuses, timestamps, elapsed time and byte counts
+only, with no raw logs or replay. The existing opt-in and authorization
+requirements still apply to **new** Docker runs.

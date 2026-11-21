@@ -39,6 +39,7 @@ import type {
   WorktreePatchCheckGrant,
   WorktreePatchCheckResult,
   WorktreePatchCheckCancel,
+  WorktreePatchCheckHistory,
 } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
@@ -218,8 +219,18 @@ export class WorktreePlanController {
     @Param('sessionId') sessionId: string,
     @Param('planId') planId: string,
     @Body() body: unknown,
-  ): WorktreePatchCheckCancel {
+  ): Promise<WorktreePatchCheckCancel> {
     return this.patchChecks.cancel(sessionId, planId, body);
+  }
+
+  /** Explicit secret-authenticated, read-only historical metadata. */
+  @Post(':planId/patch-check-history')
+  patchCheckHistory(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePatchCheckHistory> {
+    return this.patchChecks.history(sessionId, planId, body);
   }
 
   @Post(':planId/tool-authorize')

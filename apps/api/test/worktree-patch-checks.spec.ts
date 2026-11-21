@@ -26,7 +26,10 @@ const REVIEW_SECRET = 'postapply-review-secret-abcdefghijklmnopqrstuvwxyz';
 describe('operator-only post-apply Docker checks', () => {
   let base: string;
   let service: WorktreePatchChecksService;
-  let plans: { availableForMountProbe: ReturnType<typeof vi.fn> };
+  let plans: {
+    availableForMountProbe: ReturnType<typeof vi.fn>;
+    list: ReturnType<typeof vi.fn>;
+  };
   let review: { review: ReturnType<typeof vi.fn> };
   let boundary: { status: ReturnType<typeof vi.fn> };
 
@@ -60,6 +63,13 @@ describe('operator-only post-apply Docker checks', () => {
     process.env.DEV_HUB_ENABLE_PATCH_CHECKS = 'true';
     process.env.DEV_HUB_PATCH_CHECK_OPERATOR_SECRET = SECRET;
     plans = {
+      list: vi.fn().mockResolvedValue([
+        {
+          id: PLAN,
+          sessionId: SESSION,
+          repository: 'sauron9521/gym-dev-hub',
+        },
+      ]),
       availableForMountProbe: vi.fn().mockResolvedValue({
         repository: 'sauron9521/gym-dev-hub',
         fingerprint: FINGERPRINT,
@@ -281,6 +291,71 @@ describe('operator-only post-apply Docker checks', () => {
     );
   });
 
+  it('requires the independent operator secret and only a known Gym Dev Hub plan for history', async () => {
+    await expect(
+      service.history(SESSION, PLAN, {
+        operatorSecret: 'x'.repeat(40),
+      }),
+    ).rejects.toThrow('секрет');
+    await expect(
+      service.history(SESSION, PLAN, {
+        operatorSecret: SECRET,
+        other: true,
+      }),
+    ).rejects.toThrow('Некоректний');
+    delete process.env.DEV_HUB_ENABLE_PATCH_CHECKS;
+    await expect(
+      service.history(SESSION, PLAN, {
+        operatorSecret: SECRET,
+      }),
+    ).rejects.toThrow('вимкнено');
+    process.env.DEV_HUB_ENABLE_PATCH_CHECKS = 'true';
+    plans.list.mockResolvedValue([]);
+    await expect(
+      service.history(SESSION, PLAN, {
+        operatorSecret: SECRET,
+      }),
+    ).rejects.toThrow('Невідомий план');
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it('displays sanitized persisted results without rerunning Docker after restart', async () => {
+    const grant = await service.authorize(SESSION, PLAN, authorize());
+    const request = execute(grant.grantToken);
+    await service.execute(SESSION, PLAN, request);
+    const before = await service.history(SESSION, PLAN, { operatorSecret: SECRET });
+    expect(before).toMatchObject({
+      total: 1,
+      readOnly: true,
+      rawLogsAvailable: false,
+      commandsEnabled: false,
+      items: [
+        {
+          status: 'passed',
+          recipeId: 'API_TYPECHECK',
+          runId: request.runId,
+          stdoutBytes: 12,
+          stderrBytes: 0,
+          filePathSha256: expect.any(String),
+        },
+      ],
+    });
+    // New service instance has no in-memory grants or runs.
+    const restarted = new WorktreePatchChecksService(
+      plans as never,
+      review as never,
+      boundary as never,
+    );
+    const persisted = await restarted.history(SESSION, PLAN, { operatorSecret: SECRET });
+    expect(persisted.items[0]).toMatchObject(before.items[0]!);
+    expect(JSON.stringify(persisted)).not.toContain(SECRET);
+    expect(JSON.stringify(persisted)).not.toContain(REVIEW_SECRET);
+    expect(JSON.stringify(persisted)).not.toContain(grant.grantToken);
+    expect(JSON.stringify(persisted)).not.toContain(fields().filePath);
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+  });
+
   it('prevents concurrent runs and allows explicit operator cancellation', async () => {
     const grant = await service.authorize(SESSION, PLAN, authorize());
     let release!: () => void;
@@ -296,13 +371,23 @@ describe('operator-only post-apply Docker checks', () => {
     const running = service.execute(SESSION, PLAN, request);
     await vi.waitFor(() => expect(mocks.execute).toHaveBeenCalledOnce());
     await expect(service.authorize(SESSION, PLAN, authorize())).rejects.toThrow('виконується');
-    expect(
+    await expect(
       service.cancel(SESSION, PLAN, {
         runId: request.runId,
         operatorSecret: SECRET,
       }),
-    ).toEqual({ runId: request.runId, status: 'cancel-requested' });
+    ).resolves.toEqual({ runId: request.runId, status: 'cancel-requested' });
+    const during = await service.history(SESSION, PLAN, { operatorSecret: SECRET });
+    expect(during.items[0]?.status).toBe('cancel-requested');
     release();
     await expect(running).rejects.toThrow('не пройшла');
+    const after = await service.history(SESSION, PLAN, { operatorSecret: SECRET });
+    expect(after.items[0]?.status).toBe('canceled');
+    const journal = await readFile(join(base, 'private', 'audit.jsonl'), 'utf8');
+    expect(
+      [...journal.matchAll(/"event":"(issued|attempted|cancel-requested|rejected)"/g)].map(
+        (match) => match[1],
+      ),
+    ).toEqual(['issued', 'attempted', 'cancel-requested', 'rejected']);
   });
 });
