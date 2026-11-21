@@ -177,7 +177,7 @@ describe.skipIf(!enabled)(
       expect(r.rows[1].status).toBe('VERIFIED');
       expect(r.rows[1].text).toBe('Initial proposed note');
     });
-    it('rejects revision skip, historical UPDATE/DELETE and preserves approval on supersede', async () => {
+    it('rejects revision skip, historical UPDATE/DELETE and unaudited verified supersede', async () => {
       await expect(
         pool.query('UPDATE memory_records SET revision=10 WHERE id=$1', [recordA]),
       ).rejects.toMatchObject({ code: 'P0001' });
@@ -198,16 +198,18 @@ describe.skipIf(!enabled)(
         "INSERT INTO memory_records(id,repository,scope,kind,text,updated_at) VALUES($1,$2,'PROJECT','DECISION','Replacement record',NOW())",
         [newRecordId, REPO_A],
       );
-      await pool.query(
-        "UPDATE memory_records SET status='SUPERSEDED',superseded_by_id=$1,revision=revision+1,updated_at=NOW() WHERE repository=$2 AND id=$3",
-        [newRecordId, REPO_A, recordA],
-      );
+      await expect(
+        pool.query(
+          "UPDATE memory_records SET status='SUPERSEDED',superseded_by_id=$1,revision=revision+1,updated_at=NOW() WHERE repository=$2 AND id=$3",
+          [newRecordId, REPO_A, recordA],
+        ),
+      ).rejects.toMatchObject({ code: 'P0001' });
       const r = await pool.query(
         'SELECT revision,status,text FROM memory_revisions WHERE memory_id=$1 ORDER BY revision',
         [recordA],
       );
-      expect(r.rows).toHaveLength(3);
-      expect(r.rows.map((x) => x.status)).toEqual(['PROPOSED', 'VERIFIED', 'SUPERSEDED']);
+      expect(r.rows).toHaveLength(2);
+      expect(r.rows.map((x) => x.status)).toEqual(['PROPOSED', 'VERIFIED']);
     });
   },
 );

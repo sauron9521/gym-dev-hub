@@ -25,6 +25,16 @@ const reviewSchema = z.strictObject({
   recordId: z.uuid(),
   expectedRevision: z.literal(1),
 });
+const revokeReviewSchema = z.strictObject({
+  repository: MemoryRepositorySchema,
+  recordId: z.uuid(),
+  expectedRevision: z.literal(2),
+});
+const revokeSchema = z.strictObject({
+  repository: MemoryRepositorySchema,
+  expectedRevision: z.literal(2),
+  fingerprint: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+});
 const approveSchema = z.strictObject({
   repository: MemoryRepositorySchema,
   expectedRevision: z.literal(1),
@@ -44,11 +54,17 @@ type ProposalRow = {
   task_id: string;
   source_id: string;
   source_ref: string;
+  verified_by?: string | null;
+  verified_at?: Date | null;
 };
 type DecisionRow = { revision: number; verified_at: Date };
-type Decision = 'approve' | 'reject';
+type Decision = 'approve' | 'reject' | 'revoke';
 const decisionAction = (decision: Decision) =>
-  decision === 'approve' ? 'APPROVE_MEMORY_PROPOSAL' : 'REJECT_MEMORY_PROPOSAL';
+  decision === 'approve'
+    ? 'APPROVE_MEMORY_PROPOSAL'
+    : decision === 'reject'
+      ? 'REJECT_MEMORY_PROPOSAL'
+      : 'REVOKE_MEMORY_RECORD';
 const decisionStatus = (decision: Decision) => (decision === 'approve' ? 'VERIFIED' : 'REVOKED');
 const sha = (input: string) => createHash('sha256').update(input).digest('hex');
 const fingerprint = (row: ProposalRow) =>
@@ -67,6 +83,9 @@ const fingerprint = (row: ProposalRow) =>
       row.agent_id,
       row.source_id,
       row.source_ref,
+      ...(row.status === 'VERIFIED'
+        ? [row.verified_by, row.verified_at ? new Date(row.verified_at).toISOString() : null]
+        : []),
     ]),
   );
 
@@ -93,6 +112,49 @@ const PROPOSAL_QUERY = `
     AND r.status='PROPOSED' AND r.scope='SESSION'
     AND (SELECT count(*) FROM memory_sources s2
       WHERE s2.repository=r.repository AND s2.memory_id=r.id)=1
+`;
+
+/** Independently re-validate full history before revoking a VERIFIED revision 2.
+ * The verified record must originate from this exact audited agent proposal.
+ */
+const VERIFIED_QUERY = `
+  SELECT r.id,r.repository,r.kind::text,r.scope::text,r.status::text,
+    r.revision,r.text,r.session_id,r.agent_id,ms.task_id,
+    s.id AS source_id,s.source_ref,r.verified_by,r.verified_at
+  FROM memory_records r
+  JOIN memory_sessions ms ON ms.repository=r.repository
+    AND ms.id=r.session_id AND ms.agent_id=r.agent_id AND ms.task_id IS NOT NULL
+  JOIN memory_tasks t ON t.repository=r.repository AND t.id=ms.task_id
+  JOIN memory_agent_identities a ON a.repository=r.repository AND a.id=r.agent_id
+  JOIN memory_sources s ON s.repository=r.repository AND s.memory_id=r.id
+    AND s.source_type='AGENT' AND s.actor_id=r.agent_id::text
+  JOIN memory_revisions proposed ON proposed.repository=r.repository
+    AND proposed.memory_id=r.id AND proposed.revision=1
+    AND proposed.status='PROPOSED' AND proposed.source_id=s.id
+    AND proposed.scope=r.scope AND proposed.kind=r.kind AND proposed.text=r.text
+  JOIN memory_revisions verified ON verified.repository=r.repository
+    AND verified.memory_id=r.id AND verified.revision=2
+    AND verified.status='VERIFIED' AND verified.source_id=s.id
+    AND verified.scope=r.scope AND verified.kind=r.kind AND verified.text=r.text
+    AND verified.changed_by='local-operator'
+  JOIN memory_proposal_requests pr ON pr.repository=r.repository
+    AND pr.memory_id=r.id AND pr.agent_id=r.agent_id AND pr.session_id=r.session_id
+  JOIN memory_mutation_audit proposed_audit ON proposed_audit.repository=r.repository
+    AND proposed_audit.memory_id=r.id AND proposed_audit.action='PROPOSE_MEMORY'
+    AND proposed_audit.agent_id=r.agent_id AND proposed_audit.session_id=r.session_id
+    AND proposed_audit.task_id=ms.task_id
+  JOIN memory_mutation_audit approval_audit ON approval_audit.repository=r.repository
+    AND approval_audit.memory_id=r.id AND approval_audit.action='APPROVE_MEMORY_PROPOSAL'
+    AND approval_audit.agent_id=r.agent_id AND approval_audit.session_id=r.session_id
+    AND approval_audit.task_id=ms.task_id
+    AND approval_audit.operator_actor_id='local-operator' AND approval_audit.grant_id IS NOT NULL
+  WHERE r.repository=$1 AND r.id=$2::uuid AND r.revision=$3
+    AND r.revision=2 AND r.status='VERIFIED' AND r.scope='SESSION'
+    AND r.verified_by='local-operator' AND r.verified_at IS NOT NULL
+    AND (SELECT count(*) FROM memory_sources s2
+      WHERE s2.repository=r.repository AND s2.memory_id=r.id)=1
+    AND (SELECT count(*) FROM memory_revisions rv
+      WHERE rv.repository=r.repository AND rv.memory_id=r.id)=2
 `;
 
 /**
@@ -130,7 +192,9 @@ export class MemoryApprovalService {
     const flag =
       decision === 'approve'
         ? this.env.DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE
-        : this.env.DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE;
+        : decision === 'reject'
+          ? this.env.DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE
+          : this.env.DEV_HUB_MEMORY_VERIFIED_REVOCATION_HTTP_ENABLE;
     if (flag !== 'true') throw new ServiceUnavailableException('Memory operator decision disabled');
   }
 
@@ -139,7 +203,11 @@ export class MemoryApprovalService {
     if (typeof operatorSecret !== 'string') throw new MemorySecurityError('unauthorized');
     const config = memorySecurityConfig(this.env);
     const allowed =
-      decision === 'approve' ? config.approvalWriteEnabled : config.rejectionWriteEnabled;
+      decision === 'approve'
+        ? config.approvalWriteEnabled
+        : decision === 'reject'
+          ? config.rejectionWriteEnabled
+          : config.verifiedRevocationEnabled;
     if (!allowed || !config.repositories.includes(repository))
       throw new MemorySecurityError('forbidden');
     return operatorSecret;
@@ -159,11 +227,15 @@ export class MemoryApprovalService {
     return this.reviewForDecision(operatorSecret, rawInput, 'reject');
   }
 
+  async reviewVerifiedRevocationAndGrant(operatorSecret: unknown, rawInput: unknown) {
+    return this.reviewForDecision(operatorSecret, rawInput, 'revoke');
+  }
+
   private async reviewForDecision(operatorSecret: unknown, rawInput: unknown, decision: Decision) {
     this.assertEnabled(decision);
     // Authenticate operator before parsing caller's record scope or opening DB.
     this.authorization.assertOperatorForCredentialRequest(operatorSecret);
-    const parsed = reviewSchema.safeParse(rawInput);
+    const parsed = (decision === 'revoke' ? revokeReviewSchema : reviewSchema).safeParse(rawInput);
     if (!parsed.success) throw new BadRequestException('Invalid approval review request');
     const { repository, recordId, expectedRevision } = parsed.data;
     const secret = this.assertOperator(operatorSecret, repository, decision);
@@ -171,11 +243,10 @@ export class MemoryApprovalService {
     let pool: pg.Pool | undefined;
     try {
       pool = this.makePool(this.databaseUrl());
-      const result = await pool.query<ProposalRow>(PROPOSAL_QUERY, [
-        repository,
-        recordId,
-        expectedRevision,
-      ]);
+      const result = await pool.query<ProposalRow>(
+        decision === 'revoke' ? VERIFIED_QUERY : PROPOSAL_QUERY,
+        [repository, recordId, expectedRevision],
+      );
       if (result.rows.length !== 1)
         throw new ConflictException('Proposal unavailable or revision changed');
       const row = result.rows[0]!;
@@ -229,6 +300,15 @@ export class MemoryApprovalService {
     return this.transition(operatorSecret, grantToken, recordId, rawInput, 'reject');
   }
 
+  async revokeVerified(
+    operatorSecret: unknown,
+    grantToken: unknown,
+    recordId: string,
+    rawInput: unknown,
+  ): Promise<{ recordId: string; status: 'REVOKED'; revision: number }> {
+    return this.transition(operatorSecret, grantToken, recordId, rawInput, 'revoke');
+  }
+
   private async transition(
     operatorSecret: unknown,
     grantToken: unknown,
@@ -248,12 +328,19 @@ export class MemoryApprovalService {
     grantToken: unknown,
     recordId: string,
     rawInput: unknown,
+    decision: 'revoke',
+  ): Promise<{ recordId: string; status: 'REVOKED'; revision: number }>;
+  private async transition(
+    operatorSecret: unknown,
+    grantToken: unknown,
+    recordId: string,
+    rawInput: unknown,
     decision: Decision,
   ): Promise<{ recordId: string; status: 'VERIFIED' | 'REVOKED'; revision: number }> {
     this.assertEnabled(decision);
     this.authorization.assertOperatorForCredentialRequest(operatorSecret);
     const id = z.uuid().safeParse(recordId);
-    const parsed = approveSchema.safeParse(rawInput);
+    const parsed = (decision === 'revoke' ? revokeSchema : approveSchema).safeParse(rawInput);
     if (!id.success || !parsed.success) throw new BadRequestException('Invalid approval');
     const { repository, expectedRevision, fingerprint: approvalFingerprint } = parsed.data;
     const secret = this.assertOperator(operatorSecret, repository, decision);
@@ -286,11 +373,10 @@ export class MemoryApprovalService {
 
       // One row lock serializes any distinct operator grants attempting to
       // approve the same proposal concurrently; CAS rejects the loser.
-      const current = await client.query<ProposalRow>(PROPOSAL_QUERY + ' FOR UPDATE OF r', [
-        repository,
-        recordId,
-        expectedRevision,
-      ]);
+      const current = await client.query<ProposalRow>(
+        (decision === 'revoke' ? VERIFIED_QUERY : PROPOSAL_QUERY) + ' FOR UPDATE OF r',
+        [repository, recordId, expectedRevision],
+      );
       const row = current.rows[0];
       if (!row || current.rows.length !== 1 || fingerprint(row) !== approvalFingerprint)
         throw new ConflictException('Proposal unavailable or revision changed');
@@ -307,10 +393,16 @@ export class MemoryApprovalService {
          WHERE repository=$1 AND id=$2::uuid AND revision=$3
            AND status='PROPOSED' AND scope='SESSION'
          RETURNING revision,verified_at`
-          : `UPDATE memory_records SET
+          : decision === 'reject'
+            ? `UPDATE memory_records SET
            status='REVOKED',revision=revision+1,updated_at=NOW()
          WHERE repository=$1 AND id=$2::uuid AND revision=$3
            AND status='PROPOSED' AND scope='SESSION'
+         RETURNING revision,updated_at AS verified_at`
+            : `UPDATE memory_records SET
+           status='REVOKED',revision=revision+1,updated_at=NOW()
+         WHERE repository=$1 AND id=$2::uuid AND revision=$3
+           AND status='VERIFIED' AND scope='SESSION' AND verified_by='local-operator'
          RETURNING revision,updated_at AS verified_at`,
         [repository, recordId, expectedRevision],
       );

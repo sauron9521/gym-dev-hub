@@ -9,6 +9,7 @@ import {
   MemoryApprovalController,
   MemoryApprovalGrantController,
   MemoryRejectionGrantController,
+  MemoryVerifiedRevocationGrantController,
 } from '../src/memory/memory-approval.controller.js';
 import { MemoryApprovalService } from '../src/memory/memory-approval.service.js';
 
@@ -24,6 +25,7 @@ const env: NodeJS.ProcessEnv = {
   DEV_HUB_MEMORY_SECURITY_ENABLE: 'true',
   DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE: 'true',
   DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE: 'true',
+  DEV_HUB_MEMORY_VERIFIED_REVOCATION_HTTP_ENABLE: 'true',
   DEV_HUB_MEMORY_OPERATOR_SECRET: secret,
   DEV_HUB_MEMORY_ALLOWED_REPOSITORIES: repository,
   DEV_HUB_MEMORY_TRUSTED_ORIGIN: 'http://127.0.0.1:3100',
@@ -32,13 +34,16 @@ const env: NodeJS.ProcessEnv = {
 };
 const auth = new MemoryAuthorizationService(env);
 let status = 'PROPOSED';
+let revision = 1;
+let verifiedAt: Date | null = null;
 let sourceRef = 'agent-session:source-evidence';
 let auditCount = 0;
 const sql = vi.fn(async (statement: string) => {
-  if (statement.includes('FROM memory_records r'))
+  if (statement.includes('FROM memory_records r')) {
+    const expected = statement.includes("r.status='VERIFIED'") ? 'VERIFIED' : 'PROPOSED';
     return {
       rows:
-        status === 'PROPOSED'
+        status === expected
           ? [
               {
                 id: recordId,
@@ -46,21 +51,33 @@ const sql = vi.fn(async (statement: string) => {
                 kind: 'DECISION',
                 scope: 'SESSION',
                 status,
-                revision: 1,
+                revision,
                 text: 'Review this untrusted agent suggestion',
                 session_id: sessionId,
                 agent_id: agentId,
                 task_id: taskId,
                 source_id: sourceId,
                 source_ref: sourceRef,
+                verified_by: status === 'VERIFIED' ? 'local-operator' : null,
+                verified_at: verifiedAt,
               },
             ]
           : [],
     };
+  }
   if (statement.includes('UPDATE memory_records')) {
-    if (status !== 'PROPOSED') return { rowCount: 0, rows: [] };
+    const isVerifiedRevoke = statement.includes("status='VERIFIED' AND scope='SESSION'");
+    if (isVerifiedRevoke) {
+      if (status !== 'VERIFIED' || revision !== 2) return { rowCount: 0, rows: [] };
+      status = 'REVOKED';
+      revision = 3;
+      return { rowCount: 1, rows: [{ revision, verified_at: new Date() }] };
+    }
+    if (status !== 'PROPOSED' || revision !== 1) return { rowCount: 0, rows: [] };
     status = statement.includes("status='REVOKED'") ? 'REVOKED' : 'VERIFIED';
-    return { rowCount: 1, rows: [{ revision: 2, verified_at: new Date() }] };
+    revision = 2;
+    if (status === 'VERIFIED') verifiedAt = new Date();
+    return { rowCount: 1, rows: [{ revision, verified_at: verifiedAt ?? new Date() }] };
   }
   if (statement.includes('INSERT INTO memory_mutation_audit')) auditCount++;
   return { rows: [], rowCount: 1 };
@@ -73,6 +90,7 @@ const service = new MemoryApprovalService(auth, env, () => pool);
   controllers: [
     MemoryApprovalGrantController,
     MemoryRejectionGrantController,
+    MemoryVerifiedRevocationGrantController,
     MemoryApprovalController,
   ],
   providers: [{ provide: MemoryApprovalService, useValue: service }],
@@ -108,6 +126,8 @@ describe('Nest operator approval two-step HTTP (local-only)', () => {
   });
   beforeEach(() => {
     status = 'PROPOSED';
+    revision = 1;
+    verifiedAt = null;
     sourceRef = 'agent-session:source-evidence';
     auditCount = 0;
     sql.mockClear();
@@ -382,6 +402,126 @@ describe('Nest operator approval two-step HTTP (local-only)', () => {
       ).toBe(403);
     } finally {
       env.DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE = 'true';
+    }
+  });
+
+  it('reviews a VERIFIED revision 2, revokes with a distinct action and burns the grant', async () => {
+    const approvedGrant = (await (await review()).json()) as {
+      grantToken: string;
+      fingerprint: string;
+    };
+    const approved = await post(
+      base + '/' + recordId + '/approve',
+      { repository, expectedRevision: 1, fingerprint: approvedGrant.fingerprint },
+      { ...commonHeaders, 'x-dev-hub-memory-approval-grant': approvedGrant.grantToken },
+    );
+    expect(approved.status).toBe(200);
+    expect(status).toBe('VERIFIED');
+    expect(revision).toBe(2);
+    const response = await post(base + '/operator/revocation-grants', {
+      repository,
+      recordId,
+      expectedRevision: 2,
+    });
+    expect(response.status).toBe(201);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const grant = (await response.json()) as {
+      grantToken: string;
+      grantId: string;
+      fingerprint: string;
+      action: string;
+      preview: { text: string; sourceRef: string };
+    };
+    expect(grant.action).toBe('REVOKE_MEMORY_RECORD');
+    expect(grant.fingerprint).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(grant.preview.text).toBe('Review this untrusted agent suggestion');
+    const headers = { ...commonHeaders, 'x-dev-hub-memory-approval-grant': grant.grantToken };
+    const body = { repository, expectedRevision: 2, fingerprint: grant.fingerprint };
+    const revoked = await post(base + '/' + recordId + '/revoke', body, headers);
+    expect(revoked.status).toBe(200);
+    expect(revoked.headers.get('cache-control')).toBe('no-store');
+    expect(await revoked.json()).toEqual({ recordId, status: 'REVOKED', revision: 3 });
+    expect(auditCount).toBe(2);
+    expect((await post(base + '/' + recordId + '/revoke', body, headers)).status).toBe(403);
+    expect(
+      (
+        await post(base + '/operator/revocation-grants', {
+          repository,
+          recordId,
+          expectedRevision: 2,
+        })
+      ).status,
+    ).toBe(409);
+  });
+
+  it('refuses premature revocation, bad revisions, agent bearer and cross-action grants', async () => {
+    const badRev = await post(base + '/operator/revocation-grants', {
+      repository,
+      recordId,
+      expectedRevision: 1,
+    });
+    expect(badRev.status).toBe(400);
+    expect(
+      (
+        await post(base + '/operator/revocation-grants', {
+          repository,
+          recordId,
+          expectedRevision: 2,
+        })
+      ).status,
+    ).toBe(409);
+    const proposedGrant = (await (await review()).json()) as {
+      fingerprint: string;
+      grantToken: string;
+    };
+    sql.mockClear();
+    const wrong = await post(
+      base + '/' + recordId + '/revoke',
+      { repository, expectedRevision: 2, fingerprint: proposedGrant.fingerprint },
+      { ...commonHeaders, 'x-dev-hub-memory-approval-grant': proposedGrant.grantToken },
+    );
+    expect(wrong.status).toBe(403);
+    expect(sql).not.toHaveBeenCalled();
+    expect(
+      (
+        await post(
+          base + '/' + recordId + '/approve',
+          { repository, expectedRevision: 1, fingerprint: proposedGrant.fingerprint },
+          { ...commonHeaders, 'x-dev-hub-memory-approval-grant': proposedGrant.grantToken },
+        )
+      ).status,
+    ).toBe(403);
+    const agent = auth.provisionReadCredential(secret, {
+      kind: 'agent',
+      repository,
+      agentId,
+      taskId,
+      sessionId,
+      ttlSeconds: 60,
+    });
+    expect(
+      (
+        await post(
+          base + '/operator/revocation-grants',
+          { repository, recordId, expectedRevision: 2 },
+          { ...commonHeaders, authorization: 'Bearer ' + agent.bearerToken },
+        )
+      ).status,
+    ).toBe(403);
+    env.DEV_HUB_MEMORY_VERIFIED_REVOCATION_HTTP_ENABLE = 'false';
+    try {
+      expect(
+        (
+          await post(base + '/operator/revocation-grants', {
+            repository,
+            recordId,
+            expectedRevision: 2,
+          })
+        ).status,
+      ).toBe(503);
+      expect((await review()).status).toBe(201);
+    } finally {
+      env.DEV_HUB_MEMORY_VERIFIED_REVOCATION_HTTP_ENABLE = 'true';
     }
   });
 
