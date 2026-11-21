@@ -79,6 +79,8 @@ function allowedPath(segments: string[], method: string): string | null {
       'patch-check-execute',
       'patch-check-cancel',
       'patch-check-history',
+      'commit-candidate-preview',
+      'commit-candidate-acknowledge',
       'tool-authorize',
       'tool-execute',
       'task-preview',
@@ -157,6 +159,8 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
         : AbortSignal.timeout(
             path.endsWith('/mount-probe') ||
               path.endsWith('/code-read') ||
+              path.endsWith('/commit-candidate-preview') ||
+              path.endsWith('/commit-candidate-acknowledge') ||
               path.endsWith('/tool-execute')
               ? 45_000
               : path.endsWith('/boundary/preflight')

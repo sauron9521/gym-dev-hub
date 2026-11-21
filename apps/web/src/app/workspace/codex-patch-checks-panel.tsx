@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CodexCommitCandidatePanel } from './codex-commit-candidate-panel';
 import type {
   WorktreePatchCheckGrant,
   WorktreePatchCheckRecipe,
@@ -308,6 +309,13 @@ export function CodexPatchChecksPanel({
             Джерело read-only, мережа вимкнена; commit, push і merge не створювалися. Для запуску
             іншої перевірки потрібен новий дозвіл.
           </small>
+          <CodexCommitCandidatePanel
+            sessionId={sessionId}
+            planId={planId}
+            fingerprint={fingerprint}
+            applied={applied}
+            verified={verified}
+          />
         </div>
       )}
     </section>
