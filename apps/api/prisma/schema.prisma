@@ -40,16 +40,50 @@ enum MemorySourceType {
 }
 
 model MemoryRepository {
-  name             String                  @id @db.VarChar(200)
-  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  name             String                   @id @db.VarChar(200)
+  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   tasks            MemoryTask[]
   agents           MemoryAgentIdentity[]
   sessions         MemorySession[]
   records          MemoryRecord[]
   proposalRequests MemoryProposalRequest[]
   mutationAudits   MemoryMutationAudit[]
+  operators        MemoryOperatorIdentity[]
 
   @@map("memory_repositories")
+}
+
+// Distinct, role-scoped local operator credentials, never plaintext secrets.
+// These are credential-holder identities, not proof of a unique natural person.
+model MemoryOperatorIdentity {
+  id          String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  repository  String                        @db.VarChar(200)
+  handle      String                        @db.VarChar(48)
+  role        String                        @db.VarChar(16)
+  tokenDigest String                        @unique @map("token_digest") @db.Char(64)
+  createdAt   DateTime                      @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt   DateTime                      @map("expires_at") @db.Timestamptz(3)
+  revokedAt   DateTime?                     @map("revoked_at") @db.Timestamptz(3)
+  project     MemoryRepository              @relation(fields: [repository], references: [name], onUpdate: Restrict, onDelete: Restrict)
+  audits      MemoryOperatorIdentityAudit[]
+
+  @@unique([repository, handle])
+  @@unique([repository, id])
+  @@index([repository, role, expiresAt])
+  @@map("memory_operator_identities")
+}
+
+model MemoryOperatorIdentityAudit {
+  id         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  repository String                 @db.VarChar(200)
+  operatorId String                 @map("operator_id") @db.Uuid
+  action     String                 @db.VarChar(16)
+  actor      String                 @default("bootstrap-root") @db.VarChar(32)
+  createdAt  DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  operator   MemoryOperatorIdentity @relation(fields: [repository, operatorId], references: [repository, id], onUpdate: Restrict, onDelete: Restrict)
+
+  @@index([repository, operatorId, createdAt])
+  @@map("memory_operator_identity_audit")
 }
 
 model MemoryTask {

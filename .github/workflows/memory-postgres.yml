@@ -11,10 +11,14 @@ on:
       - 'apps/api/src/security/memory-http-identity.ts'
       - 'apps/api/src/security/memory-operator-credential.service.ts'
       - 'apps/api/src/security/memory-operator-credential.controller.ts'
+      - 'apps/api/src/security/memory-operator-identity.service.ts'
+      - 'apps/api/src/security/memory-operator-identity.controller.ts'
       - 'apps/api/test/memory-read.integration.spec.ts'
       - 'apps/api/test/memory-principal-binding.integration.spec.ts'
       - 'apps/api/test/memory-operator-credential.spec.ts'
       - 'apps/api/test/memory-operator-http.e2e.spec.ts'
+      - 'apps/api/test/memory-operator-identity-http.e2e.spec.ts'
+      - 'apps/api/test/memory-operator-identity.integration.spec.ts'
       - 'apps/api/test/memory-controller.spec.ts'
       - 'apps/api/test/memory-authenticated-read-http.e2e.spec.ts'
       - 'apps/api/test/memory-proposal.integration.spec.ts'
@@ -43,10 +47,14 @@ on:
       - 'apps/api/src/security/memory-http-identity.ts'
       - 'apps/api/src/security/memory-operator-credential.service.ts'
       - 'apps/api/src/security/memory-operator-credential.controller.ts'
+      - 'apps/api/src/security/memory-operator-identity.service.ts'
+      - 'apps/api/src/security/memory-operator-identity.controller.ts'
       - 'apps/api/test/memory-read.integration.spec.ts'
       - 'apps/api/test/memory-principal-binding.integration.spec.ts'
       - 'apps/api/test/memory-operator-credential.spec.ts'
       - 'apps/api/test/memory-operator-http.e2e.spec.ts'
+      - 'apps/api/test/memory-operator-identity-http.e2e.spec.ts'
+      - 'apps/api/test/memory-operator-identity.integration.spec.ts'
       - 'apps/api/test/memory-controller.spec.ts'
       - 'apps/api/test/memory-authenticated-read-http.e2e.spec.ts'
       - 'apps/api/test/memory-proposal.integration.spec.ts'
@@ -112,6 +120,6 @@ jobs:
       - name: Build shared contracts for standalone integration tests
         run: pnpm --filter @gym-dev-hub/contracts build
       - name: Run actual PostgreSQL integration and negative tests
-        run: pnpm --filter @gym-dev-hub/api exec vitest run test/memory-database-policy.spec.ts test/memory-database-integration.spec.ts test/memory-records.integration.spec.ts test/memory-read.integration.spec.ts test/memory-principal-binding.integration.spec.ts test/memory-proposal.integration.spec.ts test/memory-approval.integration.spec.ts test/memory-controller.spec.ts test/memory-status.controller.spec.ts
+        run: pnpm --filter @gym-dev-hub/api exec vitest run test/memory-database-policy.spec.ts test/memory-database-integration.spec.ts test/memory-records.integration.spec.ts test/memory-read.integration.spec.ts test/memory-principal-binding.integration.spec.ts test/memory-proposal.integration.spec.ts test/memory-operator-identity.integration.spec.ts test/memory-approval.integration.spec.ts test/memory-controller.spec.ts test/memory-status.controller.spec.ts
       - name: Complete frozen repository checks
         run: pnpm check

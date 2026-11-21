@@ -18,12 +18,15 @@ import { MemoryAuthenticatedReadService } from './memory-authenticated-read.serv
 import { MemoryAuthorizationService } from '../security/memory-authorization.service.js';
 import { MemoryOperatorCredentialService } from '../security/memory-operator-credential.service.js';
 import { MemoryOperatorCredentialController } from '../security/memory-operator-credential.controller.js';
+import { MemoryOperatorIdentityService } from '../security/memory-operator-identity.service.js';
+import { MemoryOperatorIdentityController } from '../security/memory-operator-identity.controller.js';
 
 // Verified reads, agent proposals and operator-only CAS approval each require separate opt-in.
 @Module({
   controllers: [
     MemoryController,
     MemoryOperatorCredentialController,
+    MemoryOperatorIdentityController,
     MemoryProposalController,
     MemoryApprovalGrantController,
     MemoryRejectionGrantController,
@@ -59,6 +62,12 @@ import { MemoryOperatorCredentialController } from '../security/memory-operator-
       provide: MemoryProposalService,
       useFactory: (authorization: MemoryAuthorizationService) =>
         new MemoryProposalService(authorization),
+      inject: [MemoryAuthorizationService],
+    },
+    {
+      provide: MemoryOperatorIdentityService,
+      useFactory: (authorization: MemoryAuthorizationService) =>
+        new MemoryOperatorIdentityService(authorization),
       inject: [MemoryAuthorizationService],
     },
     {

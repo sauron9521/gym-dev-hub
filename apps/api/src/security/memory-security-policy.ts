@@ -10,6 +10,7 @@ export type MemorySecurityConfiguration = {
   rejectionWriteEnabled: boolean;
   verifiedRevocationEnabled: boolean;
   supersedeEnabled: boolean;
+  operatorIdentityEnabled: boolean;
 };
 
 /** Independent, opt-in memory identity namespace, never existing worktree grants. */
@@ -89,6 +90,13 @@ export function memorySecurityConfig(env: NodeJS.ProcessEnv): MemorySecurityConf
   const supersedeFlag = env.DEV_HUB_MEMORY_SUPERSEDE_HTTP_ENABLE;
   if (supersedeFlag !== undefined && supersedeFlag !== 'true' && supersedeFlag !== 'false')
     throw new MemorySecurityError('disabled');
+  const operatorIdentityFlag = env.DEV_HUB_MEMORY_OPERATOR_IDENTITIES_HTTP_ENABLE;
+  if (
+    operatorIdentityFlag !== undefined &&
+    operatorIdentityFlag !== 'true' &&
+    operatorIdentityFlag !== 'false'
+  )
+    throw new MemorySecurityError('disabled');
   return {
     operatorSecret,
     repositories,
@@ -99,6 +107,7 @@ export function memorySecurityConfig(env: NodeJS.ProcessEnv): MemorySecurityConf
     rejectionWriteEnabled: rejectionFlag === 'true',
     verifiedRevocationEnabled: revocationFlag === 'true',
     supersedeEnabled: supersedeFlag === 'true',
+    operatorIdentityEnabled: operatorIdentityFlag === 'true',
   };
 }
 

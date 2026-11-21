@@ -112,6 +112,7 @@ export class MemoryAuthorizationService {
         config.rejectionWriteEnabled,
         config.verifiedRevocationEnabled,
         config.supersedeEnabled,
+        config.operatorIdentityEnabled,
       ]),
     );
     if (this.previousConfigDigest !== null && this.previousConfigDigest !== fingerprint) {
