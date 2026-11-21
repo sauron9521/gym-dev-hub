@@ -12,7 +12,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test && node --test packages/runner/patch-checks-local.test.mjs scripts/prepare-patch-check-store.test.mjs scripts/nest-watch-fs-probe.test.mjs scripts/dev-operator.test.mjs",
+    "test": "turbo run test && node --test packages/runner/patch-checks-local.test.mjs scripts/prepare-patch-check-store.test.mjs scripts/nest-watch-fs-probe.test.mjs scripts/nest-watch-compiler-marker.test.mjs scripts/dev-operator.test.mjs",
     "diagnose:nest-watch": "node scripts/diagnose-nest-watch.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -249,9 +249,16 @@ repository-relative path. Private `.local` and other sensitive/unrelated
 paths are redacted or SHA-256-prefixed; **no file content, keys, environment
 variables or command arguments** are written. High-volume dependency/cache
 notifications are sampled, while owned source-file changes are retained. The
-trace is capped at 256 KiB and closed automatically when Nest exits. Compare timestamps immediately
-preceding `File change detected` with the trace; **correlation alone is not
-proof** of a root cause. Add or remove _only throwaway files_ in a dedicated
+trace is capped at 256 KiB and closed automatically when Nest exits. The launcher also writes a fixed `compiler-rebuild` marker with the Nest CLI
+process ID and timestamp each time it sees TypeScript's `File change detected. Starting incremental compilation...`
+watch notice. It streams the original terminal output to the operator but
+**never writes its raw output** to the JSONL log. Compare the marker with
+preceding `fs.watch` / `fs.watchFile` events. A nearby event is a suspect,
+not proof of causation; reproduce it independently before changing watch
+configuration. This marker is collected only in opt-in diagnostics, never
+in the stable operator API. The diagnostic Nest CLI and its spawned API live
+in a dedicated process group, so stopping the opt-in launcher also stops its
+API child and releases the diagnostic port. Add or remove _only throwaway files_ in a dedicated
 worktree to validate a suspected watcher trigger, and never touch the primary
 Hub service or reuse consumed one-time grants.
 
