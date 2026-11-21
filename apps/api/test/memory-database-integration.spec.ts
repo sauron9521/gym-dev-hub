@@ -26,12 +26,19 @@ describe.skipIf(!eligible)('opt-in Hub memory PostgreSQL integration (test DB on
       const migrations = await client.query(
         'SELECT migration_name, finished_at FROM public._prisma_migrations',
       );
-      expect(migrations.rows).toEqual([
-        expect.objectContaining({
-          migration_name: '20261121120000_memory_storage_baseline',
-          finished_at: expect.any(Date),
-        }),
-      ]);
+      expect(migrations.rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            migration_name: '20261121120000_memory_storage_baseline',
+            finished_at: expect.any(Date),
+          }),
+          expect.objectContaining({
+            migration_name: '20261121124913_memory_typed_records',
+            finished_at: expect.any(Date),
+          }),
+        ]),
+      );
+      expect(migrations.rowCount).toBe(2);
     } finally {
       await client.end();
     }

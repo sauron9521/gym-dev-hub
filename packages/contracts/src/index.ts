@@ -102,3 +102,24 @@ export type {
   WorkflowReadinessGate,
   WorkflowReadinessReport,
 } from './workflow-readiness.js';
+
+// Shared Agent Memory is **not enabled** until authenticated API rollout #38-#40.
+export {
+  MEMORY_SCHEMA_VERSION,
+  MemoryRepositorySchema,
+  MemoryKindSchema,
+  MemoryStatusSchema,
+  MemoryScopeSchema,
+  MemorySourceTypeSchema,
+  MemoryRecordSchema,
+  MemoryProvenanceSchema,
+  MemoryRevisionSchema,
+} from './memory.js';
+export type {
+  MemoryRecordDto,
+  MemoryProvenanceDto,
+  MemoryRevisionDto,
+  MemoryScope,
+  MemoryKind,
+  MemoryStatus,
+} from './memory.js';

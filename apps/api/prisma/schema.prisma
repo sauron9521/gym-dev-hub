@@ -7,5 +7,167 @@ datasource db {
   provider = "postgresql"
 }
 
-// Intentionally no models: #37 adds revisioned Shared Agent Memory records.
+// Issue #37: versioned records only; authenticated read/write routes remain disabled.
 // This database is not gym-platform and has no schema overlap with it.
+
+// Repo entries are explicitly provisioned by a trusted operator; never
+// inferred from agent-supplied notes. Composite relations forbid cross-tenant IDs.
+enum MemoryKind {
+  FACT
+  DECISION
+  CONSTRAINT
+  PROPOSAL
+}
+
+enum MemoryStatus {
+  PROPOSED
+  VERIFIED
+  SUPERSEDED
+  REVOKED
+}
+
+enum MemoryScope {
+  PROJECT
+  TASK
+  SESSION
+}
+
+enum MemorySourceType {
+  GITHUB
+  WORKSPACE
+  HUMAN
+  AGENT
+}
+
+model MemoryRepository {
+  name      String                @id @db.VarChar(200)
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  tasks     MemoryTask[]
+  agents    MemoryAgentIdentity[]
+  sessions  MemorySession[]
+  records   MemoryRecord[]
+
+  @@map("memory_repositories")
+}
+
+model MemoryTask {
+  id          String           @id @default(uuid()) @db.Uuid
+  repository  String           @db.VarChar(200)
+  externalRef String           @map("external_ref") @db.VarChar(255)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  project     MemoryRepository @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  records     MemoryRecord[]
+  sessions    MemorySession[]
+
+  @@unique([repository, id])
+  @@unique([repository, externalRef])
+  @@index([repository, createdAt])
+  @@map("memory_tasks")
+}
+
+model MemoryAgentIdentity {
+  id          String           @id @default(uuid()) @db.Uuid
+  repository  String           @db.VarChar(200)
+  externalRef String           @map("external_ref") @db.VarChar(255)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  project     MemoryRepository @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  records     MemoryRecord[]
+  sessions    MemorySession[]
+
+  @@unique([repository, id])
+  @@unique([repository, externalRef])
+  @@map("memory_agent_identities")
+}
+
+model MemorySession {
+  id          String               @id @default(uuid()) @db.Uuid
+  repository  String               @db.VarChar(200)
+  externalRef String               @map("external_ref") @db.VarChar(255)
+  taskId      String?              @map("task_id") @db.Uuid
+  agentId     String?              @map("agent_id") @db.Uuid
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  project     MemoryRepository     @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  task        MemoryTask?          @relation(fields: [repository, taskId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  agent       MemoryAgentIdentity? @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  records     MemoryRecord[]
+
+  @@unique([repository, id])
+  @@unique([repository, externalRef])
+  @@index([repository, taskId])
+  @@map("memory_sessions")
+}
+
+model MemoryRecord {
+  id             String               @id @default(uuid()) @db.Uuid
+  repository     String               @db.VarChar(200)
+  scope          MemoryScope
+  kind           MemoryKind
+  status         MemoryStatus         @default(PROPOSED)
+  text           String               @db.VarChar(4096)
+  revision       Int                  @default(1)
+  taskId         String?              @map("task_id") @db.Uuid
+  sessionId      String?              @map("session_id") @db.Uuid
+  agentId        String?              @map("agent_id") @db.Uuid
+  sourceSha      String?              @map("source_sha") @db.VarChar(40)
+  expiresAt      DateTime?            @map("expires_at") @db.Timestamptz(3)
+  verifiedBy     String?              @map("verified_by") @db.VarChar(200)
+  verifiedAt     DateTime?            @map("verified_at") @db.Timestamptz(3)
+  supersededById String?              @map("superseded_by_id") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  project        MemoryRepository     @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  task           MemoryTask?          @relation(fields: [repository, taskId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  session        MemorySession?       @relation(fields: [repository, sessionId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  agent          MemoryAgentIdentity? @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  supersededBy   MemoryRecord?        @relation("MemorySupersession", fields: [repository, supersededById], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  supersedes     MemoryRecord[]       @relation("MemorySupersession")
+  sources        MemorySource[]
+  revisions      MemoryRevision[]
+
+  @@unique([repository, id])
+  @@index([repository, scope, taskId, kind, status, updatedAt])
+  @@index([repository, scope, sessionId, updatedAt])
+  @@index([repository, status, expiresAt])
+  @@map("memory_records")
+}
+
+// Provenance is anchored in the same repository and memory as the record.
+model MemorySource {
+  id         String           @id @default(uuid()) @db.Uuid
+  repository String           @db.VarChar(200)
+  memoryId   String           @map("memory_id") @db.Uuid
+  sourceType MemorySourceType @map("source_type")
+  actorId    String           @map("actor_id") @db.VarChar(200)
+  sourceRef  String           @map("source_ref") @db.VarChar(512)
+  sourceSha  String?          @map("source_sha") @db.VarChar(40)
+  observedAt DateTime         @map("observed_at") @db.Timestamptz(3)
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  record     MemoryRecord     @relation(fields: [repository, memoryId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  revisions  MemoryRevision[]
+
+  @@unique([repository, memoryId, id])
+  @@index([repository, memoryId, observedAt])
+  @@map("memory_sources")
+}
+
+// Immutable snapshots are populated by DB triggers, not agent-provided APIs.
+model MemoryRevision {
+  id         String        @id @default(uuid()) @db.Uuid
+  repository String        @db.VarChar(200)
+  memoryId   String        @map("memory_id") @db.Uuid
+  revision   Int
+  scope      MemoryScope
+  kind       MemoryKind
+  status     MemoryStatus
+  text       String        @db.VarChar(4096)
+  sourceSha  String?       @map("source_sha") @db.VarChar(40)
+  sourceId   String?       @map("source_id") @db.Uuid
+  changedBy  String        @map("changed_by") @db.VarChar(200)
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  record     MemoryRecord  @relation(fields: [repository, memoryId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  source     MemorySource? @relation(fields: [repository, memoryId, sourceId], references: [repository, memoryId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([repository, memoryId, revision])
+  @@index([repository, memoryId, createdAt])
+  @@map("memory_revisions")
+}
