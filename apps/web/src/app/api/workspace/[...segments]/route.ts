@@ -85,6 +85,9 @@ function allowedPath(segments: string[], method: string): string | null {
       'commit-write-execute',
       'github-push-authorize',
       'github-push-execute',
+      'github-draft-pr-authorize',
+      'github-draft-pr-execute',
+      'github-draft-pr-ci',
       'tool-authorize',
       'tool-execute',
       'task-preview',
@@ -164,7 +167,10 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
             path.endsWith('/commit-write-authorize') ||
               path.endsWith('/commit-write-execute') ||
               path.endsWith('/github-push-authorize') ||
-              path.endsWith('/github-push-execute')
+              path.endsWith('/github-push-execute') ||
+              path.endsWith('/github-draft-pr-authorize') ||
+              path.endsWith('/github-draft-pr-execute') ||
+              path.endsWith('/github-draft-pr-ci')
               ? 120_000
               : path.endsWith('/mount-probe') ||
                   path.endsWith('/code-read') ||
