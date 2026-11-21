@@ -631,3 +631,75 @@ should a controlled, non-destructive Git fast-forward be attempted.
 Then verify the running compiled API build and repair the pinned
 dependency store/explicit private audit directories under a separate
 manual cutover before actual production HTTP→Docker acceptance.
+
+## Launch #107 — owner-controlled primary Git fast-forward (manual, never automatic)
+
+`scripts/launch-owner-fast-forward.mjs` permits one explicitly approved,
+**Git fast-forward only** from the original primary Hub checkout to a
+pinned, locally available, independently verified `main` commit. The
+default is read-only. The separate write mode **must never run while the
+operator's API/Web is serving requests**: updating its source tree under
+a live Next.js HMR worker may trigger a reload or leave mixed runtime
+versions. The script does not stop/restart processes; it blocks when the
+known localhost operator ports (3100/3101, plus configured overrides)
+accept connections. This port check is a defensive guard, **not proof
+that every possible background process is stopped**; owner confirmation
+and process inspection remain required.
+
+Run the script **from an independent current Hub source worktree**, not
+the original dirty primary checkout. Do not paste any private secrets,
+source diffs or journal content into a command or chat.
+
+```sh
+# Read-only; expected to say blocked-operator-ports-active while Hub runs
+node scripts/launch-owner-fast-forward.mjs \
+  --check-only \
+  --expected-main=REPLACE_WITH_VERIFIED_40_HEX_MAIN_COMMIT \
+  --operator-checkout=/absolute/actual/primary/gym-dev-hub \
+  --verified-backup=/absolute/private/source-owner-backup-UNIQUE
+
+# Only after owner's separate approval, reviewed backup, and safe shutdown:
+node scripts/launch-owner-fast-forward.mjs \
+  --confirm-owner-fast-forward \
+  --expected-main=REPLACE_WITH_VERIFIED_40_HEX_MAIN_COMMIT \
+  --operator-checkout=/absolute/actual/primary/gym-dev-hub \
+  --verified-backup=/absolute/private/source-owner-backup-UNIQUE
+```
+
+The preflight requires a trusted canonical **primary** Git repository
+(`.git` directory, not an attached linked-worktree `.git` file),
+`main` branch with a known true ancestor of the externally pinned
+commit, no staged/unmerged/renamed changes and no dirty/upstream
+collisions. It refuses any tracked edits beyond the two previously
+reviewed local files `apps/web/next-env.d.ts` and `turbo.json`,
+as well as unknown untracked entries (the known `.worktrees/` is
+preserved). It refuses unexpected `GIT_DIR`, `GIT_WORK_TREE`,
+`GIT_INDEX_FILE`, `GIT_COMMON_DIR` and config-injection overrides.
+
+The specified backup and its parent must be **already-existing
+canonical owner-private 0700 directories outside** the primary checkout.
+The 0600 owner-owned manifest, two private copies, SHA-256 hashes and
+source bytes are checked via no-follow, stable-inode reads. The
+previous backup's recorded pinned main must be an ancestor of today's
+newly reviewed target, allowing a still-valid copy from a previous
+main after subsequent merges **only if its source HEAD and the dirty
+file bytes still match**. The script never backs up or reads
+`apps/api/.env`, `apps/api/.local` or linked worktree contents.
+
+Write mode is one and only one
+`git -c core.hooksPath=/dev/null -c merge.autoStash=false merge --ff-only`
+to the exact pinned commit, with no hooks, stash, reset, GitHub fetch
+or merge commit. It then checks that HEAD equals the requested commit
+and that both original dirty file hashes and untracked worktree entries
+remain unchanged. A failed/ambiguous Git operation is **not**
+automatically rolled back or retried; inspect the original checkout and
+private backup manually. `--check-only` reports either
+`owner-cutover-preflight-passed` or
+`blocked-operator-ports-active`, never an approved write.
+
+**Current production operator remains running and has not been
+fast-forwarded or restarted by this PR.** Even a successful source
+fast-forward would **not** establish the provenance of the already
+compiled running API, the new pinned pnpm store, explicit private
+audit directories or real production Docker audit. Keep Issue #107
+open and complete these as separate, owner-approved steps.
