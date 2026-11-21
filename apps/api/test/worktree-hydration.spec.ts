@@ -134,6 +134,26 @@ describe('bounded, one-time raw Git blob hydration on real Git fixtures', () => 
     expect(recheck.state).toBe('needs-review'); // No false "empty" preflight after materialization.
   });
 
+  it('reconstructs the per-worktree index for one-file Git review after hydration', async () => {
+    const worktreeGit = (...args: string[]): string =>
+      execFileSync('git', ['-C', plan.targetPath, ...args], {
+        encoding: 'utf8',
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+    expect(worktreeGit('ls-files')).toBe(''); // The metadata-only worktree has no index.
+
+    const grant = await issueGrant();
+    await hydration.hydrate(sessionId, plan.id, { grantToken: grant.grantToken });
+
+    expect(worktreeGit('ls-files')).toBe('.gitattributes\nbinary.dat\nsrc/hello.txt');
+    expect(worktreeGit('diff', '--cached', '--name-only', 'HEAD')).toBe('');
+    expect(worktreeGit('diff', '--name-only', 'HEAD')).toBe('');
+
+    await writeFile(join(plan.targetPath, 'src', 'hello.txt'), 'Approved one-file edit\n');
+    expect(worktreeGit('diff', '--name-only', 'HEAD')).toBe('src/hello.txt');
+  });
+
   it('consumes an authorization exactly once even with concurrent requests', async () => {
     const grant = await issueGrant();
     const results = await Promise.allSettled([

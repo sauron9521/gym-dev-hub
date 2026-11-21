@@ -26,6 +26,8 @@ Restart the NestJS server after changing configuration. **Do not commit the secr
 
 The API validates the Git tree using the PR #11 scanner before writing. Limits: **5,000 files, 20 MiB per file, 100 MiB total**, no symlinks, submodules, special file modes, Windows invalid names/ADS, parent traversal, embedded NUL, path collisions or Unicode/case aliases. Only validated regular Git blobs may be copied. All file opens are **exclusive create-only**, with per-parent directory checks; a pre-existing file cannot be overwritten. Files are created mode `0600` where supported and are `fsync`ed before the file handle closes. The source repository working tree is not written.
 
+After writing the verified blobs, hydration reconstructs the **disposable worktree’s Git index** from the exact pinned commit using fixed `git read-tree` plumbing and verifies there is no staged diff. This changes Git metadata only; it does not checkout files or touch the primary checkout. It allows subsequent one-file `git diff HEAD` review to see only actual changes instead of reporting the entire tree as staged deletions.
+
 **This does not call `git checkout`, `git restore`, hooks, filters or smudge/clean commands**, so untrusted repo configuration cannot run checkout scripts through this API. The copied files may contain arbitrary user code but that code **is not executed**.
 
 ## Persistent recovery semantics
