@@ -43,6 +43,8 @@ describe('actual loopback Nest HTTP operator credential isolation', () => {
     kind: 'agent',
     repository: repo,
     agentId: randomUUID(),
+    taskId: randomUUID(),
+    sessionId: randomUUID(),
     ttlSeconds: 90,
   });
   const headers = {
@@ -125,6 +127,27 @@ describe('actual loopback Nest HTTP operator credential isolation', () => {
       body: JSON.stringify({ ...issue(), kind: 'external' }),
     });
     expect(external.status).toBe(403);
+  });
+
+  it('refuses missing task/session or caller-forged scope before any DB query or audit', async () => {
+    verifyScope.mockClear();
+    const priorEvents = authorization.auditSnapshot().length;
+    for (const body of [
+      { ...issue(), taskId: undefined },
+      { ...issue(), sessionId: undefined },
+      { ...issue(), taskId: undefined, sessionId: undefined },
+      { ...issue(), agentId: undefined },
+      { ...issue(), taskId: 'not-a-uuid' },
+    ]) {
+      const response = await request(path, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(403);
+    }
+    expect(verifyScope).not.toHaveBeenCalled();
+    expect(authorization.auditSnapshot().length).toBe(priorEvents);
   });
 
   it('turns missing database membership into 403, outage into 503 without leaking its error', async () => {

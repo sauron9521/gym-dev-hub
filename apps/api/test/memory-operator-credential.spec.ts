@@ -75,6 +75,7 @@ describe('operator-only registered memory agent credential lifecycle', () => {
     [{ ...scoped(), ttlSeconds: 0 }],
     [{ ...scoped(), extra: 'not allowed' }],
     [{ ...scoped(), taskId: undefined }],
+    [{ ...scoped(), sessionId: undefined }],
   ])('rejects unsupported/unscoped credential bodies before database use', async (input) => {
     const { service, verify } = services();
     await expect(service.issue(secret, input)).rejects.toMatchObject({ code: 'forbidden' });

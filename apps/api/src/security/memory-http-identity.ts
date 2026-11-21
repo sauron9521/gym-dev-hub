@@ -16,7 +16,7 @@ import {
 } from './memory-security-policy.js';
 import type { LocalMemoryHttpRequest } from './memory-security-policy.js';
 
-/** Only for future authenticated HTTP route wiring; not mounted by Issue #39. */
+/** Local verified memory HTTP read request; never accepts cookie or query credentials. */
 export type MemoryHttpReadRequest = LocalMemoryHttpRequest & {
   authorization: string | undefined;
 };
@@ -38,8 +38,8 @@ export function toMemoryHttpException(error: unknown): HttpException {
 
 /**
  * Strict Authorization: Bearer <token>; no cookies or URL credentials.
- * This helper must not be called by public routes until authenticated
- * repository registration + trusted principal wiring are reviewed in #39.
+ * Agent-only local HTTP routes use this helper; PostgreSQL membership must
+ * still be checked after successful authentication on every request.
  */
 export function authenticateMemoryHttpRead(
   request: MemoryHttpReadRequest,
@@ -53,16 +53,26 @@ export function authenticateMemoryHttpRead(
     if (!header || !/^Bearer [A-Za-z0-9_-]{43}$/.test(header)) {
       throw new MemorySecurityError('unauthorized');
     }
-    return authorization.authenticateReadBearer(header.slice('Bearer '.length));
+    const principal = authorization.authenticateReadBearer(header.slice('Bearer '.length));
+    // External/MCP bearers have a separate opt-in and must not be usable on
+    // local agent HTTP routes. Reject legacy unbound agent tokens as well.
+    if (
+      principal.type !== 'agent' ||
+      !principal.readContext.agentId ||
+      !principal.readContext.taskId ||
+      !principal.readContext.sessionId
+    )
+      throw new MemorySecurityError('forbidden');
+    return principal;
   } catch (error) {
     throw toMemoryHttpException(error);
   }
 }
 
 /**
- * Future HTTP route entrypoint: authenticate local Bearer first, then verify
- * every bearer-derived repository/task/session/agent binding in PostgreSQL.
- * Not mounted by this PR. No request parameters are allowed to supply scope.
+ * Authenticate local Bearer first, then verify the exact bearer-derived
+ * repository/task/session/agent binding in PostgreSQL.
+ * No request parameters are allowed to supply scope.
  */
 export async function authenticateMemoryHttpReadWithDatabase(
   request: MemoryHttpReadRequest,

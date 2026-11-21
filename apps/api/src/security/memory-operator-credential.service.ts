@@ -16,8 +16,8 @@ const agentCredentialSchema = z.strictObject({
   kind: z.literal('agent'),
   repository: MemoryRepositorySchema,
   agentId: z.uuid(),
-  taskId: z.uuid().optional(),
-  sessionId: z.uuid().optional(),
+  taskId: z.uuid(),
+  sessionId: z.uuid(),
   ttlSeconds: z.number().int().min(1).max(900),
 });
 
@@ -25,7 +25,8 @@ type ScopeVerifier = (principal: MemoryPrincipal) => Promise<void>;
 
 /**
  * Opt-in operator-only credentials for registered Hub memory agents.
- * No read endpoints, external MCP clients, approval grants or DB writes.
+ * Never issues external MCP credentials, approval grants or DB writes;
+ * agent read routes are independently guarded and explicitly opt-in.
  * The shared authorization instance lives in MemoryModule until restart.
  */
 export class MemoryOperatorCredentialService {
@@ -71,8 +72,7 @@ export class MemoryOperatorCredentialService {
     if (!parsed.success) throw new MemorySecurityError('forbidden');
     const scope = parsed.data;
     const config = memorySecurityConfig(this.env);
-    if (!config.repositories.includes(scope.repository) || (scope.sessionId && !scope.taskId))
-      throw new MemorySecurityError('forbidden');
+    if (!config.repositories.includes(scope.repository)) throw new MemorySecurityError('forbidden');
 
     const principal: MemoryPrincipal = {
       type: 'agent',

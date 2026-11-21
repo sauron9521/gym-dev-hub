@@ -185,7 +185,10 @@ export class MemoryAuthorizationService {
     ) {
       throw new MemorySecurityError('forbidden');
     }
-    if (target.kind === 'agent' && !target.agentId) throw new MemorySecurityError('forbidden');
+    // No repository-wide or task-only agent credentials: every agent is
+    // tied to a concrete, independently DB-validated task AND session.
+    if (target.kind === 'agent' && (!target.agentId || !target.taskId || !target.sessionId))
+      throw new MemorySecurityError('forbidden');
     if (target.sessionId && !target.taskId) throw new MemorySecurityError('forbidden');
     if (target.kind === 'external' && target.ttlSeconds > 300)
       throw new MemorySecurityError('forbidden');

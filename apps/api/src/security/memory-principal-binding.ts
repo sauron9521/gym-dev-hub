@@ -8,7 +8,8 @@ import { MemorySecurityError } from './memory-security-policy.js';
  * A valid bearer only establishes a claimed scope: it must never alone authorize
  * access to a repository, task, session or agent-private record.
  *
- * This helper is not attached to HTTP routes until a separate reviewed change.
+ * The HTTP gateway calls this on EVERY read, not just at credential issuance.
+ * Agent credentials must be bound to an exact, existing task/session pair.
  */
 export async function verifyMemoryPrincipalBinding(
   principal: MemoryPrincipal,
@@ -20,7 +21,8 @@ export async function verifyMemoryPrincipalBinding(
     principal.permission !== 'READ_VERIFIED' ||
     principal.repository !== parsed.data.repository ||
     !['agent', 'external'].includes(principal.type) ||
-    (principal.type === 'agent' && !parsed.data.agentId) ||
+    (principal.type === 'agent' &&
+      (!parsed.data.agentId || !parsed.data.taskId || !parsed.data.sessionId)) ||
     (principal.type === 'external' && (parsed.data.agentId || parsed.data.sessionId)) ||
     (parsed.data.sessionId && !parsed.data.taskId)
   ) {
