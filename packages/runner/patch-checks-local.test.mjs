@@ -4,7 +4,11 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { stageSourceAndVerify, validatePatchCheckArgs } from './patch-checks-local.mjs';
+import {
+  stageSourceAndVerify,
+  stageOfflineStore,
+  validatePatchCheckArgs,
+} from './patch-checks-local.mjs';
 
 const hash = (v) => createHash('sha256').update(v).digest('hex');
 const CONTENT = 'export const answer = 42;\n';
@@ -60,6 +64,41 @@ test('refuses symlinks even when inside source directory', async () => {
     await assert.rejects(
       stageSourceAndVerify(source, join(root, 'output'), 'apps/api/src/main.ts', SHA),
       /Symlink/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('copies a bounded pnpm store into private scratch and skips host project links', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'devhub-store-stage-'));
+  try {
+    const source = join(root, 'trusted');
+    const output = join(root, 'private');
+    await mkdir(join(source, 'v11/files/aa'), { recursive: true });
+    await mkdir(join(source, 'v11/projects'), { recursive: true });
+    await writeFile(join(source, 'v11/files/aa/blob'), 'content');
+    await writeFile(join(source, 'v11/index.db'), 'index');
+    await symlink('/tmp/never-allowed-host-source', join(source, 'v11/projects/pointer'));
+    const stats = await stageOfflineStore(source, output);
+    assert.deepEqual(stats, { files: 2, bytes: 12 });
+    assert.equal(await readFile(join(output, 'v11/files/aa/blob'), 'utf8'), 'content');
+    await assert.rejects(readFile(join(output, 'v11/projects/pointer')));
+    await symlink('/etc/passwd', join(source, 'v11/files/aa/invalid'));
+    await assert.rejects(stageOfflineStore(source, join(root, 'reject')), /Symlink/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed if a copied pnpm store has no verified index', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'devhub-store-stage-'));
+  try {
+    await mkdir(join(root, 'source/v11/files/aa'), { recursive: true });
+    await writeFile(join(root, 'source/v11/files/aa/blob'), 'data');
+    await assert.rejects(
+      stageOfflineStore(join(root, 'source'), join(root, 'private')),
+      /Incomplete pinned pnpm store/,
     );
   } finally {
     await rm(root, { recursive: true, force: true });

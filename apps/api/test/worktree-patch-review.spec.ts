@@ -18,7 +18,7 @@ const AFTER = 'one\nTWO\nthree\n';
 const OTHER = 'export const other = true;\n';
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const git = (cwd: string, args: string[]): string =>
-  execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', timeout: 8_000 }).trim();
+  execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', timeout: 30_000 }).trim();
 
 describe('read-only post-apply verification of one Git worktree file', () => {
   let base: string;

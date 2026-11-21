@@ -91,7 +91,7 @@ export function validatePatchCheckSecurity(raw: string): void {
         typeof value !== 'string' ||
         !['nosuid', 'nodev'].every((flag) => value.includes(flag)) ||
         (key !== '/workspace' && !value.includes('noexec')) ||
-        (key === '/workspace' && value.includes('noexec')),
+        (key === '/workspace' && (!value.split(',').includes('exec') || value.includes('noexec'))),
     )
   ) {
     throw new Error('Unapproved Docker patch check scratch volumes');
@@ -296,7 +296,7 @@ export async function runPatchChecksDocker(
         '--pids-limit=128',
         '--memory=5g',
         '--cpus=2',
-        '--tmpfs=/workspace:rw,nosuid,nodev,size=3072m,mode=1777',
+        '--tmpfs=/workspace:rw,exec,nosuid,nodev,size=3072m,mode=1777',
         '--tmpfs=/results:rw,nosuid,nodev,noexec,size=32m,mode=1777',
         '--tmpfs=/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777',
         ...prepared.mounts.flatMap((mount) => [

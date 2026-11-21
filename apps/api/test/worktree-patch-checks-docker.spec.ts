@@ -76,7 +76,7 @@ describe('pinned Docker one-file check receipt/security policy', () => {
       JSON.stringify(['no-new-privileges:true']) +
       '|' +
       JSON.stringify({
-        '/workspace': 'rw,nosuid,nodev,size=3072m,mode=1777',
+        '/workspace': 'rw,exec,nosuid,nodev,size=3072m,mode=1777',
         '/results': 'rw,nosuid,nodev,noexec,size=32m,mode=1777',
         '/tmp': 'rw,nosuid,nodev,noexec,size=64m,mode=1777',
       });
@@ -84,7 +84,7 @@ describe('pinned Docker one-file check receipt/security policy', () => {
     for (const bad of [
       good.replace('no-new-privileges:true', 'privileged'),
       good.replace('noexec', 'exec'),
-      good.replace('rw,nosuid,nodev,size=3072m', 'rw,nosuid,nodev,noexec,size=3072m'),
+      good.replace('rw,exec,nosuid,nodev,size=3072m', 'rw,nosuid,nodev,noexec,size=3072m'),
       good.replace('["ALL"]', '[]'),
       good.replace('/results', '/host'),
     ])

@@ -282,6 +282,21 @@ trusted `gym-dev-hub-node-runner:v1` image from the updated
 script-free** pnpm 12 store as absolute canonical
 `DEV_HUB_PATCH_CHECK_PNPM_STORE`, available inside the Docker mount and
 containing the dependencies from the repository's unchanged lockfile.
+For Alpine (musl), provision both `linux-x64` and `linux-x64-musl`
+optional packages from the exact reviewed lockfile using pnpm
+`supportedArchitectures`; a Linux-glibc-only cache is insufficient for
+native Rollup/Vitest binaries. Provision with no package lifecycle scripts
+and verify the lockfile remains unchanged. The **read-only** host store is
+copied (with bounds and no untrusted symlinks) into container-private
+`/workspace/.pnpm-store`, excluding pnpm's host `v11/projects`
+bookkeeping links. pnpm 12 can update its local SQLite index in this private
+copy. Install uses `--offline --frozen-lockfile --ignore-scripts
+--trust-lockfile`; the last flag is allowed here **only after** the Hub has
+independently verified every Git blob of the original, immutable lockfile
+and the one approved postimage. pnpm still checks package bytes/integrity.
+The pnpm CLI is invoked through an exact Node executable path rather than
+a shell wrapper, to work with `shell:false`.
+
 Missing image, store, dependency closure, stale Git or credentials cause
 fail-closed rejection; the API never builds images or downloads packages.
 The image tag alone is never enough; its exact ID and expected non-root,
@@ -322,3 +337,9 @@ execution must be manually provisioned and smoke-tested; unit/CI checks
 alone cannot prove a runnable local Docker configuration. No automated
 commit, push, PR, merge, rollback or follow-up tests are implied by a
 single passed check.
+
+The reviewed Docker image also includes Git strictly for project tests that
+create their own **temporary** Git repositories inside scratch. The original
+source's `.git` metadata is never mounted into the container. Vitest uses
+a static single-worker/no-file-parallelism recipe to avoid heavy Git fixture
+timeouts under the 2-CPU and 128-process sandbox limits.

@@ -9,7 +9,7 @@ LABEL org.gym-dev-hub.runner.protocol="1" \
 
 # Build-time network only: install a trusted runtime, NEVER project packages.
 # --ignore-scripts disables package lifecycle scripts while provisioning pnpm.
-RUN apk add --no-cache nodejs npm \
+RUN apk add --no-cache nodejs npm git \
     && test "$(node -p 'process.versions.node.split(".")[0]')" = "24" \
     && npm install --global --ignore-scripts --no-audit --no-fund pnpm@12.18.0 \
     && test "$(pnpm --version)" = "12.18.0" \
