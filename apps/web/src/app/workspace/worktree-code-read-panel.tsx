@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { prepareScopedCodexDraft } from './codex-scoped-draft';
+import { CodexPatchPreviewPanel } from './codex-patch-preview-panel';
 import type {
   WorktreeCodeReadGrant,
   WorktreeCodeReadResult,
@@ -166,6 +167,13 @@ export function WorktreeCodeReadPanel({
           <pre className="ws-code-read-result">
             <code>{result.content}</code>
           </pre>
+          {readCommit && (
+            <CodexPatchPreviewPanel
+              key={readCommit + ':' + result.checkedAt + ':' + result.filePath}
+              source={result}
+              sourceCommit={readCommit}
+            />
+          )}
           {onPrepareCodexDraft &&
             (codexDraft ? (
               <>

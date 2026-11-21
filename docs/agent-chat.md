@@ -61,3 +61,33 @@ The AI response is an **untrusted proposed unified diff**, not an applied
 patch. Human review, deterministic validation, per-worktree code-writing
 authorization, fixed isolated test recipes and GitHub PR creation require
 **separate future changes**. No GitHub push or merge capability is enabled.
+
+## One-file Codex patch preview (PR #61)
+
+After the separately approved one-file Docker read from a verified, SHA-pinned
+worktree, the Workspace UI shows **Перевірити запропонований AI-патч**. The
+operator can copy the unified diff returned by Codex and paste it into the
+preview textarea. The browser checks the diff _in memory_ against the exact
+previously returned source bytes and the read grant's pinned Git commit.
+This does not execute a command, modify any file, make an API request, call
+Codex or record an authorization. The diff is not persisted.
+
+For this initial fail-closed format, only **one existing text file**, exact
+`--- a/path` / `+++ b/path` headers, standard unified hunk ranges and
+optional exact `diff --git` / `index` headers are accepted. A whole
+`diff` Markdown fence is accepted. Every removed/context line must match
+the actual verified source and every hunk line count/position must agree.
+No rename, creation, deletion, mode change, symlink, binary patch, extra file,
+free-form text or context mismatch is allowed. Source is limited to 8 KiB,
+the patch to 20,000 characters, the resulting file to 12 KiB, and at most
+20 hunks / 200 edited lines. The first slice only handles LF text with a
+final newline; unsupported files fail visibly instead of being normalized
+or truncated.
+
+The UI previews added/removed/context rows with original/new line numbers and
+labels the result **read-only**. An accepted preview is **not** evidence that
+the on-disk worktree is still unchanged. A future, separately approved
+patch-application PR must re-check worktree provenance and the exact current
+Git/source revision, prevent races, and provide its own authenticated,
+single-use write capability. No applied code, tests, branches, pushes,
+or pull requests are produced by this preview.
