@@ -809,3 +809,72 @@ source/lockfile and private audit directories, then separately
 build/start the real operator and verify both HTTP services.
 Leave Issue #107 OPEN until real production audited Docker
 checks and interruption acceptance exist.
+
+## Launch #107 — verified private pinned-store provisioning + owner-controlled pin
+
+The current lockfile's **owner-private pinned store** is provisioned by
+the existing fixed `node scripts/prepare-patch-check-store.mjs --prepare`
+command **from the actual owner checkout** (not a disposable Git worktree).
+The script creates a new lockfile-keyed `apps/api/.local/patch-check-pnpm-stores`
+snapshot; no existing snapshot is overwritten or removed. It downloads only
+during trusted-host provisioning, verifies a complete filtered pnpm install
+with **no network** for Linux glibc and Linux Alpine/musl, and publishes a
+manifest with the stable lockfile key and a digest of every bounded store
+file. `node scripts/prepare-patch-check-store.mjs --verify` fully
+rechecks that manifest/digest without package downloads.
+
+**PR #132** adds `scripts/launch-owner-pin-store.mjs` to safely reconcile
+the owner-private `DEV_HUB_PATCH_CHECK_PNPM_STORE` configuration with
+the **exact current lockfile**. Run it from an independent clean worktree
+that has this script; the `--operator-checkout` must point to the actual
+primary installation.
+
+```sh
+# READ-ONLY: no .env changes, no restart, full private store digest verification
+node scripts/launch-owner-pin-store.mjs \
+  --check-only \
+  --expected-main=REPLACE_WITH_EXACT_VERIFIED_MAIN_SHA \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub
+
+# ONLY after a separately approved maintenance shutdown; never run
+# this while API/Web or the operator supervisor are still alive.
+# Supply the exact envSha256 returned by --check-only, and an already
+# existing real 0700 owner-private backup parent OUTSIDE the checkout:
+node scripts/launch-owner-pin-store.mjs \
+  --confirm-private-env-pin \
+  --expected-main=REPLACE_WITH_EXACT_VERIFIED_MAIN_SHA \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub \
+  --expected-env-sha256=REPLACE_WITH_EXACT_READ_ONLY_HASH \
+  --backup-parent=/absolute/existing/private/owner-backups
+```
+
+The script checks trusted Git origin, exact primary HEAD, lockfile-keyed
+store path under the actual checkout and **all store content/manifest
+checksums** using `storeVerified` from the existing read-only launch
+preflight. The 0600 one-owner `apps/api/.env` must contain exactly one
+plain `DEV_HUB_PATCH_CHECK_PNPM_STORE=` assignment. The check-only
+response contains a SHA-256 of the entire .env and the intended store
+path, but never any secret, current env value or other env lines.
+
+The explicit write mode binds the user's action to that exact .env
+checksum, verifies canonical private ownership and absence of running
+Hub process/port activity, and creates a **new, exclusive private
+snapshot** of the entire original .env (0700 directory, 0600 file).
+It then replaces **only one store-path assignment**, preserving all
+other config bytes, comments and line endings. The replacement is an
+exclusive 0600 temp file, fsynced and atomically renamed in the same
+directory, with post-write checksum verification. Failure never
+automatically removes the recovery snapshot, retries Git, restarts
+services, removes an old store, or changes audit directories. Owner
+must separately inspect any ambiguous failure. A process scan is a
+momentary preflight, not an OS-level exclusion lock; do not run the
+write path with concurrent operator startups/config editors.
+
+**Actual owner execution at this stage:** only the existing store
+`--prepare` and `--verify`, followed by this new script in
+`--check-only` mode against the live primary. The previously
+running Hub remains online with its old .env pin; the new store
+cannot be used by that live process until an **explicit separately
+authorized** config pin and operator restart. Keep #107 OPEN: two
+private audit directories, live runtime provenance and real owner
+HTTP→Docker→durable audit checks remain to be completed.
