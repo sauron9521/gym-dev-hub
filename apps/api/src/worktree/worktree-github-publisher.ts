@@ -281,7 +281,9 @@ export async function publishExactCommit(
   });
   if (tree.json?.sha !== approved.treeSha) throw new Error('GitHub tree SHA mismatch');
   const commit = await request('POST', '/git/commits', token, {
-    message: approved.subject,
+    // `git commit-tree -m` stores a terminal LF. GitHub's Git Data API uses
+    // the exact supplied message bytes; omitting LF creates a different SHA.
+    message: approved.subject + '\n',
     tree: approved.treeSha,
     parents: [approved.parentSha],
     author: approved.author,

@@ -124,3 +124,22 @@ enabling it for regular development.
 
 **Next PR**: separately authorized creation of a draft GitHub pull
 request for the published branch, CI status tracking and owner-only merge.
+
+## Exact commit-message bytes (live GitHub E2E finding)
+
+The local commit writer uses `git commit-tree -m <subject>`, which stores
+`<subject>\n` in the raw Git commit object. GitHub's Git Data
+`POST /git/commits` preserves the supplied `message` string exactly,
+including whether it has a terminal newline. The first live remote publish
+created the correct blob and tree but an **unreferenced commit with a different
+SHA** when supplied only `<subject>` without `\n`; the task branch was
+correctly not created. A read-only GitHub object lookup confirmed the
+alternate no-final-LF SHA existed while the local SHA did not.
+
+Publishing now supplies the exact `<subject>\n` bytes, without changing
+other Git metadata, branch creation policy or the strict returned Git SHA
+verification. The local test double hashes the real fixed Git Data commit
+payload and checks it equals the source commit's SHA, preventing the former
+false-positive mock. No remote ref or Draft PR was created by the failed
+E2E run; restart only with a **fresh** independent one-time grant after
+updating the API. Never replay a consumed grant.
