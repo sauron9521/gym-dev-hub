@@ -76,7 +76,7 @@ function isolatedGitEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
-/** Fixed read-only Git subcommands. No user-supplied shell arguments or filenames. */
+/** Fixed Git object reads and index-only plumbing. No shell or user-supplied Git commands. */
 function gitBytes(cwd: string, args: string[], maxBuffer: number): Promise<Buffer> {
   return new Promise((resolveOutput, reject) => {
     execFile(
@@ -293,6 +293,16 @@ export class WorktreeHydrationService {
           await this.plans.recordHydrationProgress(sessionId, planId, filesWritten, bytesWritten);
         }
       }
+      // A --no-checkout worktree starts with an empty index. Reconstruct only
+      // this worktree's index from the pinned commit after all checked Git blobs
+      // are written. read-tree does not checkout files or invoke filters/hooks.
+      // Without this step, Git diff misreports the entire repository as deleted.
+      await gitBytes(reserved.targetPath, ['read-tree', grant.commit], 1024);
+      await gitBytes(
+        reserved.targetPath,
+        ['diff', '--cached', '--exit-code', grant.commit, '--'],
+        1024,
+      );
       return await this.plans.finishHydration(
         sessionId,
         planId,
