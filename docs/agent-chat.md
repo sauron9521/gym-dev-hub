@@ -376,3 +376,11 @@ local task commit as a **new** GitHub branch using exact Git Data
 objects and atomic new-ref creation. It requires an independent
 operator secret, a repository-scoped write token and separate explicit
 grant/execute steps. No force-push, main write, PR creation or merge.
+
+## Operator-approved GitHub Draft PR and CI visibility (PR #70)
+
+See [github-draft-pr.md](./github-draft-pr.md). This disabled-by-default,
+independently authorized pilot creates a **Draft PR only** from an
+audited, published `devhub/task-*` branch to `main`, then reuses
+the Hub's existing read-only CI readiness. No auto-merge,
+ready-for-review transition, force-push or branch write is included.

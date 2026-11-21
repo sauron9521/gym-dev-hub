@@ -61,3 +61,98 @@ export async function appendGitHubPushAudit(
     await handle.close();
   }
 }
+
+/** Exact read-only audit replay; absence of terminal success is never success. */
+export async function auditedPublishedTaskBranch(
+  sessionId: string,
+  planId: string,
+  commitSha: string,
+  branch: string,
+): Promise<{ runId: string; parentSha: string }> {
+  const dir = await checkedCommitDirectory();
+  const file = join(dir, 'github-push.jsonl');
+  const stat = await lstat(file);
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.nlink !== 1 ||
+    stat.size <= 0 ||
+    stat.size > 1024 * 1024 ||
+    (process.platform !== 'win32' && (stat.mode & 0o077) !== 0)
+  ) {
+    throw new Error('Unsafe or empty GitHub publish audit');
+  }
+  const fd = await open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const first = await fd.stat();
+    if (
+      !first.isFile() ||
+      first.ino !== stat.ino ||
+      first.dev !== stat.dev ||
+      first.size !== stat.size
+    )
+      throw new Error('GitHub publish audit changed on open');
+    const data = await fd.readFile();
+    const final = await fd.stat();
+    if (
+      data.length !== first.size ||
+      final.size !== first.size ||
+      first.mtimeMs !== final.mtimeMs ||
+      first.ctimeMs !== final.ctimeMs ||
+      data.at(-1) !== 10
+    )
+      throw new Error('GitHub publish audit changed/truncated');
+    const entries = new TextDecoder('utf-8', { fatal: true })
+      .decode(data)
+      .slice(0, -1)
+      .split('\n')
+      .map((line) => {
+        if (!line || Buffer.byteLength(line) > 1024) throw new Error('Invalid publish audit row');
+        return record.parse(JSON.parse(line) as unknown);
+      });
+    const grants = new Map<string, GitHubPushAudit[]>();
+    for (const entry of entries) {
+      const history = grants.get(entry.grantId) ?? [];
+      history.push(entry);
+      grants.set(entry.grantId, history);
+    }
+    let matching: GitHubPushAudit | null = null;
+    for (const history of grants.values()) {
+      const [issued, attempted, finalEvent] = history;
+      if (
+        !issued ||
+        issued.event !== 'issued' ||
+        issued.runId !== null ||
+        history.length > 3 ||
+        (attempted && (attempted.event !== 'attempted' || attempted.runId === null)) ||
+        (finalEvent &&
+          (!['published', 'rejected'].includes(finalEvent.event) ||
+            finalEvent.runId !== attempted?.runId)) ||
+        history.some(
+          (entry) =>
+            entry.sessionId !== issued.sessionId ||
+            entry.planId !== issued.planId ||
+            entry.commitSha !== issued.commitSha ||
+            entry.branch !== issued.branch ||
+            entry.parentSha !== issued.parentSha,
+        )
+      ) {
+        throw new Error('Invalid GitHub publish audit transition');
+      }
+      if (
+        finalEvent?.event !== 'published' ||
+        finalEvent.sessionId !== sessionId ||
+        finalEvent.planId !== planId ||
+        finalEvent.commitSha !== commitSha ||
+        finalEvent.branch !== branch
+      )
+        continue;
+      if (matching) throw new Error('Ambiguous completed task branch publication');
+      matching = finalEvent;
+    }
+    if (!matching?.runId) throw new Error('No confirmed task branch publication');
+    return { runId: matching.runId, parentSha: matching.parentSha };
+  } finally {
+    await fd.close();
+  }
+}

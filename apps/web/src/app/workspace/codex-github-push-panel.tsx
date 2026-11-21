@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CodexGitHubDraftPrPanel } from './codex-github-draft-pr-panel';
 import type {
   WorktreeCommitWriteResult,
   WorktreeGitHubPushGrant,
@@ -183,6 +184,7 @@ export function CodexGitHubPushPanel({ sessionId, planId, committed }: Props) {
             Перейти до task-гілки на GitHub
           </a>
           <small>Жодного force-push, змін main, PR або merge.</small>
+          <CodexGitHubDraftPrPanel sessionId={sessionId} planId={planId} published={result} />
         </div>
       )}
       {error && (

@@ -20,6 +20,7 @@ import { WorktreePatchChecksService } from './worktree-patch-checks.service.js';
 import { WorktreeCommitCandidateService } from './worktree-commit-candidate.service.js';
 import { WorktreeCommitWriteService } from './worktree-commit-write.service.js';
 import { WorktreeGitHubPushService } from './worktree-github-push.service.js';
+import { WorktreeGitHubDraftPrService } from './worktree-github-draft-pr.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './task-execution-grant.service.js';
@@ -49,6 +50,9 @@ import type {
   WorktreeCommitWriteResult,
   WorktreeGitHubPushGrant,
   WorktreeGitHubPushResult,
+  WorktreeDraftPrGrant,
+  WorktreeDraftPrResult,
+  PullReadiness,
 } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
@@ -68,6 +72,7 @@ export class WorktreePlanController {
     private readonly commitCandidate: WorktreeCommitCandidateService,
     private readonly commitWrite: WorktreeCommitWriteService,
     private readonly githubPush: WorktreeGitHubPushService,
+    private readonly githubDraftPr: WorktreeGitHubDraftPrService,
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
     private readonly taskGrants: TaskExecutionGrantService,
@@ -303,6 +308,36 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreeGitHubPushResult> {
     return this.githubPush.execute(sessionId, planId, body);
+  }
+
+  /** Separate one-use manual Draft PR authorization, no remote mutation. */
+  @Post(':planId/github-draft-pr-authorize')
+  githubDraftPrAuthorize(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeDraftPrGrant> {
+    return this.githubDraftPr.authorize(sessionId, planId, body);
+  }
+
+  /** Fixed Draft PR creation: base main, published SHA, no merge. */
+  @Post(':planId/github-draft-pr-execute')
+  githubDraftPrExecute(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeDraftPrResult> {
+    return this.githubDraftPr.execute(sessionId, planId, body);
+  }
+
+  /** Explicit read-only CI, validated against the published task commit. */
+  @Post(':planId/github-draft-pr-ci')
+  githubDraftPrCI(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<PullReadiness> {
+    return this.githubDraftPr.status(sessionId, planId, body);
   }
 
   @Post(':planId/tool-authorize')

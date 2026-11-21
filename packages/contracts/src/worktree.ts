@@ -404,3 +404,32 @@ export interface WorktreeGitHubPushResult {
   pullRequestCreated: false;
   mergeEnabled: false;
 }
+
+/** Separate one-shot grant to create one GitHub Draft PR, with fixed base main. */
+export interface WorktreeDraftPrGrant {
+  grantId: string;
+  grantToken: string;
+  branch: string;
+  commitSha: string;
+  title: string;
+  baseBranch: 'main';
+  expiresAt: string;
+  purpose: 'CREATE_ONE_GITHUB_DRAFT_PR_ONLY';
+  draft: true;
+  branchWriteEnabled: false;
+  mergeEnabled: false;
+}
+export interface WorktreeDraftPrResult {
+  grantId: string;
+  runId: string;
+  number: number;
+  url: string;
+  branch: string;
+  commitSha: string;
+  title: string;
+  baseBranch: 'main';
+  draft: true;
+  status: 'draft-created';
+  branchWriteEnabled: false;
+  mergeEnabled: false;
+}
