@@ -8,6 +8,7 @@ import type {
 } from '@gym-dev-hub/contracts';
 import { WorktreeInspectionPanel } from './worktree-inspection-panel';
 import { WorktreeHydrationPanel } from './worktree-hydration-panel';
+import { WorktreePatchCheckHistoryPanel } from './worktree-patch-check-history-panel';
 
 const labels: Record<WorktreePlanState, string> = {
   pending: 'Очікує погодження',
@@ -222,6 +223,16 @@ export function WorktreePlanPanel({
           </div>
         </div>
       )}
+      {latest &&
+        latest.repository === 'sauron9521/gym-dev-hub' &&
+        latest.baseHeadSha &&
+        ['created', 'revoked', 'expired'].includes(latest.state) && (
+          <WorktreePatchCheckHistoryPanel
+            key={sessionId + ':' + latest.id}
+            sessionId={sessionId}
+            planId={latest.id}
+          />
+        )}
       {latest?.state === 'pending' && !completed && (
         <label className="ws-plan-confirm">
           <input

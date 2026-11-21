@@ -265,3 +265,45 @@ export interface WorktreePatchCheckCancel {
   runId: string;
   status: 'cancel-requested';
 }
+
+/** Sanitized read-only projection of fixed Docker check audit events. */
+export type WorktreePatchCheckHistoryStatus =
+  | 'authorized'
+  | 'expired'
+  | 'running'
+  | 'cancel-requested'
+  | 'passed'
+  | 'failed'
+  | 'canceled'
+  | 'interrupted';
+
+export interface WorktreePatchCheckHistoryEntry {
+  grantId: string;
+  runId: string | null;
+  recipeId: WorktreePatchCheckRecipe;
+  sourceCommit: string;
+  proposedSha256: string;
+  filePathSha256: string;
+  status: WorktreePatchCheckHistoryStatus;
+  authorizedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  durationMs: number | null;
+  stdoutBytes: number | null;
+  stderrBytes: number | null;
+}
+
+export interface WorktreePatchCheckHistory {
+  sessionId: string;
+  planId: string;
+  checkedAt: string;
+  total: number;
+  limited: boolean;
+  items: WorktreePatchCheckHistoryEntry[];
+  readOnly: true;
+  rawLogsAvailable: false;
+  commandsEnabled: false;
+  commitEnabled: false;
+  pushEnabled: false;
+  mergeEnabled: false;
+}

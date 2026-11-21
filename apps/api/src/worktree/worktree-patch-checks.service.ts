@@ -7,15 +7,18 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { constants } from 'node:fs';
-import { lstat, mkdir, open, realpath } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import type {
   WorktreePatchCheckGrant,
   WorktreePatchCheckResult,
   WorktreePatchCheckCancel,
+  WorktreePatchCheckHistory,
 } from '@gym-dev-hub/contracts';
+import {
+  appendPatchCheckAudit,
+  readPatchCheckAudit,
+  projectPatchCheckHistory,
+} from './worktree-patch-check-audit.js';
 import { BoundaryService } from '../boundary/boundary.service.js';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreePatchReviewService } from './worktree-patch-review.service.js';
@@ -54,7 +57,6 @@ type Check = z.infer<typeof request>;
 type Grant = Check & { id: string; sessionId: string; planId: string; expiresAt: number };
 const TTL = 45_000;
 const MAX_GRANTS = 16;
-const MAX_AUDIT = 1024 * 1024;
 const digest = (s: string) => createHash('sha256').update(s).digest('hex');
 
 function authenticate(secret: string): void {
@@ -94,65 +96,6 @@ function verifyRecipeScope(check: Check, repository: string): void {
   }
 }
 
-/** Fail-closed durable audit: never stores source, token, secrets, diff or local path. */
-async function audit(event: string, grant: Grant, runId?: string): Promise<void> {
-  const dir = resolve(
-    process.env.DEV_HUB_PATCH_CHECK_STATE_DIR ?? resolve(process.cwd(), '.local', 'patch-checks'),
-  );
-  await mkdir(dir, { recursive: true, mode: 0o700 });
-  const [info, canonical] = await Promise.all([lstat(dir), realpath(dir)]);
-  if (
-    !info.isDirectory() ||
-    info.isSymbolicLink() ||
-    canonical !== dir ||
-    (process.platform !== 'win32' && (info.mode & 0o077) !== 0)
-  ) {
-    throw new Error('Unsafe patch check audit folder');
-  }
-  const path = join(dir, 'audit.jsonl');
-  const old = await lstat(path).catch((error: NodeJS.ErrnoException) =>
-    error.code === 'ENOENT' ? null : Promise.reject(error),
-  );
-  if (old && (!old.isFile() || old.isSymbolicLink() || old.nlink !== 1)) {
-    throw new Error('Unsafe patch check audit file');
-  }
-  const fd = await open(
-    path,
-    constants.O_APPEND | constants.O_WRONLY | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0),
-    0o600,
-  );
-  try {
-    const stat = await fd.stat();
-    if (
-      !stat.isFile() ||
-      stat.nlink !== 1 ||
-      stat.size > MAX_AUDIT ||
-      (process.platform !== 'win32' && (stat.mode & 0o077) !== 0)
-    ) {
-      throw new Error('Unsafe patch check log');
-    }
-    const record = JSON.stringify({
-      at: new Date().toISOString(),
-      event,
-      grantId: grant.id,
-      runId: runId ?? null,
-      sessionId: grant.sessionId,
-      planId: grant.planId,
-      recipeId: grant.recipeId,
-      fingerprint: grant.fingerprint,
-      sourceCommit: grant.sourceCommit,
-      filePathSha256: digest(grant.filePath),
-      sourceSha256: grant.sourceSha256,
-      proposedSha256: grant.proposedSha256,
-    });
-    if (Buffer.byteLength(record) > 1200) throw new Error('Audit entry too long');
-    await fd.writeFile(record + '\n');
-    await fd.sync();
-  } finally {
-    await fd.close();
-  }
-}
-
 @Injectable()
 export class WorktreePatchChecksService {
   private readonly grants = new Map<string, Grant>();
@@ -160,7 +103,12 @@ export class WorktreePatchChecksService {
     runId: string;
     sessionId: string;
     planId: string;
+    grant: Grant;
     abort: AbortController;
+    attempted: Promise<void> | null;
+    attemptedWritten: boolean;
+    cancelAudit: Promise<void> | null;
+    finishing: boolean;
   } | null = null;
   private secretDigest: Buffer | null = null;
 
@@ -250,7 +198,7 @@ export class WorktreePatchChecksService {
       expiresAt: Date.now() + TTL,
     };
     try {
-      await audit('issued', grant);
+      await appendPatchCheckAudit('issued', grant);
     } catch {
       throw new ServiceUnavailableException('Не вдалося записати audit дозволу Docker check.');
     }
@@ -304,12 +252,24 @@ export class WorktreePatchChecksService {
       throw new ConflictException('Одноразовий Docker grant недійсний або використаний.');
     }
     if (this.active) throw new ConflictException('Інша Docker задача вже виконується.');
-    const current = { runId, sessionId, planId, abort: new AbortController() };
+    const current = {
+      runId,
+      sessionId,
+      planId,
+      grant,
+      abort: new AbortController(),
+      attempted: null as Promise<void> | null,
+      attemptedWritten: false,
+      cancelAudit: null as Promise<void> | null,
+      finishing: false,
+    };
     this.active = current;
     const started = Date.now();
     try {
       verifyBoundary(this.boundary);
-      await audit('attempted', grant, runId);
+      current.attempted = appendPatchCheckAudit('attempted', grant, runId);
+      await current.attempted;
+      current.attemptedWritten = true;
       const first = await this.revalidate(sessionId, planId, check, reviewOperatorSecret);
       if (current.abort.signal.aborted) throw new ConflictException('Завдання скасовано.');
       const prepared = await preparePatchCheckRunner(first.worktree);
@@ -328,7 +288,14 @@ export class WorktreePatchChecksService {
       );
       if (current.abort.signal.aborted) throw new ConflictException('Завдання скасовано.');
       await this.revalidate(sessionId, planId, check, reviewOperatorSecret);
-      await audit('passed', grant, runId);
+      if (current.abort.signal.aborted) throw new ConflictException('Завдання скасовано.');
+      current.finishing = true; // Cancel after terminal result must never append after "passed".
+      await appendPatchCheckAudit('passed', grant, runId, {
+        durationMs: Date.now() - started,
+        stdoutBytes: outcome.stdoutBytes,
+        stderrBytes: outcome.stderrBytes,
+        containerRemoved: true,
+      });
       return {
         runId,
         grantId: grant.id,
@@ -350,9 +317,19 @@ export class WorktreePatchChecksService {
         mergeEnabled: false,
       };
     } catch (error) {
-      await audit('rejected', grant, runId).catch(() => {
-        // Even if audit fails, do not report success or reissue the grant.
-      });
+      current.finishing = true;
+      // Cancellation may be requested while the attempted record is flushing.
+      // Always preserve attempted -> cancel-requested -> rejected ordering.
+      await current.cancelAudit?.catch(() => undefined);
+      if (current.attemptedWritten) {
+        await appendPatchCheckAudit('rejected', grant, runId, {
+          durationMs: Date.now() - started,
+          failureKind: current.abort.signal.aborted ? 'canceled' : 'failed',
+        }).catch(() => {
+          // If audit fails, never claim success or reissue the grant.
+          // A lone "attempted" is shown as interrupted / outcome unknown.
+        });
+      }
       if (error instanceof HttpException) throw error;
       throw new ServiceUnavailableException(
         'Ізольована Docker-перевірка не пройшла або стан невідомий. Перевір Docker та audit.',
@@ -362,7 +339,11 @@ export class WorktreePatchChecksService {
     }
   }
 
-  cancel(sessionId: string, planId: string, body: unknown): WorktreePatchCheckCancel {
+  async cancel(
+    sessionId: string,
+    planId: string,
+    body: unknown,
+  ): Promise<WorktreePatchCheckCancel> {
     const input = cancelSchema.safeParse(body);
     if (!input.success) throw new BadRequestException('Некоректний запит скасування Docker check.');
     this.requireSecret(input.data.operatorSecret);
@@ -375,7 +356,60 @@ export class WorktreePatchChecksService {
     ) {
       throw new ConflictException('Немає активної Docker-перевірки з таким runId.');
     }
+    if (current.finishing || !current.attempted || current.cancelAudit) {
+      throw new ConflictException('Завдання вже завершується або скасування вже запитано.');
+    }
+    const previous = current.attempted;
+    current.cancelAudit = previous.then(() =>
+      appendPatchCheckAudit('cancel-requested', current.grant, current.runId),
+    );
     current.abort.abort();
+    try {
+      await current.cancelAudit;
+    } catch {
+      throw new ServiceUnavailableException(
+        'Скасування запрошено, але журнал не підтверджений. Перевір стан Docker.',
+      );
+    }
     return { runId: current.runId, status: 'cancel-requested' };
+  }
+
+  /** Historical metadata only. No Git, Docker, code, tokens or execution. */
+  async history(
+    sessionId: string,
+    planId: string,
+    body: unknown,
+  ): Promise<WorktreePatchCheckHistory> {
+    const input = z
+      .strictObject({
+        operatorSecret: z.string().min(32).max(256),
+      })
+      .safeParse(body);
+    if (!input.success) throw new BadRequestException('Некоректний запит журналу Docker checks.');
+    this.requireSecret(input.data.operatorSecret);
+    const plans = await this.plans.list(sessionId);
+    const plan = plans.find((item) => item.id === planId);
+    if (!plan || plan.repository !== 'sauron9521/gym-dev-hub') {
+      throw new ConflictException('Невідомий план Gym Dev Hub.');
+    }
+    try {
+      const entries = await readPatchCheckAudit();
+      this.requireSecret(input.data.operatorSecret);
+      const current = this.active;
+      return projectPatchCheckHistory(
+        entries,
+        sessionId,
+        planId,
+        current?.sessionId === sessionId && current.planId === planId ? current.runId : null,
+        new Set(
+          [...this.grants.values()]
+            .filter((grant) => grant.sessionId === sessionId && grant.planId === planId)
+            .map((grant) => grant.id),
+        ),
+      );
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException('Журнал Docker checks недоступний або пошкоджений.');
+    }
   }
 }
