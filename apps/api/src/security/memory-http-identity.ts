@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { MemoryAuthorizationService } from './memory-authorization.service.js';
 import type { MemoryPrincipal } from './memory-authorization.service.js';
+import type pg from 'pg';
+import { verifyMemoryPrincipalBinding } from './memory-principal-binding.js';
 import {
   assertMemoryLocalBoundary,
   MemorySecurityError,
@@ -52,6 +54,25 @@ export function authenticateMemoryHttpRead(
       throw new MemorySecurityError('unauthorized');
     }
     return authorization.authenticateReadBearer(header.slice('Bearer '.length));
+  } catch (error) {
+    throw toMemoryHttpException(error);
+  }
+}
+
+/**
+ * Future HTTP route entrypoint: authenticate local Bearer first, then verify
+ * every bearer-derived repository/task/session/agent binding in PostgreSQL.
+ * Not mounted by this PR. No request parameters are allowed to supply scope.
+ */
+export async function authenticateMemoryHttpReadWithDatabase(
+  request: MemoryHttpReadRequest,
+  authorization: MemoryAuthorizationService,
+  env: NodeJS.ProcessEnv,
+  db: Pick<pg.Pool, 'query'>,
+): Promise<MemoryPrincipal> {
+  const principal = authenticateMemoryHttpRead(request, authorization, env);
+  try {
+    return await verifyMemoryPrincipalBinding(principal, db);
   } catch (error) {
     throw toMemoryHttpException(error);
   }
