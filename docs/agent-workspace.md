@@ -23,6 +23,10 @@ Writes use a temporary file and rename, and are serialized within one NestJS pro
 
 **Limitations:** this simple file-based store must only be used by **one API process**, on a local machine. Multi-process consistency, backups, database migrations, and remote collaboration require a later PostgreSQL/Prisma store. Do not edit the JSON file while the server is running.
 
+## Planned shared agent memory
+
+Cross-session verified memory, task leases, and external MCP integration are **not** implemented by this local JSON Workspace. See the proposed [Shared Agent Memory ADR](architecture/shared-agent-memory.md) for storage, provenance, operator approval, repository scoping, and migration safety. Existing sessions and JSON notes remain unchanged.
+
 ## HTTP endpoints
 
 | Method | Endpoint                           | Purpose                                    |
