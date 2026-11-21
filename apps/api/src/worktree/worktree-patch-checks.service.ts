@@ -27,6 +27,7 @@ import {
   runPatchChecksDocker,
   type FixedPatchRecipe,
 } from './worktree-patch-checks-docker.js';
+import { withPatchCheckSourceStage } from './worktree-patch-check-stage.js';
 
 const RECIPES = ['API_TYPECHECK', 'API_TEST', 'WEB_TYPECHECK', 'WEB_TEST'] as const;
 const request = z.strictObject({
@@ -272,20 +273,25 @@ export class WorktreePatchChecksService {
       current.attemptedWritten = true;
       const first = await this.revalidate(sessionId, planId, check, reviewOperatorSecret);
       if (current.abort.signal.aborted) throw new ConflictException('Завдання скасовано.');
-      const prepared = await preparePatchCheckRunner(first.worktree);
-      this.requireSecret(input.data.operatorSecret);
-      verifyBoundary(this.boundary);
-      const second = await this.revalidate(sessionId, planId, check, reviewOperatorSecret);
-      if (second.worktree !== first.worktree || current.abort.signal.aborted) {
-        throw new ConflictException('Worktree змінився або завдання скасоване.');
-      }
-      const outcome = await runPatchChecksDocker(
-        prepared,
-        check.recipeId as FixedPatchRecipe,
-        check.filePath,
-        check.proposedSha256,
-        current.abort.signal,
-      );
+      // Hydration intentionally writes original files with mode 0600. A fixed
+      // non-root Docker runner cannot read them directly; stage a bounded,
+      // short-lived copy instead of changing source permissions or UID policy.
+      const outcome = await withPatchCheckSourceStage(first.worktree, async (stagedSource) => {
+        const prepared = await preparePatchCheckRunner(stagedSource);
+        this.requireSecret(input.data.operatorSecret);
+        verifyBoundary(this.boundary);
+        const second = await this.revalidate(sessionId, planId, check, reviewOperatorSecret);
+        if (second.worktree !== first.worktree || current.abort.signal.aborted) {
+          throw new ConflictException('Worktree змінився або завдання скасоване.');
+        }
+        return runPatchChecksDocker(
+          prepared,
+          check.recipeId as FixedPatchRecipe,
+          check.filePath,
+          check.proposedSha256,
+          current.abort.signal,
+        );
+      });
       if (current.abort.signal.aborted) throw new ConflictException('Завдання скасовано.');
       await this.revalidate(sessionId, planId, check, reviewOperatorSecret);
       if (current.abort.signal.aborted) throw new ConflictException('Завдання скасовано.');

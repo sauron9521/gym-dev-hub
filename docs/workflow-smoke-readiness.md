@@ -96,3 +96,27 @@ not perform a live write or configure any new permission.
 **Next slice after a real disposable E2E acceptance test:** durable
 operator workflow checkpointing and refresh/resume, preserving
 one-time grants' security (never persisting bearer tokens or secrets).
+
+## Non-root Docker check source staging (E2E follow-up)
+
+The first real local E2E run after PR #72 reached the fixed Docker
+`WEB_TYPECHECK` recipe, but its runner rejected staging. Hydration correctly
+created original worktree files as `0600`; the intentionally non-root Docker
+UID `65534` cannot read those files from a raw read-only worktree mount.
+
+The follow-up fix uses a **bounded, disposable sibling source snapshot**
+while a single previously approved fixed check runs. Its copied directories
+are mode `0755` and copied regular files `0644` on POSIX, so the isolated
+runner can read and copy them. The original hydrated worktree keeps its
+`0600` files and is never chmod'd. All source files are revalidated after
+staging, Docker remains non-root / networkless with read-only bind mounts,
+and the stage is removed using only known created files/directories in a
+`finally` block. Failed cleanup fails closed. This temporary snapshot
+contains only the public, tracked Gym Dev Hub tree (not `.git`), under the
+same 5,000-file / 100 MiB bounds as the fixed runner. It is not suitable
+for sensitive or untrusted private repository content.
+
+Each failed one-time check remains **rejected** in the audit; do not replay
+its grant. Start a fresh authorization after the code change is deployed.
+Successful source staging alone is not proof of pnpm store hydration,
+TypeScript checks, tests, or GitHub PR readiness.
