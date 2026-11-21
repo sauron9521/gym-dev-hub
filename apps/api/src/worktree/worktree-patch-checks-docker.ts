@@ -198,9 +198,12 @@ async function smallRegularFile(path: string, max: number, privateOnly = false):
   }
 }
 
-export async function preparePatchCheckRunner(worktree: string): Promise<PreparedPatchChecks> {
+export async function preparePatchCheckRunner(
+  worktree: string,
+  verifiedReadableStore = process.env.DEV_HUB_PATCH_CHECK_PNPM_STORE,
+): Promise<PreparedPatchChecks> {
   const imageId = process.env.DEV_HUB_PATCH_CHECK_IMAGE_ID;
-  const store = process.env.DEV_HUB_PATCH_CHECK_PNPM_STORE;
+  const store = verifiedReadableStore;
   if (!imageId || !/^sha256:[a-f0-9]{64}$/.test(imageId) || !store) {
     throw new Error('Explicit pinned patch check image ID and offline pnpm store required');
   }

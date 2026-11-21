@@ -8,10 +8,15 @@ import { WorktreePatchChecksService } from '../src/worktree/worktree-patch-check
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   execute: vi.fn(),
+  mirror: vi.fn(),
 }));
 vi.mock('../src/worktree/worktree-patch-check-stage.js', () => ({
   withPatchCheckSourceStage: (_source: string, action: (path: string) => Promise<unknown>) =>
     action('/staged-source'),
+}));
+
+vi.mock('../src/worktree/worktree-patch-check-store-stage.js', () => ({
+  withPatchCheckStoreStage: mocks.mirror,
 }));
 
 vi.mock('../src/worktree/worktree-patch-checks-docker.js', () => ({
@@ -67,6 +72,15 @@ describe('operator-only post-apply Docker checks', () => {
     process.env.DEV_HUB_PATCH_CHECK_STATE_DIR = join(base, 'private');
     process.env.DEV_HUB_ENABLE_PATCH_CHECKS = 'true';
     process.env.DEV_HUB_PATCH_CHECK_OPERATOR_SECRET = SECRET;
+    process.env.DEV_HUB_PATCH_CHECK_PNPM_STORE = '/private/pinned-store';
+    mocks.mirror.mockImplementation(
+      (
+        _store: string,
+        _lock: string,
+        _signal: AbortSignal,
+        action: (readableStore: string) => Promise<unknown>,
+      ) => action('/verified-store'),
+    );
     plans = {
       list: vi.fn().mockResolvedValue([
         {
@@ -115,6 +129,7 @@ describe('operator-only post-apply Docker checks', () => {
       'DEV_HUB_PATCH_CHECK_STATE_DIR',
       'DEV_HUB_ENABLE_PATCH_CHECKS',
       'DEV_HUB_PATCH_CHECK_OPERATOR_SECRET',
+      'DEV_HUB_PATCH_CHECK_PNPM_STORE',
     ])
       delete process.env[key];
     await rm(base, { recursive: true, force: true });
@@ -149,6 +164,13 @@ describe('operator-only post-apply Docker checks', () => {
       mergeEnabled: false,
     });
     expect(mocks.prepare).toHaveBeenCalledTimes(1);
+    expect(mocks.prepare).toHaveBeenCalledWith('/staged-source', '/verified-store');
+    expect(mocks.mirror).toHaveBeenCalledWith(
+      '/private/pinned-store',
+      '/staged-source/pnpm-lock.yaml',
+      expect.any(AbortSignal),
+      expect.any(Function),
+    );
     expect(mocks.execute).toHaveBeenCalledWith(
       expect.any(Object),
       'API_TYPECHECK',
@@ -281,6 +303,23 @@ describe('operator-only post-apply Docker checks', () => {
     );
     expect(mocks.prepare).not.toHaveBeenCalled();
     expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unreadable or mismatched private store before invoking Docker', async () => {
+    const grant = await service.authorize(SESSION, PLAN, authorize());
+    mocks.mirror.mockRejectedValueOnce(new Error('Pinned store digest mismatch'));
+    await expect(service.execute(SESSION, PLAN, execute(grant.grantToken))).rejects.toThrow(
+      'не пройшла',
+    );
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.execute).not.toHaveBeenCalled();
+    const audit = await readFile(join(base, 'private', 'audit.jsonl'), 'utf8');
+    expect(audit).toContain('"event":"attempted"');
+    expect(audit).toContain('"event":"rejected"');
+    expect(audit).not.toContain('"event":"passed"');
+    await expect(service.execute(SESSION, PLAN, execute(grant.grantToken))).rejects.toThrow(
+      'використаний',
+    );
   });
 
   it('fails closed on container errors and records rejection without replay', async () => {

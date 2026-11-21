@@ -349,3 +349,35 @@ and is not evidence of end-to-end authorized HTTP workflow acceptance.
 The preflight now rejects a stale pinned pnpm store (wrong source lockfile)
 **before starting Docker**, and a failed isolated recipe can report only a
 fixed allowlisted stage identifier, never raw test stderr or secrets.
+
+## Production private pnpm store staging — #107
+
+The operator's provisioned pnpm store remains **private** (directory mode
+`0700`, file mode `0600`). The fixed Docker worker deliberately runs as
+UID 65534 and cannot directly read those private files. The authorized
+Docker execution now uses the same bounded store staging helper as the
+explicit manual smoke:
+
+- Require Linux non-root host, canonical store path with no symlink parents,
+  matching manifest key and lockfile; read the manifest with `O_NOFOLLOW`.
+- Stream-copy only verified pnpm store files into a new temporary `/tmp`
+  directory, skipping pnpm's `v11/projects` host bookkeeping. Enforce
+  80,000-file / 1.6-GiB bounds and verify a deterministic SHA-256 digest,
+  file count and total bytes against the owner-provisioned manifest before
+  making the stage readable by Docker UID 65534.
+- Keep the original private store unchanged; stage files are read-only to
+  other users, and the fixed Docker worker mounts the temporary store
+  **read-only** with no network, no host project path or mutable worktree.
+- Revalidate operator permission and exact one-file source after staging.
+  Remove the newly created stage after container completion, even on failures.
+  Cleanup failure is a rejected / unknown result, **never** `passed`.
+  Never replay consumed grants or automatically rewrite `.env`.
+
+Because the temporary mirror contains **public dependencies from the
+public Gym Dev Hub lockfile**, do not use this workflow for secret/private
+packages or publicly expose the host. A hard process crash may leave a
+newly created, public-only temp mirror requiring **manual inspection**;
+do not automatically delete unrelated `/tmp` paths. A temporary test-only
+receipt is distinct from the production authorized audit. #107 remains
+open until a real owner-authorized HTTP run and interrupted restart
+have been independently verified.

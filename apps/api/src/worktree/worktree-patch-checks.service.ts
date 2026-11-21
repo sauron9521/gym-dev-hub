@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { join } from 'node:path';
 import { z } from 'zod';
 import type {
   WorktreePatchCheckGrant,
@@ -28,6 +29,7 @@ import {
   type FixedPatchRecipe,
 } from './worktree-patch-checks-docker.js';
 import { withPatchCheckSourceStage } from './worktree-patch-check-stage.js';
+import { withPatchCheckStoreStage } from './worktree-patch-check-store-stage.js';
 
 const RECIPES = [
   'API_FORMAT',
@@ -284,19 +286,30 @@ export class WorktreePatchChecksService {
       // non-root Docker runner cannot read them directly; stage a bounded,
       // short-lived copy instead of changing source permissions or UID policy.
       const outcome = await withPatchCheckSourceStage(first.worktree, async (stagedSource) => {
-        const prepared = await preparePatchCheckRunner(stagedSource);
-        this.requireSecret(input.data.operatorSecret);
-        verifyBoundary(this.boundary);
-        const second = await this.revalidate(sessionId, planId, check, reviewOperatorSecret);
-        if (second.worktree !== first.worktree || current.abort.signal.aborted) {
-          throw new ConflictException('Worktree змінився або завдання скасоване.');
-        }
-        return runPatchChecksDocker(
-          prepared,
-          check.recipeId as FixedPatchRecipe,
-          check.filePath,
-          check.proposedSha256,
+        // The owner-provisioned store is private 0700/0600. Verify every byte
+        // against its pinned manifest, copy only public package content, and
+        // mount the disposable mirror for Docker UID 65534. Never chmod the
+        // private original store or bypass single-use grant revalidation.
+        return withPatchCheckStoreStage(
+          process.env.DEV_HUB_PATCH_CHECK_PNPM_STORE ?? '',
+          join(stagedSource, 'pnpm-lock.yaml'),
           current.abort.signal,
+          async (stagedStore) => {
+            const prepared = await preparePatchCheckRunner(stagedSource, stagedStore);
+            this.requireSecret(input.data.operatorSecret);
+            verifyBoundary(this.boundary);
+            const second = await this.revalidate(sessionId, planId, check, reviewOperatorSecret);
+            if (second.worktree !== first.worktree || current.abort.signal.aborted) {
+              throw new ConflictException('Worktree змінився або завдання скасоване.');
+            }
+            return runPatchChecksDocker(
+              prepared,
+              check.recipeId as FixedPatchRecipe,
+              check.filePath,
+              check.proposedSha256,
+              current.abort.signal,
+            );
+          },
         );
       });
       if (current.abort.signal.aborted) throw new ConflictException('Завдання скасовано.');
