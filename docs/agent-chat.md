@@ -129,3 +129,61 @@ A later patch-write implementation must revalidate its own state atomically,
 with an independently issued, single-use operator grant, bounded write target,
 race-safe file operations, audit and cleanup. Never convert this response into
 permission to modify files.
+
+## Operator-approved single-file patch apply (PR #63)
+
+**Disabled by default.** This is the first capability that changes worktree
+source bytes. It is exclusively for the **local trusted-operator Hub**, not a
+remote, multi-tenant application and **not** an arbitrary agent shell. Prereqs:
+the existing one-file Docker read, browser diff review, server patch preflight
+and a hydrated, verified, pinned Git worktree. Separately set these opt-in flags
+in the **ignored local** `apps/api/.env` only after manually reviewing the code:
+
+- `DEV_HUB_ENABLE_PATCH_APPLY=true`
+- `DEV_HUB_PATCH_APPLY_OPERATOR_SECRET=<new independent random secret of 32–256 bytes>`
+
+The preflight flags `DEV_HUB_ENABLE_PATCH_PREFLIGHT`,
+`DEV_HUB_ENABLE_SCOPED_CODE_READ`, and
+`DEV_HUB_ENABLE_WORKTREE_MOUNT` must also be enabled. The write secret is
+**not** the existing read secret or a ChatGPT/OpenAI token, and must never be
+committed. Never expose the local Hub ports publicly. Stop and disable this
+flag if the local machine is shared with untrusted users.
+
+After reviewing the diff, the operator must explicitly approve one file,
+commit, and patch and enter the **separate write secret**. The
+`patch-apply-authorize` endpoint independently rechecks the exact Git
+fingerprint, complete worktree integrity, UTF-8 original SHA-256 and shared
+unified diff parser, **then** issues one 45-second, in-memory,
+one-time bearer capability bound to exact session, plan, file, commit,
+source SHA, patch SHA and proposed SHA. An audit event is required before
+the grant can be issued. A second explicit operator action with the write
+secret invokes `patch-apply`, immediately consumes the token and takes
+both an in-process lock and a per-plan exclusive on-disk lock.
+
+The service rechecks the Git state and source under the lock. It parses the
+patch **as data, never executing a command**. The bounded replacement is
+written to an exclusive temporary file in the same directory, synced and
+atomically renamed over the original **only if the target file identity,
+content, permissions and paths still match the approved preimage**. Only
+existing non-executable files with mode 0600 or 0644, link count 1, ≤8 KiB
+source and ≤12 KiB output are supported; no new/deleted files, symlinks,
+hardlinked targets, arbitrary argv, Git commands, shell or hooks.
+
+Audit records (`apps/api/.local/patch-apply/audit.jsonl` by default) contain
+timestamps, grant IDs and hashes, **not** secrets, bearer tokens or file
+contents. Failures reject further use of the same grant; a crash can leave
+a per-plan `.lock` requiring **manual inspection** before removal. An audit
+failure after the atomic rename or an interrupted write requires manual
+verification: **there is no automatic rollback**. After the first successful
+write the original SHA-pinned worktree integrity becomes `mismatch` as
+expected; a follow-up review should use Git diff and run tests, not reattempt
+another patch against the now-stale pinned source.
+
+**Threat-model limitation:** atomic rename and no-follow descriptor checks
+protect against accidental drift, parallel Hub writes and many common path
+errors. Node's path-based rename is not a kernel-level openat/renameat2
+transaction; a _hostile process running under the same local account_ may
+still race directory paths. Do not expose this functionality to untrusted
+local processes or treat it as a hardened multi-user sandbox. No push,
+commit, pull request or merge is performed; all remain separate later steps
+with explicit operator review.

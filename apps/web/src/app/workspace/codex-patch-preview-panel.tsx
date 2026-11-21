@@ -1,7 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import type { WorktreeCodeReadResult, WorktreePatchPreflightResult } from '@gym-dev-hub/contracts';
+import type {
+  WorktreeCodeReadResult,
+  WorktreePatchPreflightResult,
+  WorktreePatchApplyGrant,
+  WorktreePatchApplyResult,
+} from '@gym-dev-hub/contracts';
 import { MAX_PATCH_CHARS, reviewCodexPatch, type PatchReviewResult } from './codex-patch-review';
 
 type Props = {
@@ -23,9 +28,128 @@ export function CodexPatchPreviewPanel({ source, sourceCommit, fingerprint }: Pr
   const [checking, setChecking] = useState(false);
   const [serverReport, setServerReport] = useState<WorktreePatchPreflightResult | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [writeSecret, setWriteSecret] = useState('');
+  const [writeConfirmed, setWriteConfirmed] = useState(false);
+  const [writeBusy, setWriteBusy] = useState(false);
+  const [writeGrant, setWriteGrant] = useState<WorktreePatchApplyGrant | null>(null);
+  const [writeResult, setWriteResult] = useState<WorktreePatchApplyResult | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
+
+  async function authorizeOneFileWrite() {
+    if (
+      !result?.ok ||
+      !serverReport ||
+      !writeConfirmed ||
+      writeSecret.length < 32 ||
+      writeGrant ||
+      writeBusy ||
+      writeResult
+    )
+      return;
+    const secret = writeSecret;
+    setWriteSecret('');
+    setWriteBusy(true);
+    setWriteError(null);
+    try {
+      const response = await fetch(
+        `/api/workspace/sessions/${source.sessionId}/worktree-plans/${source.planId}/patch-apply-authorize`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({
+            fingerprint,
+            sourceCommit,
+            filePath: source.filePath,
+            expectedSourceSha256: serverReport.sourceSha256,
+            patch,
+            operatorSecret: secret,
+            confirmation: 'I_APPROVE_ONE_FILE_PATCH_ONLY',
+          }),
+        },
+      );
+      if (!response.ok)
+        throw new Error('Одноразовий дозвіл не видано. Перевір opt-in, секрет і Git.');
+      const received = (await response.json()) as WorktreePatchApplyGrant;
+      if (
+        received.purpose !== 'WRITE_ONE_APPROVED_WORKTREE_FILE' ||
+        received.filePath !== source.filePath ||
+        received.sourceCommit !== sourceCommit ||
+        received.patchSha256 !== serverReport.patchSha256 ||
+        received.proposedSha256 !== serverReport.proposedSha256
+      ) {
+        throw new Error('Недозволений або невідповідний grant.');
+      }
+      setWriteGrant(received);
+    } catch (error) {
+      setWriteError(error instanceof Error ? error.message : 'Дозвіл не видано.');
+    } finally {
+      setWriteBusy(false);
+    }
+  }
+
+  async function applyOnce() {
+    if (!writeGrant || writeBusy || writeSecret.length < 32 || !serverReport || writeResult) return;
+    const token = writeGrant.grantToken;
+    const secret = writeSecret;
+    setWriteSecret('');
+    setWriteGrant(null); // Every attempted write permanently consumes the UI grant.
+    setWriteBusy(true);
+    setWriteError(null);
+    try {
+      const response = await fetch(
+        `/api/workspace/sessions/${source.sessionId}/worktree-plans/${source.planId}/patch-apply`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({
+            fingerprint,
+            sourceCommit,
+            filePath: source.filePath,
+            expectedSourceSha256: serverReport.sourceSha256,
+            patch,
+            operatorSecret: secret,
+            grantToken: token,
+          }),
+        },
+      );
+      if (!response.ok)
+        throw new Error(
+          'Патч не застосовано або стан невідомий. Перевір worktree та аудит вручну.',
+        );
+      const received = (await response.json()) as WorktreePatchApplyResult;
+      if (
+        received.status !== 'applied' ||
+        received.filePath !== source.filePath ||
+        received.sourceCommit !== sourceCommit ||
+        received.proposedSha256 !== serverReport.proposedSha256 ||
+        received.grantId !== writeGrant.grantId ||
+        received.mergeEnabled !== false ||
+        received.githubPushEnabled !== false
+      ) {
+        throw new Error('Результат запису потребує ручної перевірки.');
+      }
+      setWriteResult(received);
+      setServerReport(null);
+    } catch (error) {
+      setWriteError(error instanceof Error ? error.message : 'Перевір стан worktree вручну.');
+      setServerReport(null); // A failed attempt may still have written data.
+    } finally {
+      setWriteBusy(false);
+    }
+  }
 
   async function verifyOnServer() {
-    if (!result?.ok || checking || !acknowledged || operatorSecret.length < 32) return;
+    if (
+      !result?.ok ||
+      checking ||
+      !acknowledged ||
+      operatorSecret.length < 32 ||
+      writeGrant ||
+      writeResult
+    )
+      return;
     const secret = operatorSecret;
     setOperatorSecret('');
     setServerError(null);
@@ -90,19 +214,24 @@ export function CodexPatchPreviewPanel({ source, sourceCommit, fingerprint }: Pr
         maxLength={MAX_PATCH_CHARS}
         spellCheck={false}
         placeholder={`--- a/${source.filePath}\n+++ b/${source.filePath}\n@@ -1 +1 @@\n-old\n+new`}
-        disabled={checking}
+        disabled={checking || writeBusy || Boolean(writeGrant) || Boolean(writeResult)}
         onChange={(event) => {
           setPatch(event.target.value);
           setResult(null);
           setServerReport(null);
           setServerError(null);
           setAcknowledged(false);
+          setWriteConfirmed(false);
+          setWriteGrant(null);
+          setWriteError(null);
         }}
       />
       <button
         type="button"
         className="refresh"
-        disabled={!patch.trim() || checking}
+        disabled={
+          !patch.trim() || checking || writeBusy || Boolean(writeGrant) || Boolean(writeResult)
+        }
         onClick={() => {
           setResult(reviewCodexPatch(source, sourceCommit, patch));
           setServerReport(null);
@@ -189,6 +318,91 @@ export function CodexPatchPreviewPanel({ source, sourceCommit, fingerprint }: Pr
                 SHA-256 запропонованого вмісту: <code>{serverReport.proposedSha256}</code>
               </small>
               <p>Режим: лише перевірка. Жодного файлу не змінено.</p>
+              {!writeResult && !writeGrant && (
+                <div className="ws-worktree-authorization">
+                  <h4>Окремий дозвіл на зміну одного файла</h4>
+                  <p>
+                    Це вже реальний запис до ізольованого worktree. Створюється короткоживучий
+                    одноразовий дозвіл на конкретний патч. Не змінює main, не робить commit чи PR.
+                    Для скасування просто не погоджуй запис.
+                  </p>
+                  <label className="ws-plan-confirm">
+                    <input
+                      type="checkbox"
+                      checked={writeConfirmed}
+                      disabled={writeBusy}
+                      onChange={(event) => setWriteConfirmed(event.target.checked)}
+                    />
+                    Я перевірив diff і явно дозволяю змінити один файл у цьому worktree.
+                  </label>
+                  <label htmlFor="ws-patch-write-secret">Окремий секрет застосування патча</label>
+                  <input
+                    id="ws-patch-write-secret"
+                    type="password"
+                    autoComplete="off"
+                    value={writeSecret}
+                    disabled={writeBusy}
+                    onChange={(event) => setWriteSecret(event.target.value)}
+                    placeholder="DEV_HUB_PATCH_APPLY_OPERATOR_SECRET"
+                  />
+                  <button
+                    type="button"
+                    className="refresh"
+                    disabled={writeBusy || !writeConfirmed || writeSecret.length < 32}
+                    onClick={() => void authorizeOneFileWrite()}
+                  >
+                    {writeBusy ? 'Перевірка дозволу…' : 'Видати одноразовий дозвіл на цей патч'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {writeGrant && !writeResult && (
+            <div className="ws-worktree-authorization" role="status">
+              <strong>
+                Одноразовий дозвіл виданий до{' '}
+                {new Date(writeGrant.expiresAt).toLocaleTimeString('uk-UA')}.
+              </strong>
+              <p>
+                Увага: натискання наступної кнопки реально змінить файл у worktree. Відкат
+                автоматично не виконується.
+              </p>
+              <label htmlFor="ws-patch-apply-again-secret">
+                Повторно введи секрет для завершення
+              </label>
+              <input
+                id="ws-patch-apply-again-secret"
+                type="password"
+                autoComplete="off"
+                value={writeSecret}
+                disabled={writeBusy}
+                onChange={(event) => setWriteSecret(event.target.value)}
+                placeholder="DEV_HUB_PATCH_APPLY_OPERATOR_SECRET"
+              />
+              <button
+                type="button"
+                className="ws-primary"
+                disabled={writeBusy || writeSecret.length < 32}
+                onClick={() => void applyOnce()}
+              >
+                {writeBusy ? 'Застосування…' : 'Застосувати один перевірений патч'}
+              </button>
+            </div>
+          )}
+          {writeError && (
+            <p role="alert" className="ws-chat-error">
+              {writeError}
+            </p>
+          )}
+          {writeResult && (
+            <div role="status">
+              <strong>Файл змінено в ізольованому worktree.</strong>
+              <p>
+                SHA-256: <code>{writeResult.proposedSha256}</code>
+              </p>
+              <small>
+                Злиття, push і commit не виконано. Перевір diff і тести перед створенням PR.
+              </small>
             </div>
           )}
         </div>

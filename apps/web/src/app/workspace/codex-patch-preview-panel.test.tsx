@@ -28,7 +28,9 @@ describe('Codex patch preview UI', () => {
     expect(markup).toContain('Перевірити і переглянути diff');
     expect(markup).toContain('disabled');
     expect(markup).toContain('maxLength="20000"');
-    expect(markup).not.toContain('Застосувати патч');
+    expect(markup).not.toContain('Застосувати один перевірений патч');
     expect(markup).not.toContain('Надіслати до Codex');
+    expect(markup).not.toContain('Видати одноразовий дозвіл на цей патч');
+    expect(markup).not.toContain('Застосувати один перевірений патч');
   });
 });
