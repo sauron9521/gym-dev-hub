@@ -123,3 +123,19 @@ export type {
   MemoryKind,
   MemoryStatus,
 } from './memory.js';
+
+// Internal, authentication-gated read contracts; no public endpoint enabled yet.
+export {
+  MemoryReadQuerySchema,
+  MemoryReadContextSchema,
+  MemoryReadItemSchema,
+  MemoryReadPageSchema,
+  MemoryReadRevisionsSchema,
+} from './memory-read.js';
+export type {
+  MemoryReadQuery,
+  MemoryReadContext,
+  MemoryReadItem,
+  MemoryReadPage,
+  MemoryReadRevisions,
+} from './memory-read.js';
