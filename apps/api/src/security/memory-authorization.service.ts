@@ -105,6 +105,7 @@ export class MemoryAuthorizationService {
         config.proposalWriteEnabled,
         config.approvalWriteEnabled,
         config.rejectionWriteEnabled,
+        config.verifiedRevocationEnabled,
       ]),
     );
     if (this.previousConfigDigest !== null && this.previousConfigDigest !== fingerprint) {

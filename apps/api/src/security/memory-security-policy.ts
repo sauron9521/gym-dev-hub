@@ -8,6 +8,7 @@ export type MemorySecurityConfiguration = {
   proposalWriteEnabled: boolean;
   approvalWriteEnabled: boolean;
   rejectionWriteEnabled: boolean;
+  verifiedRevocationEnabled: boolean;
 };
 
 /** Independent, opt-in memory identity namespace, never existing worktree grants. */
@@ -81,6 +82,9 @@ export function memorySecurityConfig(env: NodeJS.ProcessEnv): MemorySecurityConf
   const rejectionFlag = env.DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE;
   if (rejectionFlag !== undefined && rejectionFlag !== 'true' && rejectionFlag !== 'false')
     throw new MemorySecurityError('disabled');
+  const revocationFlag = env.DEV_HUB_MEMORY_VERIFIED_REVOCATION_HTTP_ENABLE;
+  if (revocationFlag !== undefined && revocationFlag !== 'true' && revocationFlag !== 'false')
+    throw new MemorySecurityError('disabled');
   return {
     operatorSecret,
     repositories,
@@ -89,6 +93,7 @@ export function memorySecurityConfig(env: NodeJS.ProcessEnv): MemorySecurityConf
     proposalWriteEnabled: proposalFlag === 'true',
     approvalWriteEnabled: approvalFlag === 'true',
     rejectionWriteEnabled: rejectionFlag === 'true',
+    verifiedRevocationEnabled: revocationFlag === 'true',
   };
 }
 

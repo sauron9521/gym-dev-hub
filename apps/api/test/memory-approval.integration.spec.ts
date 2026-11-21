@@ -473,6 +473,205 @@ describe.skipIf(!enabled)(
       expect(audit.rows[0]?.n).toBe(0);
     });
 
+    it('revokes an audited VERIFIED revision 2 to terminal REVOKED revision 3 without losing provenance', async () => {
+      const created = await create(randomUUID());
+      const prior = await prepare(created.recordId);
+      await approve(prior);
+      const ctx = { repository, agentId, taskId, sessionId };
+      const reader = new MemoryQueryService(pool, randomBytes(32));
+      expect((await reader.list(ctx, { repository })).items.map((x) => x.record.id)).toContain(
+        created.recordId,
+      );
+
+      const review = await approvals.reviewVerifiedRevocationAndGrant(secret, {
+        repository,
+        recordId: created.recordId,
+        expectedRevision: 2,
+      });
+      expect(review).toMatchObject({
+        action: 'REVOKE_MEMORY_RECORD',
+        expectedRevision: 2,
+        preview: { text: created.payload.text, sourceRef: created.payload.sourceRef },
+      });
+      const result = await approvals.revokeVerified(secret, review.grantToken, created.recordId, {
+        repository,
+        expectedRevision: 2,
+        fingerprint: review.fingerprint,
+      });
+      expect(result).toEqual({ recordId: created.recordId, status: 'REVOKED', revision: 3 });
+      const current = await pool.query(
+        'SELECT status,revision,verified_by,verified_at,agent_id,session_id,text FROM memory_records WHERE id=$1',
+        [created.recordId],
+      );
+      expect(current.rows[0]).toMatchObject({
+        status: 'REVOKED',
+        revision: 3,
+        verified_by: 'local-operator',
+        agent_id: agentId,
+        session_id: sessionId,
+        text: created.payload.text,
+      });
+      expect(current.rows[0].verified_at).toBeInstanceOf(Date);
+      const history = await pool.query(
+        'SELECT revision,status,source_id,text,changed_by FROM memory_revisions WHERE memory_id=$1 ORDER BY revision',
+        [created.recordId],
+      );
+      expect(history.rows.map((x) => x.status)).toEqual(['PROPOSED', 'VERIFIED', 'REVOKED']);
+      expect(new Set(history.rows.map((x) => x.source_id)).size).toBe(1);
+      expect(history.rows[2]).toMatchObject({
+        revision: 3,
+        text: created.payload.text,
+        changed_by: 'local-operator',
+      });
+      const audit = await pool.query(
+        'SELECT action,operator_actor_id,grant_id,previous_digest,resulting_digest FROM memory_mutation_audit WHERE memory_id=$1',
+        [created.recordId],
+      );
+      expect(audit.rows).toHaveLength(3);
+      expect(audit.rows.find((x) => x.action === 'REVOKE_MEMORY_RECORD')).toMatchObject({
+        operator_actor_id: 'local-operator',
+        grant_id: review.grantId,
+        previous_digest: review.fingerprint.slice(7),
+      });
+      expect(audit.rows.find((x) => x.action === 'REVOKE_MEMORY_RECORD')?.resulting_digest).toMatch(
+        /^[0-9a-f]{64}$/,
+      );
+      expect((await reader.list(ctx, { repository })).items.map((x) => x.record.id)).not.toContain(
+        created.recordId,
+      );
+      await expect(reader.get(ctx, repository, created.recordId)).rejects.toThrow();
+      await expect(
+        approvals.revokeVerified(secret, review.grantToken, created.recordId, {
+          repository,
+          expectedRevision: 2,
+          fingerprint: review.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(
+        approvals.reviewVerifiedRevocationAndGrant(secret, {
+          repository,
+          recordId: created.recordId,
+          expectedRevision: 2,
+        }),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
+    it('serializes two independent verified revocations: one success and one stale 409', async () => {
+      const created = await create(randomUUID());
+      await approve(await prepare(created.recordId));
+      const [a, b] = await Promise.all([
+        approvals.reviewVerifiedRevocationAndGrant(secret, {
+          repository,
+          recordId: created.recordId,
+          expectedRevision: 2,
+        }),
+        approvals.reviewVerifiedRevocationAndGrant(secret, {
+          repository,
+          recordId: created.recordId,
+          expectedRevision: 2,
+        }),
+      ]);
+      const results = await Promise.allSettled(
+        [a, b].map((g) =>
+          approvals.revokeVerified(secret, g.grantToken, created.recordId, {
+            repository,
+            expectedRevision: 2,
+            fingerprint: g.fingerprint,
+          }),
+        ),
+      );
+      expect(results.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+      const losers = results.filter((x) => x.status === 'rejected');
+      expect(losers).toHaveLength(1);
+      if (losers[0]?.status === 'rejected') expect(losers[0].reason).toMatchObject({ status: 409 });
+      const rows = await pool.query('SELECT status,revision FROM memory_records WHERE id=$1', [
+        created.recordId,
+      ]);
+      expect(rows.rows[0]).toMatchObject({ status: 'REVOKED', revision: 3 });
+      const history = await pool.query(
+        'SELECT count(*)::int AS n FROM memory_revisions WHERE memory_id=$1',
+        [created.recordId],
+      );
+      expect(history.rows[0]?.n).toBe(3);
+      const audits = await pool.query(
+        "SELECT count(*)::int AS n FROM memory_mutation_audit WHERE memory_id=$1 AND action='REVOKE_MEMORY_RECORD'",
+        [created.recordId],
+      );
+      expect(audits.rows[0]?.n).toBe(1);
+    });
+
+    it('refuses direct verified revocation and rolls back state/history on audited-write failure', async () => {
+      const created = await create(randomUUID());
+      await approve(await prepare(created.recordId));
+      await expect(
+        pool.query(
+          "UPDATE memory_records SET status='REVOKED',revision=revision+1,updated_at=NOW() WHERE id=$1",
+          [created.recordId],
+        ),
+      ).rejects.toMatchObject({ code: 'P0001' });
+      await expect(
+        pool.query(
+          "UPDATE memory_records SET status='SUPERSEDED',revision=revision+1,updated_at=NOW() WHERE id=$1",
+          [created.recordId],
+        ),
+      ).rejects.toMatchObject({ code: 'P0001' });
+      const grant = await approvals.reviewVerifiedRevocationAndGrant(secret, {
+        repository,
+        recordId: created.recordId,
+        expectedRevision: 2,
+      });
+      const failing = new MemoryApprovalService(
+        auth,
+        env,
+        (url) => {
+          const inner = new pg.Pool({ connectionString: url, ssl: false, max: 1 });
+          return {
+            connect: async () => {
+              const client = await inner.connect();
+              return {
+                query: async (sql: string, params?: unknown[]) => {
+                  if (sql.includes('INSERT INTO memory_mutation_audit'))
+                    throw Error('private simulated audit failure');
+                  return client.query(sql, params);
+                },
+                release: () => client.release(),
+              };
+            },
+            end: async () => inner.end(),
+          } as unknown as pg.Pool;
+        },
+        'test',
+      );
+      await expect(
+        failing.revokeVerified(secret, grant.grantToken, created.recordId, {
+          repository,
+          expectedRevision: 2,
+          fingerprint: grant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 503 });
+      const state = await pool.query('SELECT status,revision FROM memory_records WHERE id=$1', [
+        created.recordId,
+      ]);
+      expect(state.rows[0]).toMatchObject({ status: 'VERIFIED', revision: 2 });
+      const history = await pool.query(
+        'SELECT count(*)::int AS n FROM memory_revisions WHERE memory_id=$1',
+        [created.recordId],
+      );
+      expect(history.rows[0]?.n).toBe(2);
+      const audit = await pool.query(
+        "SELECT count(*)::int AS n FROM memory_mutation_audit WHERE memory_id=$1 AND action='REVOKE_MEMORY_RECORD'",
+        [created.recordId],
+      );
+      expect(audit.rows[0]?.n).toBe(0);
+      await expect(
+        approvals.revokeVerified(secret, grant.grantToken, created.recordId, {
+          repository,
+          expectedRevision: 2,
+          fingerprint: grant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
     it('rejects unsourced direct records and rejects reassignment of identity/scope/text', async () => {
       const ghost = randomUUID();
       await pool.query(

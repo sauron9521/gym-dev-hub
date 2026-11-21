@@ -64,6 +64,30 @@ export class MemoryApprovalController {
     private readonly approvals: MemoryApprovalService,
   ) {}
 
+  @Post(':id/revoke')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async revokeVerified(
+    @Req() request: LocalRequest,
+    @Param('id') id: string,
+    @Body() input: unknown,
+  ) {
+    try {
+      return await this.approvals.revokeVerified(
+        requireOperatorRequest(request, this.approvals),
+        onlyString(request.headers['x-dev-hub-memory-approval-grant']),
+        id,
+        input,
+      );
+    } catch (error) {
+      if (error instanceof MemorySecurityError) throw toMemoryHttpException(error);
+      throw error;
+    }
+  }
+
   @Post(':id/reject')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
@@ -124,6 +148,33 @@ export class MemoryRejectionGrantController {
   async reviewAndGrant(@Req() request: LocalRequest, @Body() input: unknown) {
     try {
       return await this.approvals.reviewRejectionAndGrant(
+        requireOperatorRequest(request, this.approvals),
+        input,
+      );
+    } catch (error) {
+      if (error instanceof MemorySecurityError) throw toMemoryHttpException(error);
+      throw error;
+    }
+  }
+}
+
+/** Only reviewed VERIFIED revision-2 records may get a separate revoke grant. */
+@Controller('v1/memory/operator/revocation-grants')
+export class MemoryVerifiedRevocationGrantController {
+  constructor(
+    @Inject(MemoryApprovalService)
+    private readonly approvals: MemoryApprovalService,
+  ) {}
+
+  @Post()
+  @HttpCode(201)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async reviewAndGrant(@Req() request: LocalRequest, @Body() input: unknown) {
+    try {
+      return await this.approvals.reviewVerifiedRevocationAndGrant(
         requireOperatorRequest(request, this.approvals),
         input,
       );

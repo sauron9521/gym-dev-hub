@@ -1,6 +1,6 @@
 # Operator-reviewed rejection of unverified memory (Issue #40)
 
-**Default off; local-only, one decision per record.** This independently gated path allows a trusted local operator to reject a previously created `PROPOSED` agent record, moving it to terminal `REVOKED` with revision 2. It does **not** revoke already `VERIFIED` knowledge, edit records, supersede, delete audit, inject Codex instructions or expose external MCP/HTTP. A rejected record is never visible to the default verified-only memory read API.
+**Default off; local-only, one decision per record.** This independently gated path allows a trusted local operator to reject a previously created `PROPOSED` agent record, moving it to terminal `REVOKED` with revision 2. This proposal-rejection route does **not** revoke `VERIFIED` knowledge; that separate operator workflow is documented in [verified revocation](memory-verified-revocation.md). Neither route edits content, supersedes, deletes audit, injects Codex instructions nor exposes external MCP/HTTP. A rejected record is never visible to the default verified-only memory read API.
 
 ## Explicit separate opt-in
 
@@ -34,4 +34,4 @@ The operator secret is `x-dev-hub-memory-operator-secret` on both requests; it i
 - The rejection flag is separate from approval; disabling it must not disable previously opted-in read or approve routes. Roll back by disabling the flag and restarting the Hub. Keep the additive migration and immutable history.
 - No automatic retry after a lost response. Inspect the record and audit before deciding on any further action; do not create another grant blindly.
 
-**Acceptance remaining (#40 and #39 stay open):** operator-only revocation of already verified records, supersede with revision-safe provenance, per-human operator identity/RBAC, independent source trust verification, durable distributed grants if the Hub ever runs across multiple instances, and final adversarial security review. This worktree PR is **stacked on #98** and must not be merged until #98 is in `main` and this PR's CI is rerun on the resulting base.
+**Acceptance remaining (#40 and #39 stay open):** revocation of first-generation verified records is [separately available](memory-verified-revocation.md); supersede with revision-safe provenance, per-human operator identity/RBAC, independent source trust verification, durable distributed grants if the Hub ever runs across multiple instances, and final adversarial security review. PR #99 has been merged into `main`; all future changes use a fresh base.

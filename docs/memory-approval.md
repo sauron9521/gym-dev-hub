@@ -1,6 +1,6 @@
 # Operator-reviewed Memory approval — Issue #40 (CAS slice)
 
-**Default off. No agent approval.** This slice adds only an explicit local operator transition from a **DB-registered, immutable, session-bound, sourced** `PROPOSED` record to `VERIFIED`. The original agent proposal is untrusted data until this manual review. No automatic Codex context injection, verified-record revoke/supersede writer, UI or MCP transport is introduced. Rejection of an unverified proposal is now separately gated and documented in [operator rejection](memory-rejection.md).
+**Default off. No agent approval.** This slice adds only an explicit local operator transition from a **DB-registered, immutable, session-bound, sourced** `PROPOSED` record to `VERIFIED`. The original agent proposal is untrusted data until this manual review. No automatic Codex context injection, supersede writer, UI or MCP transport is introduced. A [separate revocation workflow](memory-verified-revocation.md) can withdraw a verified revision 2 only after independent operator review. Rejection of an unverified proposal is now separately gated and documented in [operator rejection](memory-rejection.md).
 
 ## Enable and isolate
 
@@ -50,6 +50,6 @@ An additive Prisma migration locks original repository, scope, kind, task ID, se
 
 Local full `pnpm check` covers Nest HTTP, grant authenticity, origin/secret denial and capability separation, using no local PostgreSQL. The isolated GitHub **Memory PostgreSQL** workflow runs migration and real transaction tests against **gym_dev_hub_memory_test** only: two independent simultaneous approval grants → one success + one **409**, exact two source-linked revisions, transactional audit, immutable scope/text, grant replay/revocation, invalid source and rollback after deliberate audit failure.
 
-**Still not done:** revoking already VERIFIED records and superseding records with explicit lifecycle rules; unverified proposal rejection is [separately implemented](memory-rejection.md); durable unique human identity and RBAC, support for multiple Hub instances, independent source verification beyond an operator's manual evidence review, and broader integration tests/security acceptance before closing #40/#39. Existing `PROPOSED` records never appear in normal verified read results until successfully approved.
+**Still not done:** superseding already verified records with explicit lifecycle rules; [first-generation verified revocation](memory-verified-revocation.md) is separately implemented; unverified proposal rejection is [separately implemented](memory-rejection.md); durable unique human identity and RBAC, support for multiple Hub instances, independent source verification beyond an operator's manual evidence review, and broader integration tests/security acceptance before closing #40/#39. Existing `PROPOSED` records never appear in normal verified read results until successfully approved.
 
 **Rollback:** disable `DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE` and restart the Hub process to invalidate outstanding in-memory grants. Keep the additive audit columns and all immutable history; do not drop migrations for routine rollback.
