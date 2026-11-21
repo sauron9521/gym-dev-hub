@@ -345,3 +345,33 @@ export interface WorktreeCommitCandidateAcknowledgement {
   pushEnabled: false;
   mergeEnabled: false;
 }
+
+/** Separately approved 45-second capability; does not allow push or merge. */
+export interface WorktreeCommitWriteGrant {
+  grantId: string;
+  grantToken: string;
+  candidateId: string;
+  candidateSha256: string;
+  sourceCommit: string;
+  commitSubject: string;
+  expiresAt: string;
+  purpose: 'ONE_LOCAL_GIT_COMMIT_ONLY';
+  pushEnabled: false;
+  mergeEnabled: false;
+}
+
+export interface WorktreeCommitWriteResult {
+  runId: string;
+  grantId: string;
+  candidateSha256: string;
+  commitSha: string;
+  parentSha: string;
+  treeSha: string;
+  branch: string;
+  commitSubject: string;
+  filePathSha256: string;
+  status: 'committed';
+  worktreeClean: true;
+  pushEnabled: false;
+  mergeEnabled: false;
+}

@@ -18,6 +18,7 @@ import { WorktreePatchApplyService } from './worktree-patch-apply.service.js';
 import { WorktreePatchReviewService } from './worktree-patch-review.service.js';
 import { WorktreePatchChecksService } from './worktree-patch-checks.service.js';
 import { WorktreeCommitCandidateService } from './worktree-commit-candidate.service.js';
+import { WorktreeCommitWriteService } from './worktree-commit-write.service.js';
 import { WorktreeToolService } from './worktree-tool.service.js';
 import { TaskRunnerPolicyService } from './task-runner-policy.service.js';
 import { TaskExecutionGrantService } from './task-execution-grant.service.js';
@@ -43,6 +44,8 @@ import type {
   WorktreePatchCheckHistory,
   WorktreeCommitCandidatePreview,
   WorktreeCommitCandidateAcknowledgement,
+  WorktreeCommitWriteGrant,
+  WorktreeCommitWriteResult,
 } from '@gym-dev-hub/contracts';
 
 @Controller('workspace/sessions/:sessionId/worktree-plans')
@@ -60,6 +63,7 @@ export class WorktreePlanController {
     private readonly patchReview: WorktreePatchReviewService,
     private readonly patchChecks: WorktreePatchChecksService,
     private readonly commitCandidate: WorktreeCommitCandidateService,
+    private readonly commitWrite: WorktreeCommitWriteService,
     private readonly tools: WorktreeToolService,
     private readonly taskRunner: TaskRunnerPolicyService,
     private readonly taskGrants: TaskExecutionGrantService,
@@ -255,6 +259,26 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreeCommitCandidateAcknowledgement> {
     return this.commitCandidate.acknowledge(sessionId, planId, body);
+  }
+
+  /** Explicit one-time, local-only commit grant; no Git write here. */
+  @Post(':planId/commit-write-authorize')
+  commitWriteAuthorize(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeCommitWriteGrant> {
+    return this.commitWrite.authorize(sessionId, planId, body);
+  }
+
+  /** Performs precisely one scoped local Git commit; no push/merge. */
+  @Post(':planId/commit-write-execute')
+  commitWriteExecute(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreeCommitWriteResult> {
+    return this.commitWrite.execute(sessionId, planId, body);
   }
 
   @Post(':planId/tool-authorize')

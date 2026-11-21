@@ -81,6 +81,8 @@ function allowedPath(segments: string[], method: string): string | null {
       'patch-check-history',
       'commit-candidate-preview',
       'commit-candidate-acknowledge',
+      'commit-write-authorize',
+      'commit-write-execute',
       'tool-authorize',
       'tool-execute',
       'task-preview',
@@ -157,19 +159,21 @@ async function forward(request: NextRequest, context: Context, method: 'GET' | '
       signal: isEventStream
         ? request.signal
         : AbortSignal.timeout(
-            path.endsWith('/mount-probe') ||
-              path.endsWith('/code-read') ||
-              path.endsWith('/commit-candidate-preview') ||
-              path.endsWith('/commit-candidate-acknowledge') ||
-              path.endsWith('/tool-execute')
-              ? 45_000
-              : path.endsWith('/boundary/preflight')
+            path.endsWith('/commit-write-authorize') || path.endsWith('/commit-write-execute')
+              ? 120_000
+              : path.endsWith('/mount-probe') ||
+                  path.endsWith('/code-read') ||
+                  path.endsWith('/commit-candidate-preview') ||
+                  path.endsWith('/commit-candidate-acknowledge') ||
+                  path.endsWith('/tool-execute')
                 ? 45_000
-                : path.endsWith('/hydrate')
-                  ? 300_000
-                  : path.includes('codex') || path.endsWith('/chat')
-                    ? 20_000
-                    : 10_000,
+                : path.endsWith('/boundary/preflight')
+                  ? 45_000
+                  : path.endsWith('/hydrate')
+                    ? 300_000
+                    : path.includes('codex') || path.endsWith('/chat')
+                      ? 20_000
+                      : 10_000,
           ),
       redirect: 'error',
     });
