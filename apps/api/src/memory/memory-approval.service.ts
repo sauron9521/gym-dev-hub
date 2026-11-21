@@ -91,7 +91,7 @@ export const fingerprint = (row: ProposalRow) =>
     ]),
   );
 
-const PROPOSAL_QUERY = `
+export const PROPOSAL_QUERY = `
   SELECT r.id,r.repository,r.kind::text,r.scope::text,r.status::text,
     r.revision,r.text,r.session_id,r.agent_id,ms.task_id,
     s.id AS source_id,s.source_ref
@@ -192,6 +192,9 @@ export class MemoryApprovalService {
   }
 
   private assertEnabled(decision: Decision): void {
+    // No shared-root fallback after opting into personal rejection.
+    if (decision === 'reject' && this.env.DEV_HUB_MEMORY_PERSONAL_REJECTION_HTTP_ENABLE === 'true')
+      throw new ServiceUnavailableException('Legacy rejection disabled by personal operator mode');
     const flag =
       decision === 'approve'
         ? this.env.DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE

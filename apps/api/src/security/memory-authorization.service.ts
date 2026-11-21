@@ -113,6 +113,7 @@ export class MemoryAuthorizationService {
         config.verifiedRevocationEnabled,
         config.supersedeEnabled,
         config.operatorIdentityEnabled,
+        config.personalRejectionEnabled,
       ]),
     );
     if (this.previousConfigDigest !== null && this.previousConfigDigest !== fingerprint) {

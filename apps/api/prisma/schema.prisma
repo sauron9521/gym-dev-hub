@@ -56,16 +56,17 @@ model MemoryRepository {
 // Distinct, role-scoped local operator credentials, never plaintext secrets.
 // These are credential-holder identities, not proof of a unique natural person.
 model MemoryOperatorIdentity {
-  id          String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  repository  String                        @db.VarChar(200)
-  handle      String                        @db.VarChar(48)
-  role        String                        @db.VarChar(16)
-  tokenDigest String                        @unique @map("token_digest") @db.Char(64)
-  createdAt   DateTime                      @default(now()) @map("created_at") @db.Timestamptz(3)
-  expiresAt   DateTime                      @map("expires_at") @db.Timestamptz(3)
-  revokedAt   DateTime?                     @map("revoked_at") @db.Timestamptz(3)
-  project     MemoryRepository              @relation(fields: [repository], references: [name], onUpdate: Restrict, onDelete: Restrict)
-  audits      MemoryOperatorIdentityAudit[]
+  id             String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  repository     String                        @db.VarChar(200)
+  handle         String                        @db.VarChar(48)
+  role           String                        @db.VarChar(16)
+  tokenDigest    String                        @unique @map("token_digest") @db.Char(64)
+  createdAt      DateTime                      @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt      DateTime                      @map("expires_at") @db.Timestamptz(3)
+  revokedAt      DateTime?                     @map("revoked_at") @db.Timestamptz(3)
+  project        MemoryRepository              @relation(fields: [repository], references: [name], onUpdate: Restrict, onDelete: Restrict)
+  audits         MemoryOperatorIdentityAudit[]
+  mutationAudits MemoryMutationAudit[]
 
   @@unique([repository, handle])
   @@unique([repository, id])
@@ -236,24 +237,27 @@ model MemoryProposalRequest {
 
 // Metadata-only append-only transaction audit, no raw text, secrets or prompts.
 model MemoryMutationAudit {
-  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  repository      String              @db.VarChar(200)
-  memoryId        String              @map("memory_id") @db.Uuid
-  agentId         String              @map("agent_id") @db.Uuid
-  taskId          String              @map("task_id") @db.Uuid
-  sessionId       String              @map("session_id") @db.Uuid
-  action          String              @db.VarChar(40)
-  previousDigest  String?             @map("previous_digest") @db.Char(64)
-  resultingDigest String              @map("resulting_digest") @db.Char(64)
-  operatorActorId String?             @map("operator_actor_id") @db.VarChar(80)
-  grantId         String?             @map("grant_id") @db.Uuid
-  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
-  project         MemoryRepository    @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
-  agent           MemoryAgentIdentity @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
-  task            MemoryTask          @relation(fields: [repository, taskId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
-  session         MemorySession       @relation(fields: [repository, sessionId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
-  record          MemoryRecord        @relation(fields: [repository, memoryId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  id                 String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  repository         String                  @db.VarChar(200)
+  memoryId           String                  @map("memory_id") @db.Uuid
+  agentId            String                  @map("agent_id") @db.Uuid
+  taskId             String                  @map("task_id") @db.Uuid
+  sessionId          String                  @map("session_id") @db.Uuid
+  action             String                  @db.VarChar(40)
+  previousDigest     String?                 @map("previous_digest") @db.Char(64)
+  resultingDigest    String                  @map("resulting_digest") @db.Char(64)
+  operatorActorId    String?                 @map("operator_actor_id") @db.VarChar(80)
+  operatorIdentityId String?                 @map("operator_identity_id") @db.Uuid
+  operatorIdentity   MemoryOperatorIdentity? @relation(fields: [repository, operatorIdentityId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  grantId            String?                 @map("grant_id") @db.Uuid
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  project            MemoryRepository        @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  agent              MemoryAgentIdentity     @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  task               MemoryTask              @relation(fields: [repository, taskId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  session            MemorySession           @relation(fields: [repository, sessionId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  record             MemoryRecord            @relation(fields: [repository, memoryId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([repository, memoryId, createdAt])
+  @@index([repository, operatorIdentityId, createdAt])
   @@map("memory_mutation_audit")
 }
