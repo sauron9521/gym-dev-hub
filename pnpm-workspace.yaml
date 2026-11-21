@@ -3,3 +3,6 @@ packages:
   - packages/*
 allowBuilds:
   esbuild: true
+  # Reject Prisma install hooks: explicit reviewed CLI generation only.
+  prisma: false
+  '@prisma/engines': false

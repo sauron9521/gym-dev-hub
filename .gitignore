@@ -13,3 +13,5 @@ coverage/
 # Keep local development session histories out of public GitHub.
 .local/
 .vscode/
+# Generated Hub-only Prisma 7 client: explicit generation; never commit artifacts.
+apps/api/.local/generated/

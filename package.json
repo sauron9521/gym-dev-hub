@@ -9,6 +9,12 @@
   "scripts": {
     "dev": "turbo run dev --parallel",
     "dev:operator": "node scripts/dev-operator.mjs",
+    "memory:db:up": "docker compose --env-file apps/api/.env -f compose.memory.yml up -d --wait",
+    "memory:db:down": "docker compose --env-file apps/api/.env -f compose.memory.yml down",
+    "memory:db:generate": "pnpm --filter @gym-dev-hub/api db:generate",
+    "memory:db:status": "pnpm --filter @gym-dev-hub/api db:status",
+    "memory:db:health": "pnpm --filter @gym-dev-hub/api db:health",
+    "memory:db:migrate": "pnpm --filter @gym-dev-hub/api db:migrate",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

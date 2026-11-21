@@ -1,0 +1,11 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../.local/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Intentionally no models: #37 adds revisioned Shared Agent Memory records.
+// This database is not gym-platform and has no schema overlap with it.

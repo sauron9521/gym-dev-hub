@@ -9,7 +9,13 @@
     "start": "node dist/main.js",
     "lint": "oxlint src test --deny-warnings",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "prisma generate --config prisma.config.ts",
+    "db:status": "node scripts/memory-db-control.mjs status",
+    "db:health": "node scripts/memory-db-control.mjs health",
+    "db:health:test": "node scripts/memory-db-control.mjs health:test",
+    "db:migrate": "node scripts/memory-db-control.mjs migrate",
+    "db:migrate:test": "node scripts/memory-db-control.mjs migrate:test"
   },
   "dependencies": {
     "@gym-dev-hub/contracts": "workspace:*",
@@ -17,6 +23,9 @@
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^12.5.1",
     "@nestjs/platform-express": "^12.5.1",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "pg": "8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^4.6.7"
@@ -25,6 +34,8 @@
     "@gym-dev-hub/tsconfig": "workspace:*",
     "@nestjs/cli": "^12.0.0",
     "@types/node": "^24.0.0",
+    "@types/pg": "8.23.1",
+    "prisma": "7.10.1",
     "typescript": "^6.0.0",
     "vitest": "^3.2.4"
   }
