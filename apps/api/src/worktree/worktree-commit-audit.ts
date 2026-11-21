@@ -147,3 +147,112 @@ export async function acquireCommitLock(planId: string): Promise<CommitLock> {
     },
   };
 }
+
+/** Strict read-only audit replay before publishing any local Git object. */
+export async function readCommitAudit(): Promise<CommitAuditRecord[]> {
+  const dir = await checkedCommitDirectory();
+  const file = join(dir, 'audit.jsonl');
+  const stat = await lstat(file);
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.nlink !== 1 ||
+    stat.size <= 0 ||
+    stat.size > MAX_BYTES ||
+    (process.platform !== 'win32' && (stat.mode & 0o077) !== 0)
+  ) {
+    throw new Error('Unsafe or empty local commit audit');
+  }
+  const handle = await open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const before = await handle.stat();
+    if (
+      !before.isFile() ||
+      before.dev !== stat.dev ||
+      before.ino !== stat.ino ||
+      before.size !== stat.size
+    )
+      throw new Error('Git commit audit changed while opening');
+    const data = await handle.readFile();
+    const after = await handle.stat();
+    if (
+      data.length !== before.size ||
+      after.size !== before.size ||
+      after.mtimeMs !== before.mtimeMs ||
+      after.ctimeMs !== before.ctimeMs ||
+      !data.length ||
+      data[data.length - 1] !== 10
+    ) {
+      throw new Error('Git commit audit changed or was truncated');
+    }
+    const source = new TextDecoder('utf-8', { fatal: true }).decode(data);
+    const lines = source.slice(0, -1).split('\n');
+    return lines.map((line) => {
+      if (!line || Buffer.byteLength(line) > 1024) throw new Error('Invalid Git commit audit line');
+      return journalSchema.parse(JSON.parse(line) as unknown);
+    });
+  } finally {
+    await handle.close();
+  }
+}
+
+export function auditedCompletedCommit(
+  records: readonly CommitAuditRecord[],
+  sessionId: string,
+  planId: string,
+  commitSha: string,
+): { grantId: string; parentSha: string; filePathSha256: string; subjectSha256: string } {
+  const groups = new Map<string, CommitAuditRecord[]>();
+  for (const item of records) {
+    const list = groups.get(item.grantId) ?? [];
+    list.push(item);
+    groups.set(item.grantId, list);
+  }
+  let found: CommitAuditRecord | null = null;
+  for (const group of groups.values()) {
+    if (group.length > 4 || group[0]?.event !== 'issued') {
+      throw new Error('Unexpected commit audit event order');
+    }
+    for (let i = 0; i < group.length; i++) {
+      const event = group[i]!;
+      const first = group[0]!;
+      if (
+        event.sessionId !== first.sessionId ||
+        event.planId !== first.planId ||
+        event.sourceCommit !== first.sourceCommit ||
+        event.candidateSha256 !== first.candidateSha256 ||
+        event.filePathSha256 !== first.filePathSha256 ||
+        event.subjectSha256 !== first.subjectSha256 ||
+        (i === 0 && event.runId !== null)
+      )
+        throw new Error('Tampered commit audit identity');
+    }
+    if (
+      group.length > 1 &&
+      (group[1]?.event !== 'attempted' ||
+        !group[1].runId ||
+        group.slice(2).some((x) => x.runId !== group[1]?.runId) ||
+        group.slice(2).some((x) => !['committed', 'rejected'].includes(x.event)) ||
+        group.filter((x) => x.event === 'committed').length > 1 ||
+        group.filter((x) => x.event === 'rejected').length > 1)
+    )
+      throw new Error('Invalid local commit event transition');
+    const last = group.at(-1)!;
+    if (
+      last.event !== 'committed' ||
+      last.sessionId !== sessionId ||
+      last.planId !== planId ||
+      last.commitSha !== commitSha
+    )
+      continue;
+    if (group.length !== 3 || found) throw new Error('Ambiguous completed Git commit audit');
+    found = last;
+  }
+  if (!found) throw new Error('No exact audited Git commit');
+  return {
+    grantId: found.grantId,
+    parentSha: found.sourceCommit,
+    filePathSha256: found.filePathSha256,
+    subjectSha256: found.subjectSha256,
+  };
+}

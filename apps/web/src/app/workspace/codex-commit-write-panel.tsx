@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CodexGitHubPushPanel } from './codex-github-push-panel';
 import type {
   WorktreeCommitCandidateAcknowledgement,
   WorktreeCommitWriteGrant,
@@ -222,6 +223,7 @@ export function CodexCommitWritePanel({ sessionId, planId, reviewed }: Props) {
             Parent: <code>{result.parentSha}</code>
           </p>
           <small>Worktree чистий. Push, PR і merge не виконувалися.</small>
+          <CodexGitHubPushPanel sessionId={sessionId} planId={planId} committed={result} />
         </div>
       )}
       {error && (
