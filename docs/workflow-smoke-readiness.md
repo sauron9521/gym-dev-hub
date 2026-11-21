@@ -743,3 +743,69 @@ On the actual running operator, they identify remaining Hub-linked
 processes but **do not stop any**. PR merge does not update the dirty
 primary checkout, provision new dependencies, change the production
 audit folders, or restart API/Web. Issue #107 remains OPEN.
+
+## Launch #107 — explicitly authorized graceful operator shutdown (manual)
+
+`scripts/launch-owner-operator-shutdown.mjs` makes the **first
+maintenance-window operation** separately reviewable. It does
+**not** run as part of `pnpm check`, GitHub CI, the Hub UI or a
+normal start. The only action that can send a signal is its exact,
+consciously selected `--confirm-graceful-stop` command. **Do
+not run that command until the owner has explicitly approved
+the service downtime.** Merge of this PR is not downtime approval.
+
+With the trusted current **independent** Hub worktree, choose the
+supervisor PID from an operator-controlled terminal. On this system
+that process is `node scripts/dev-operator.mjs`, _not_ the Nest API
+or the Next.js child. Never guess a PID from a prior session.
+
+```sh
+# Always do this first; READ-ONLY, no signals or restart
+node scripts/launch-owner-operator-shutdown.mjs \
+  --inspect-only \
+  --operator-checkout=/absolute/primary/gym-dev-hub \
+  --supervisor-pid=REPLACE_WITH_VERIFIED_SUPERVISOR_PID
+
+# ONLY after explicit owner-approved maintenance, using the exact
+# process startTicks reported by inspect-only for that SAME PID:
+node scripts/launch-owner-operator-shutdown.mjs \
+  --confirm-graceful-stop \
+  --operator-checkout=/absolute/primary/gym-dev-hub \
+  --supervisor-pid=REPLACE_WITH_VERIFIED_SUPERVISOR_PID \
+  --expected-start-ticks=REPLACE_WITH_REPORTED_START_TICKS
+```
+
+The script reads only Linux `/proc` metadata for an exact PID,
+owned by the invoking **non-root** user, whose argv is precisely
+Node running the Hub `scripts/dev-operator.mjs`. It pins the
+kernel-reported process birthtime (start ticks). If Linux Yama
+or ptrace restrictions prevent reading the supervisor's `cwd`
+and `exe`, a backup check proves a **direct same-owner child**
+executing the **absolute** path
+`<primary>/apps/api/dist/main.js` with the matching parent PID
+and stable child birthtime. Without either proof it **refuses**.
+
+The manual stop mode verifies exact identity twice before sending
+**only one SIGTERM to that supervisor PID**. The already-running
+`dev-operator` process is responsible for closing its own API/Web
+child process groups. This tool never sends SIGKILL, signals
+unrelated process groups, falls back to `killall`, edits Git,
+moves ignored files or alters Docker containers. It waits for
+the supervisor process to terminate, then checks the known local
+API/Web ports and read-only Linux process inventory. If anything
+remains or the result is ambiguous, it **fails closed** and
+requires separate owner inspection; it never retries or kills
+other processes. Linux PID reuse has a very small time-of-check
+race without kernel pidfd, so owner-supervised maintenance and
+no concurrent operator start are still essential.
+
+Test coverage uses only **fresh disposable Node supervisor/API
+fixtures and their own listening ports**; no test signals the
+real Hub. The command is **not a one-button rollback, Git
+cutover, or restart**. Once a truly verified stop is separately
+approved and complete, review the private backup, run the owner
+fast-forward against a freshly pinned GitHub main, validate
+source/lockfile and private audit directories, then separately
+build/start the real operator and verify both HTTP services.
+Leave Issue #107 OPEN until real production audited Docker
+checks and interruption acceptance exist.
