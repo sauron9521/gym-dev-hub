@@ -1,18 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { MemoryController } from '../src/memory/memory.controller.js';
+import type { MemoryAuthenticatedReadService } from '../src/memory/memory-authenticated-read.service.js';
 
-describe('memory read routes remain disabled until authentication #39', () => {
-  it('all three routes return 503, without a database, on any configuration', () => {
-    const c = new MemoryController();
-    for (const action of [() => c.list(), () => c.get(), () => c.revisions()]) {
-      try {
-        action();
-        throw new Error('Expected 503');
-      } catch (error) {
-        expect(error).toBeInstanceOf(ServiceUnavailableException);
-        expect((error as ServiceUnavailableException).getStatus()).toBe(503);
-      }
+describe('memory HTTP route boundaries', () => {
+  it('detail and revisions remain 503 even when list is opted in', () => {
+    const c = new MemoryController({ list: vi.fn() } as unknown as MemoryAuthenticatedReadService);
+    for (const action of [() => c.get(), () => c.revisions()]) {
+      expect(action).toThrowError(ServiceUnavailableException);
     }
   });
 });
