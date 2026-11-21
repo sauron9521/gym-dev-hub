@@ -384,3 +384,11 @@ independently authorized pilot creates a **Draft PR only** from an
 audited, published `devhub/task-*` branch to `main`, then reuses
 the Hub's existing read-only CI readiness. No auto-merge,
 ready-for-review transition, force-push or branch write is included.
+
+## Full workflow smoke prerequisites (PR #71)
+
+See [workflow-smoke-readiness.md](./workflow-smoke-readiness.md). The
+Workspace read-only readiness panel reports SHA drift and missing
+operator opt-ins for the complete one-file workflow **without**
+enabling writes, revealing credentials or claiming Docker/GitHub
+permissions or real E2E success.

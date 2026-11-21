@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CodexChatPanel } from './codex-chat-panel';
 import { BoundaryStatusPanel } from './boundary-status-panel';
+import { WorkflowReadinessPanel } from './workflow-readiness-panel';
 import { WorkerStatusPanel } from './worker-status-panel';
 import { WorktreePlanPanel } from './worktree-plan-panel';
 import { useEffect, useState, type FormEvent } from 'react';
@@ -337,6 +338,7 @@ export function WorkspaceClient({ initial, initialError }: Props) {
             </button>
           </div>
 
+          <WorkflowReadinessPanel />
           <BoundaryStatusPanel />
           <WorkerStatusPanel />
 

@@ -95,3 +95,10 @@ export type {
 
 export { MAX_PATCH_CHARS, reviewCodexPatch } from './codex-patch-review.js';
 export type { PatchReviewLine, PatchReview, PatchReviewResult } from './codex-patch-review.js';
+
+export type {
+  WorkflowGateState,
+  WorkflowGateId,
+  WorkflowReadinessGate,
+  WorkflowReadinessReport,
+} from './workflow-readiness.js';
