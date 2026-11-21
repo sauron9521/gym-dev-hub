@@ -9,6 +9,7 @@ import type {
   WorktreePostApplyReview,
 } from '@gym-dev-hub/contracts';
 import { MAX_PATCH_CHARS, reviewCodexPatch, type PatchReviewResult } from './codex-patch-review';
+import { CodexPatchChecksPanel } from './codex-patch-checks-panel';
 
 type Props = {
   source: WorktreeCodeReadResult;
@@ -516,6 +517,14 @@ export function CodexPatchPreviewPanel({ source, sourceCommit, fingerprint }: Pr
                       Це read-only звіт про один момент часу. Перед PR ще потрібні тести, перевірка
                       diff, окремий commit/push та ручний merge.
                     </small>
+                    <CodexPatchChecksPanel
+                      key={writeResult.grantId}
+                      sessionId={source.sessionId}
+                      planId={source.planId}
+                      fingerprint={fingerprint}
+                      applied={writeResult}
+                      verified={postApplyReport}
+                    />
                   </div>
                 )}
               </div>

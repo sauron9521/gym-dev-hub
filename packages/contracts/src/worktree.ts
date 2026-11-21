@@ -227,3 +227,41 @@ export interface WorktreePostApplyReview {
   pushEnabled: false;
   mergeEnabled: false;
 }
+
+export type WorktreePatchCheckRecipe = 'API_TYPECHECK' | 'API_TEST' | 'WEB_TYPECHECK' | 'WEB_TEST';
+
+export interface WorktreePatchCheckGrant {
+  grantId: string;
+  grantToken: string;
+  recipeId: WorktreePatchCheckRecipe;
+  filePath: string;
+  proposedSha256: string;
+  expiresAt: string;
+  purpose: 'AUTHORIZE_ONE_FIXED_POST_APPLY_DOCKER_CHECK';
+}
+
+export interface WorktreePatchCheckResult {
+  runId: string;
+  grantId: string;
+  recipeId: WorktreePatchCheckRecipe;
+  filePath: string;
+  sourceCommit: string;
+  proposedSha256: string;
+  status: 'passed';
+  checkedAt: string;
+  durationMs: number;
+  stdoutBytes: number;
+  stderrBytes: number;
+  containerRemoved: true;
+  readOnlySource: true;
+  networkEnabled: false;
+  arbitraryCommandsEnabled: false;
+  commitCreated: false;
+  pushEnabled: false;
+  mergeEnabled: false;
+}
+
+export interface WorktreePatchCheckCancel {
+  runId: string;
+  status: 'cancel-requested';
+}

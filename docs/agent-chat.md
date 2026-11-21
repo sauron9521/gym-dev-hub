@@ -235,3 +235,90 @@ hostile same-account processes racing directory paths after verification.
 A future implementation slice may introduce separately approved,
 fixed Docker test recipes for a reviewed changed worktree, followed by
 explicit commit/push/PR steps; none are authorized by this result.
+
+## Fixed post-apply Docker typecheck/test checks (PR #65)
+
+This is an **explicit opt-in, local-only, trusted-operator execution
+capability**. Unlike post-apply Git review, a TypeScript compiler and Vitest
+do execute project-supplied configuration and tests, so this runs only
+inside a disposable sandbox. The Hub still cannot accept an arbitrary
+command, test file, package, image, volume, environment or Git operation
+from an agent or browser.
+
+**Four fixed recipes, only for Gym Dev Hub**, chosen according to the one
+previously approved changed source file:
+
+| Source file       | Allowed fixed recipes        |
+| ----------------- | ---------------------------- |
+| `apps/api/src/**` | `API_TYPECHECK` / `API_TEST` |
+| `apps/web/src/**` | `WEB_TYPECHECK` / `WEB_TEST` |
+
+Changes to docs, configs or any other paths cannot enable a Docker check in
+this first slice. The endpoint requires **one successful audited patch-apply
+receipt** and a fresh, server-verified, read-only post-apply Git review
+from PR #64, including full-tree Git integrity and one exact post-image
+SHA-256. The review is repeated before authorization, immediately before
+Docker, and after the container is removed.
+
+An operator separately enables
+`DEV_HUB_ENABLE_PATCH_CHECKS=true`, sets a newly generated independent
+`DEV_HUB_PATCH_CHECK_OPERATOR_SECRET` (32–256 bytes), and retains the
+post-apply review prerequisites, including
+`DEV_HUB_ENABLE_PATCH_REVIEW=true` and
+`DEV_HUB_PATCH_APPLY_OPERATOR_SECRET`. The Docker safety preflight must
+have passed within five minutes. The operator must supply **both** secrets
+to authorize a single recipe and again to execute it. The new token is
+cryptographically random, stored only as a hash, valid 45 seconds, bound
+to exact session, plan, original grant ID, recipe, commit, file path,
+fingerprint, and source/post-image hashes, and consumed before any await.
+A distinct cancellation endpoint accepts the operator secret and matching
+run ID. Failed runs cannot be replayed.
+
+**Provisioning is manual and never performed by the API**: rebuild the
+trusted `gym-dev-hub-node-runner:v1` image from the updated
+`packages/runner/Dockerfile` (which now contains
+`patch-checks-local.mjs`) and pin its real Docker SHA256 image ID in
+`DEV_HUB_PATCH_CHECK_IMAGE_ID`. Configure a complete **offline,
+script-free** pnpm 12 store as absolute canonical
+`DEV_HUB_PATCH_CHECK_PNPM_STORE`, available inside the Docker mount and
+containing the dependencies from the repository's unchanged lockfile.
+Missing image, store, dependency closure, stale Git or credentials cause
+fail-closed rejection; the API never builds images or downloads packages.
+The image tag alone is never enough; its exact ID and expected non-root,
+Linux/amd64, disabled-by-default entrypoint labels must match.
+
+The container:
+
+- receives two **read-only bind mounts**, the validated one-file worktree
+  and the trusted pnpm store; the host Docker socket is never mounted
+- has `--network=none`, read-only root filesystem, UID/GID 65534,
+  cap-drop ALL, no-new-privileges, IPC none, pids 128, 5 GiB memory,
+  2 CPUs, bounded output and timeout, then mandatory forced cleanup
+- stages only bounded, non-symlink source files (max 5,000 files / 100 MiB)
+  into a private ephemeral scratch volume and matches the approved
+  post-image SHA before installing dependencies
+- installs dependencies offline with `--ignore-scripts` and
+  `--frozen-lockfile`, builds shared TypeScript declarations, then
+  runs a **static** Node CLI path to TypeScript or Vitest, no shell or
+  package lifecycle scripts; never executes the original host source
+- uses an executable **private** `/workspace` tmpfs for native test
+  workers such as esbuild, while `/tmp` and `/results` stay noexec;
+  source/store mounts and host root stay read-only.
+
+The response is a **structured passed receipt** with bounded byte counts
+and explicit `commitCreated:false`, `pushEnabled:false`,
+`mergeEnabled:false`. Failed tests, timeouts, cancellations, integrity
+drift, malformed receipts and Docker cleanup failures report failure,
+not success. Only secret-free hashes and run events are written to the
+private `.local/patch-checks/audit.jsonl`; raw arbitrary project logs
+are not exposed in HTTP responses.
+
+**Limitations:** This is not a security boundary against malicious code
+exploiting kernel/runtime vulnerabilities. It is intended for local,
+trusted-operator projects only; never expose the Hub to the internet.
+A privileged/untrusted same-UID host process may still race filesystem
+paths. The offline package closure, Docker image and actual container
+execution must be manually provisioned and smoke-tested; unit/CI checks
+alone cannot prove a runnable local Docker configuration. No automated
+commit, push, PR, merge, rollback or follow-up tests are implied by a
+single passed check.
