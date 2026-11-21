@@ -430,26 +430,37 @@ For example, with the actual absolute values substituted locally:
 sg docker -c 'cd /path/to/clean/gym-dev-hub/apps/api && DEV_HUB_LIVE_HTTP_DOCKER_PROBE=I_APPROVE_ISOLATED_REAL_HTTP_DOCKER_PROBE DEV_HUB_PATCH_CHECK_PNPM_STORE=/path/to/verified/pnpm-store node --env-file=/path/to/owner-private/apps/api/.env node_modules/vitest/vitest.mjs run test/worktree-patch-checks-live-http-docker.e2e.spec.ts'
 ```
 
-It creates an **ephemeral Nest server bound only to 127.0.0.1**, uses
-the real `WorktreePlanController`, single-use grant service, private
-durable audit, verified private-store stage, fixed Docker runner and
-source-stage helpers. It archives only the exact committed Git tree into
-a disposable temporary checkout and generates fresh, **fixture-only**
-operator/review secrets. The test HTTP client explicitly authorizes one
-`WEB_FORMAT` check, executes the real non-networked Docker recipe,
-denies token reuse, inspects sanitized disk audit, then creates a fresh
-Nest server to prove durable history survives restart. All owned fixture
-files are cleaned up; the private original store stays unchanged.
+It creates an **ephemeral Nest server bound only to 127.0.0.1**, and
+a **new isolated real Git repository and linked worktree** created solely
+from the exact published tracked source. It uses the real
+`WorktreePlanController`, `WorktreeIntegrityService`,
+`WorktreePatchPreflightService`, `WorktreePatchApplyService`,
+`WorktreePatchReviewService`, one-time Docker-check grants, private
+fsynced apply/check audits, verified private-store staging, and fixed
+non-networked, non-root Docker runner.
 
-**Important boundary:** plan, reviewed diff and boundary-preflight are
-**fixtures**, NOT a real owner-reviewed post-apply worktree. The source file
-is unchanged in this probe, so this cannot prove the actual post-apply
-review requirement. It does NOT use the running Hub, production
-`.env` operator secret, production grant maps or production audit.
-The restart is a fresh test HTTP app, not a SIGKILL of the running API.
-A hard process crash during staging may leave a public-only temporary
-snapshot under `/tmp` that requires owner inspection; do not automatically
-prune unrelated directories. A green probe is integrated real HTTP+Docker
-evidence, **not** final production operator acceptance. Keep Issue #107 open until an actual
-reviewed operator grant with real production audit, and controlled
-in-flight API kill/restart, are verified.
+The test submits an explicit one-file patch proposal, approves and
+**atomically applies** it with the actual production service, verifies
+the real `HEAD` diff and every other tracked Git blob, and rejects
+an unexpected second-file change before continuing. It then authorizes
+and executes `WEB_FORMAT` via real HTTP, rejects grant replay, checks
+both isolated audit journals for redaction and durability, and restarts
+the fixture Nest app to prove the passed history remains.
+
+**Important boundary:** the **plan-discovery metadata**, the initial
+worktree inspection summary and the Docker-boundary preflight are
+controlled **test fixtures**, not a real owner-selected live plan.
+The source is a separate Git commit from a fresh test-only repository,
+not the original GitHub worktree branch; the edit is a harmless fixture
+comment, not an approved business change. Fresh independent random
+secrets are used only in the isolated process. No production `.env`
+operator secret, grant map, checked-out source or audit journal is
+modified. This is a **real Git review and real HTTP→Docker→audit fixture**,
+but **not a production owner-approved workflow**.
+
+The restart is a fresh test HTTP application, not a SIGKILL of the
+running API. A hard process crash during staging may leave public-only
+temporary snapshots under `/tmp` for owner inspection; do not
+automatically remove unrelated directories. Keep #107 open until the
+real live operator's authorized post-apply audit and controlled in-flight
+API kill/restart are verified.
