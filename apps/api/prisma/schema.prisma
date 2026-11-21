@@ -40,24 +40,27 @@ enum MemorySourceType {
 }
 
 model MemoryRepository {
-  name      String                @id @db.VarChar(200)
-  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  tasks     MemoryTask[]
-  agents    MemoryAgentIdentity[]
-  sessions  MemorySession[]
-  records   MemoryRecord[]
+  name             String                  @id @db.VarChar(200)
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  tasks            MemoryTask[]
+  agents           MemoryAgentIdentity[]
+  sessions         MemorySession[]
+  records          MemoryRecord[]
+  proposalRequests MemoryProposalRequest[]
+  mutationAudits   MemoryMutationAudit[]
 
   @@map("memory_repositories")
 }
 
 model MemoryTask {
-  id          String           @id @default(uuid()) @db.Uuid
-  repository  String           @db.VarChar(200)
-  externalRef String           @map("external_ref") @db.VarChar(255)
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  project     MemoryRepository @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
-  records     MemoryRecord[]
-  sessions    MemorySession[]
+  id             String                @id @default(uuid()) @db.Uuid
+  repository     String                @db.VarChar(200)
+  externalRef    String                @map("external_ref") @db.VarChar(255)
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  project        MemoryRepository      @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  records        MemoryRecord[]
+  sessions       MemorySession[]
+  mutationAudits MemoryMutationAudit[]
 
   @@unique([repository, id])
   @@unique([repository, externalRef])
@@ -66,13 +69,15 @@ model MemoryTask {
 }
 
 model MemoryAgentIdentity {
-  id          String           @id @default(uuid()) @db.Uuid
-  repository  String           @db.VarChar(200)
-  externalRef String           @map("external_ref") @db.VarChar(255)
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  project     MemoryRepository @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
-  records     MemoryRecord[]
-  sessions    MemorySession[]
+  id               String                  @id @default(uuid()) @db.Uuid
+  repository       String                  @db.VarChar(200)
+  externalRef      String                  @map("external_ref") @db.VarChar(255)
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  project          MemoryRepository        @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  records          MemoryRecord[]
+  sessions         MemorySession[]
+  proposalRequests MemoryProposalRequest[]
+  mutationAudits   MemoryMutationAudit[]
 
   @@unique([repository, id])
   @@unique([repository, externalRef])
@@ -80,16 +85,18 @@ model MemoryAgentIdentity {
 }
 
 model MemorySession {
-  id          String               @id @default(uuid()) @db.Uuid
-  repository  String               @db.VarChar(200)
-  externalRef String               @map("external_ref") @db.VarChar(255)
-  taskId      String?              @map("task_id") @db.Uuid
-  agentId     String?              @map("agent_id") @db.Uuid
-  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  project     MemoryRepository     @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
-  task        MemoryTask?          @relation(fields: [repository, taskId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
-  agent       MemoryAgentIdentity? @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
-  records     MemoryRecord[]
+  id               String                  @id @default(uuid()) @db.Uuid
+  repository       String                  @db.VarChar(200)
+  externalRef      String                  @map("external_ref") @db.VarChar(255)
+  taskId           String?                 @map("task_id") @db.Uuid
+  agentId          String?                 @map("agent_id") @db.Uuid
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  project          MemoryRepository        @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  task             MemoryTask?             @relation(fields: [repository, taskId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  agent            MemoryAgentIdentity?    @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  records          MemoryRecord[]
+  proposalRequests MemoryProposalRequest[]
+  mutationAudits   MemoryMutationAudit[]
 
   @@unique([repository, id])
   @@unique([repository, externalRef])
@@ -98,31 +105,33 @@ model MemorySession {
 }
 
 model MemoryRecord {
-  id             String               @id @default(uuid()) @db.Uuid
-  repository     String               @db.VarChar(200)
-  scope          MemoryScope
-  kind           MemoryKind
-  status         MemoryStatus         @default(PROPOSED)
-  text           String               @db.VarChar(4096)
-  revision       Int                  @default(1)
-  taskId         String?              @map("task_id") @db.Uuid
-  sessionId      String?              @map("session_id") @db.Uuid
-  agentId        String?              @map("agent_id") @db.Uuid
-  sourceSha      String?              @map("source_sha") @db.VarChar(40)
-  expiresAt      DateTime?            @map("expires_at") @db.Timestamptz(3)
-  verifiedBy     String?              @map("verified_by") @db.VarChar(200)
-  verifiedAt     DateTime?            @map("verified_at") @db.Timestamptz(3)
-  supersededById String?              @map("superseded_by_id") @db.Uuid
-  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
-  project        MemoryRepository     @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
-  task           MemoryTask?          @relation(fields: [repository, taskId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
-  session        MemorySession?       @relation(fields: [repository, sessionId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
-  agent          MemoryAgentIdentity? @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
-  supersededBy   MemoryRecord?        @relation("MemorySupersession", fields: [repository, supersededById], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
-  supersedes     MemoryRecord[]       @relation("MemorySupersession")
-  sources        MemorySource[]
-  revisions      MemoryRevision[]
+  id               String                  @id @default(uuid()) @db.Uuid
+  repository       String                  @db.VarChar(200)
+  scope            MemoryScope
+  kind             MemoryKind
+  status           MemoryStatus            @default(PROPOSED)
+  text             String                  @db.VarChar(4096)
+  revision         Int                     @default(1)
+  taskId           String?                 @map("task_id") @db.Uuid
+  sessionId        String?                 @map("session_id") @db.Uuid
+  agentId          String?                 @map("agent_id") @db.Uuid
+  sourceSha        String?                 @map("source_sha") @db.VarChar(40)
+  expiresAt        DateTime?               @map("expires_at") @db.Timestamptz(3)
+  verifiedBy       String?                 @map("verified_by") @db.VarChar(200)
+  verifiedAt       DateTime?               @map("verified_at") @db.Timestamptz(3)
+  supersededById   String?                 @map("superseded_by_id") @db.Uuid
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  project          MemoryRepository        @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  task             MemoryTask?             @relation(fields: [repository, taskId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  session          MemorySession?          @relation(fields: [repository, sessionId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  agent            MemoryAgentIdentity?    @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  supersededBy     MemoryRecord?           @relation("MemorySupersession", fields: [repository, supersededById], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  supersedes       MemoryRecord[]          @relation("MemorySupersession")
+  sources          MemorySource[]
+  revisions        MemoryRevision[]
+  proposalRequests MemoryProposalRequest[]
+  mutationAudits   MemoryMutationAudit[]
 
   @@unique([repository, id])
   @@index([repository, scope, taskId, kind, status, updatedAt])
@@ -170,4 +179,45 @@ model MemoryRevision {
   @@unique([repository, memoryId, revision])
   @@index([repository, memoryId, createdAt])
   @@map("memory_revisions")
+}
+
+// Idempotency is unique per registered agent/session, not a caller-supplied actor.
+model MemoryProposalRequest {
+  repository    String              @db.VarChar(200)
+  agentId       String              @map("agent_id") @db.Uuid
+  sessionId     String              @map("session_id") @db.Uuid
+  requestKey    String              @map("request_key") @db.Uuid
+  payloadDigest String              @map("payload_digest") @db.Char(64)
+  memoryId      String              @map("memory_id") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  project       MemoryRepository    @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  agent         MemoryAgentIdentity @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  session       MemorySession       @relation(fields: [repository, sessionId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  record        MemoryRecord        @relation(fields: [repository, memoryId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([repository, agentId, sessionId, requestKey])
+  @@unique([repository, memoryId])
+  @@map("memory_proposal_requests")
+}
+
+// Metadata-only append-only transaction audit, no raw text, secrets or prompts.
+model MemoryMutationAudit {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  repository      String              @db.VarChar(200)
+  memoryId        String              @map("memory_id") @db.Uuid
+  agentId         String              @map("agent_id") @db.Uuid
+  taskId          String              @map("task_id") @db.Uuid
+  sessionId       String              @map("session_id") @db.Uuid
+  action          String              @db.VarChar(40)
+  previousDigest  String?             @map("previous_digest") @db.Char(64)
+  resultingDigest String              @map("resulting_digest") @db.Char(64)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  project         MemoryRepository    @relation(fields: [repository], references: [name], onDelete: Restrict, onUpdate: Restrict)
+  agent           MemoryAgentIdentity @relation(fields: [repository, agentId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  task            MemoryTask          @relation(fields: [repository, taskId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  session         MemorySession       @relation(fields: [repository, sessionId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+  record          MemoryRecord        @relation(fields: [repository, memoryId], references: [repository, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([repository, memoryId, createdAt])
+  @@map("memory_mutation_audit")
 }

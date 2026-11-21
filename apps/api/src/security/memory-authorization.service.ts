@@ -13,6 +13,7 @@ const credentialInputSchema = z.strictObject({
   taskId: uuid.optional(),
   sessionId: uuid.optional(),
   ttlSeconds: z.number().int().min(1).max(900),
+  permission: z.enum(['READ_VERIFIED', 'PROPOSE_MEMORY']).optional(),
 });
 const grantInputSchema = z.strictObject({
   repository: MemoryRepositorySchema,
@@ -26,7 +27,7 @@ export type MemoryPrincipal = Readonly<{
   type: 'agent' | 'external';
   actorId: string;
   repository: string;
-  permission: 'READ_VERIFIED';
+  permission: 'READ_VERIFIED' | 'PROPOSE_MEMORY';
   readContext: MemoryReadContext;
 }>;
 export type MemorySecurityAuditEvent = Readonly<{
@@ -50,6 +51,7 @@ type Credential = {
   agentId?: string;
   taskId?: string;
   sessionId?: string;
+  permission: 'READ_VERIFIED' | 'PROPOSE_MEMORY';
   expiresAt: number;
 };
 type Grant = MemoryGrantIntent & { id: string; expiresAt: number };
@@ -63,7 +65,8 @@ const key = (value: string): string => hash(value).toString('hex');
 
 /**
  * Process-local auth primitives shared by the opt-in operator credential HTTP
- * controller. Read routes, memory DB mutations, approval HTTP and MCP remain disabled.
+ * controller. Proposal capability is separate from read; approvals and MCP
+ * transport remain disabled and all write routes require independent opt-in.
  * Restart/disable/operator-secret rotation invalidates all active tokens.
  */
 export class MemoryAuthorizationService {
@@ -99,6 +102,7 @@ export class MemoryAuthorizationService {
         config.repositories,
         config.trustedOrigin,
         config.externalReadEnabled,
+        config.proposalWriteEnabled,
       ]),
     );
     if (this.previousConfigDigest !== null && this.previousConfigDigest !== fingerprint) {
@@ -171,13 +175,14 @@ export class MemoryAuthorizationService {
     credentialId: string;
     bearerToken: string;
     expiresAt: string;
-    permission: 'READ_VERIFIED';
+    permission: 'READ_VERIFIED' | 'PROPOSE_MEMORY';
   } {
     const config = this.config();
     this.authenticateOperator(config, operatorSecret);
     const parsed = credentialInputSchema.safeParse(input);
     if (!parsed.success) throw new MemorySecurityError('forbidden');
     const target = parsed.data;
+    const permission = target.permission ?? 'READ_VERIFIED';
     this.checkRepository(config, target.repository);
     if (
       target.kind === 'external' &&
@@ -190,6 +195,10 @@ export class MemoryAuthorizationService {
     if (target.kind === 'agent' && (!target.agentId || !target.taskId || !target.sessionId))
       throw new MemorySecurityError('forbidden');
     if (target.sessionId && !target.taskId) throw new MemorySecurityError('forbidden');
+    if (permission === 'PROPOSE_MEMORY' && !config.proposalWriteEnabled)
+      throw new MemorySecurityError('disabled');
+    if (target.kind === 'external' && permission !== 'READ_VERIFIED')
+      throw new MemorySecurityError('forbidden');
     if (target.kind === 'external' && target.ttlSeconds > 300)
       throw new MemorySecurityError('forbidden');
     if (this.credentials.size >= MAX_CREDENTIALS) throw new MemorySecurityError('rate-limited');
@@ -202,6 +211,7 @@ export class MemoryAuthorizationService {
       ...(target.agentId ? { agentId: target.agentId } : {}),
       ...(target.taskId ? { taskId: target.taskId } : {}),
       ...(target.sessionId ? { sessionId: target.sessionId } : {}),
+      permission,
       expiresAt: this.clock() + target.ttlSeconds * 1000,
     });
     this.audit('credential-issued', target.repository, credentialId);
@@ -209,7 +219,7 @@ export class MemoryAuthorizationService {
       credentialId,
       bearerToken: token,
       expiresAt: new Date(this.clock() + target.ttlSeconds * 1000).toISOString(),
-      permission: 'READ_VERIFIED',
+      permission,
     };
   }
 
@@ -223,6 +233,7 @@ export class MemoryAuthorizationService {
     if (!credential || this.clock() >= credential.expiresAt)
       throw new MemorySecurityError('unauthorized');
     this.checkRepository(config, credential.repository);
+    if (credential.permission !== 'READ_VERIFIED') throw new MemorySecurityError('forbidden');
     if (credential.type === 'external' && !config.externalReadEnabled)
       throw new MemorySecurityError('unauthorized');
     const readContext = MemoryReadContextSchema.parse({
@@ -237,6 +248,36 @@ export class MemoryAuthorizationService {
       repository: credential.repository,
       permission: 'READ_VERIFIED',
       readContext,
+    };
+  }
+
+  /**
+   * Proposal-only capability is deliberately disjoint from READ_VERIFIED.
+   * Possessing a read bearer can never authorize a write, even on loopback.
+   */
+  authenticateProposalBearer(token: unknown): MemoryPrincipal {
+    const config = this.config();
+    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token))
+      throw new MemorySecurityError('unauthorized');
+    const credential = this.credentials.get(key(token));
+    if (!credential || this.clock() >= credential.expiresAt)
+      throw new MemorySecurityError('unauthorized');
+    if (credential.type !== 'agent' || credential.permission !== 'PROPOSE_MEMORY')
+      throw new MemorySecurityError('forbidden');
+    this.checkRepository(config, credential.repository);
+    if (!credential.agentId || !credential.taskId || !credential.sessionId)
+      throw new MemorySecurityError('forbidden');
+    return {
+      type: 'agent',
+      actorId: credential.id,
+      repository: credential.repository,
+      permission: 'PROPOSE_MEMORY',
+      readContext: MemoryReadContextSchema.parse({
+        repository: credential.repository,
+        agentId: credential.agentId,
+        taskId: credential.taskId,
+        sessionId: credential.sessionId,
+      }),
     };
   }
 
