@@ -1,16 +1,50 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { inspectStore, POLICY, run, storeKey } from './prepare-patch-check-store.mjs';
+import {
+  inspectStore,
+  mirrorManifests,
+  POLICY,
+  run,
+  storeKey,
+} from './prepare-patch-check-store.mjs';
 
 test('store fingerprint binds exact lock bytes and pinned toolchain', () => {
   assert.match(storeKey('lock-A'), /^[a-f0-9]{64}$/);
   assert.equal(storeKey('lock-A'), storeKey(Buffer.from('lock-A')));
   assert.notEqual(storeKey('lock-A'), storeKey('lock-B'));
+  // A previous glibc-only store must never satisfy the updated musl recipe.
+  const previous = createHash('sha256')
+    .update('gym-dev-hub:patch-check:pnpm12.18.0:linux-x64:v1\0lock-A')
+    .digest('hex');
+  assert.notEqual(storeKey('lock-A'), previous);
+  assert.deepEqual(POLICY.targetPlatforms, ['linux-x64', 'linux-x64-musl']);
   assert.equal(POLICY.maxFiles, 80_000);
   assert.equal(POLICY.maxBytes, 1_600 * 1024 * 1024);
+});
+
+test('metadata mirror fetches glibc and Alpine/musl dependencies without changing the source', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'devhub-pnpm-multi-abi-'));
+  const original = await readFile(new URL('../pnpm-workspace.yaml', import.meta.url), 'utf8');
+  try {
+    await mirrorManifests(root);
+    const mirrored = await readFile(join(root, 'pnpm-workspace.yaml'), 'utf8');
+    assert.match(mirrored, /supportedArchitectures:\n  - linux-x64\n  - linux-x64-musl/);
+    assert.equal(mirrored.replace(/\nsupportedArchitectures:[\s\S]*$/, ''), original);
+    assert.equal(
+      await readFile(new URL('../pnpm-workspace.yaml', import.meta.url), 'utf8'),
+      original,
+    );
+    assert.match(
+      await readFile(join(root, 'pnpm-lock.yaml'), 'utf8'),
+      /@rollup\/rollup-linux-x64-musl/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('rejects unsupported manual operations', async () => {

@@ -163,3 +163,28 @@ Linux x64; Windows performance/transport is tracked separately in #59.
 The E2E on 2026-11-21 verified `WEB_TYPECHECK` using an isolated 25,364-file
 store; `WEB_TEST` reached `FIXED_CHECK` and returned nonzero. That test
 runner failure is a separate issue, not proof of a complete workflow.
+
+## Alpine/musl native optional dependency closure (Issue #76)
+
+`WEB_TYPECHECK` passed with the original v1 store, but `WEB_TEST` could not
+start Vitest in the Alpine Docker runner: Rollup required the locked native
+`@rollup/rollup-linux-x64-musl` module, while the glibc-only host fetch did
+not include it. This was confirmed with a temporary **credential-free,
+networkless** diagnostic container.
+
+The v2 provisioner now adds only to its temporary metadata mirror:
+
+```yaml
+supportedArchitectures:
+  - linux-x64
+  - linux-x64-musl
+```
+
+Both native variants come from the same frozen `pnpm-lock.yaml` and are
+verified through pnpm's offline frozen install. This does **not** edit the
+actual project's `pnpm-workspace.yaml` or the original source tree. The
+new v2 store key prevents silently reusing a previously verified glibc-only
+store. After merging the fix, run `pnpm provision:patch-check-store` and
+`pnpm provision:patch-check-store:verify` again, update the ignored
+`DEV_HUB_PATCH_CHECK_PNPM_STORE` path, and restart the API. Do not replay
+consumed one-time Docker grants.

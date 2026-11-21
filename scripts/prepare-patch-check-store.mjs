@@ -27,6 +27,8 @@ import { fileURLToPath } from 'node:url';
 
 export const POLICY = Object.freeze({
   pnpmVersion: '12.18.0',
+  // Host is glibc; the pinned Docker runner is Alpine/musl.
+  targetPlatforms: Object.freeze(['linux-x64', 'linux-x64-musl']),
   maxFiles: 80_000,
   maxBytes: 1_600 * 1024 * 1024,
   requiredManifestPaths: Object.freeze([
@@ -49,7 +51,7 @@ const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 export function storeKey(lockBytes) {
   return sha256(
     Buffer.concat([
-      Buffer.from('gym-dev-hub:patch-check:pnpm12.18.0:linux-x64:v1\0'),
+      Buffer.from('gym-dev-hub:patch-check:pnpm12.18.0:linux-x64+linux-x64-musl:v2\0'),
       Buffer.from(lockBytes),
     ]),
   );
@@ -194,12 +196,24 @@ async function runPnpm(args, cwd, home, maxMs = 180_000) {
   });
 }
 
-async function mirrorManifests(target) {
+/** The extra native targets apply ONLY to this disposable metadata mirror. */
+export async function mirrorManifests(target) {
   for (const rel of POLICY.requiredManifestPaths) {
     const destination = join(target, rel);
     await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
     await copyFile(join(ROOT, rel), destination);
   }
+  const file = join(target, 'pnpm-workspace.yaml');
+  const original = await readFile(file, 'utf8');
+  if (/^supportedArchitectures:/m.test(original)) {
+    throw new Error('Workspace already specifies native targets; review pinned store policy');
+  }
+  await writeFile(
+    file,
+    original +
+      '\nsupportedArchitectures:\n' +
+      POLICY.targetPlatforms.map((platform) => '  - ' + platform + '\n').join(''),
+  );
 }
 
 async function lockInfo() {
@@ -226,11 +240,11 @@ async function verify() {
   const store = join(TARGET, info.key);
   const manifest = JSON.parse(await readFile(store + '.json', 'utf8'));
   if (
-    manifest.protocol !== 1 ||
+    manifest.protocol !== 2 ||
     manifest.lockSha256 !== info.lockSha256 ||
     manifest.storeKey !== info.key ||
     manifest.pnpmVersion !== POLICY.pnpmVersion ||
-    manifest.platform !== 'linux-x64' ||
+    JSON.stringify(manifest.targetPlatforms) !== JSON.stringify(POLICY.targetPlatforms) ||
     !SHA.test(manifest.storeDigest)
   )
     throw new Error('Pinned store manifest does not match the current lockfile');
@@ -298,12 +312,12 @@ async function prepare() {
     );
     const inventory = await inspectStore(store);
     const snapshot = {
-      protocol: 1,
+      protocol: 2,
       storeKey: info.key,
       lockSha256: info.lockSha256,
       storeDigest: inventory.digest,
       pnpmVersion: POLICY.pnpmVersion,
-      platform: 'linux-x64',
+      targetPlatforms: POLICY.targetPlatforms,
       files: inventory.files,
       bytes: inventory.bytes,
     };
