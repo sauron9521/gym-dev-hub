@@ -3,6 +3,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolveMemoryDatabaseConfiguration } from '../src/database/memory-database-policy.js';
 import { MemoryApprovalService } from '../src/memory/memory-approval.service.js';
+import { MemorySupersedeService } from '../src/memory/memory-supersede.service.js';
 import { MemoryProposalService } from '../src/memory/memory-proposal.service.js';
 import { MemoryQueryService } from '../src/memory/memory-query.service.js';
 import { MemoryAuthorizationService } from '../src/security/memory-authorization.service.js';
@@ -23,6 +24,7 @@ const env: NodeJS.ProcessEnv = {
   DEV_HUB_MEMORY_APPROVAL_HTTP_ENABLE: 'true',
   DEV_HUB_MEMORY_REJECTION_HTTP_ENABLE: 'true',
   DEV_HUB_MEMORY_VERIFIED_REVOCATION_HTTP_ENABLE: 'true',
+  DEV_HUB_MEMORY_SUPERSEDE_HTTP_ENABLE: 'true',
   DEV_HUB_MEMORY_ALLOWED_REPOSITORIES: repository,
   DEV_HUB_MEMORY_OPERATOR_SECRET: secret,
   DEV_HUB_MEMORY_TRUSTED_ORIGIN: 'http://127.0.0.1:3100',
@@ -668,6 +670,278 @@ describe.skipIf(!enabled)(
         approvals.revokeVerified(secret, grant.grantToken, created.recordId, {
           repository,
           expectedRevision: 2,
+          fingerprint: grant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('supersedes one independently approved same-scope memory using a linked immutable revision and audit', async () => {
+      const first = await create('old-' + randomUUID());
+      const next = await create('new-' + randomUUID());
+      await approve(await prepare(first.recordId));
+      await approve(await prepare(next.recordId));
+      const service = new MemorySupersedeService(auth, env, undefined, 'test');
+      const grant = await service.reviewAndGrant(secret, {
+        repository,
+        recordId: first.recordId,
+        replacementRecordId: next.recordId,
+        expectedRevision: 2,
+      });
+      expect(grant).toMatchObject({
+        action: 'SUPERSEDE_MEMORY_RECORD',
+        preview: {
+          original: { text: first.payload.text, sourceRef: first.payload.sourceRef },
+          replacement: { text: next.payload.text, sourceRef: next.payload.sourceRef },
+        },
+      });
+      expect(grant.fingerprint).toMatch(/^sha256:[0-9a-f]{64}$/);
+      const result = await service.supersede(secret, grant.grantToken, first.recordId, {
+        repository,
+        expectedRevision: 2,
+        replacementRecordId: next.recordId,
+        fingerprint: grant.fingerprint,
+      });
+      expect(result).toEqual({
+        recordId: first.recordId,
+        status: 'SUPERSEDED',
+        revision: 3,
+        supersededById: next.recordId,
+      });
+      const rows = await pool.query(
+        'SELECT id,status,revision,superseded_by_id,text FROM memory_records WHERE id=ANY($1::uuid[]) ORDER BY id',
+        [[first.recordId, next.recordId]],
+      );
+      const old = rows.rows.find((r) => r.id === first.recordId);
+      const newer = rows.rows.find((r) => r.id === next.recordId);
+      expect(old).toMatchObject({
+        status: 'SUPERSEDED',
+        revision: 3,
+        superseded_by_id: next.recordId,
+        text: first.payload.text,
+      });
+      expect(newer).toMatchObject({
+        status: 'VERIFIED',
+        revision: 2,
+        superseded_by_id: null,
+        text: next.payload.text,
+      });
+      const revisions = await pool.query(
+        'SELECT revision,status,source_id,text,changed_by FROM memory_revisions WHERE memory_id=$1 ORDER BY revision',
+        [first.recordId],
+      );
+      expect(revisions.rows.map((r) => r.status)).toEqual(['PROPOSED', 'VERIFIED', 'SUPERSEDED']);
+      expect(new Set(revisions.rows.map((r) => r.source_id)).size).toBe(1);
+      expect(revisions.rows[2]).toMatchObject({
+        text: first.payload.text,
+        changed_by: 'local-operator',
+      });
+      const audits = await pool.query(
+        'SELECT action,grant_id,operator_actor_id,previous_digest,resulting_digest FROM memory_mutation_audit WHERE memory_id=$1',
+        [first.recordId],
+      );
+      expect(audits.rows).toHaveLength(3);
+      const superseded = audits.rows.find((r) => r.action === 'SUPERSEDE_MEMORY_RECORD');
+      expect(superseded).toMatchObject({
+        grant_id: grant.grantId,
+        operator_actor_id: 'local-operator',
+        previous_digest: grant.fingerprint.slice(7),
+      });
+      expect(superseded?.resulting_digest).toMatch(/^[0-9a-f]{64}$/);
+      const reader = new MemoryQueryService(pool, randomBytes(32));
+      const visible = (
+        await reader.list({ repository, agentId, taskId, sessionId }, { repository })
+      ).items.map((x) => x.record.id);
+      expect(visible).not.toContain(first.recordId);
+      expect(visible).toContain(next.recordId);
+      await expect(
+        service.supersede(secret, grant.grantToken, first.recordId, {
+          repository,
+          expectedRevision: 2,
+          replacementRecordId: next.recordId,
+          fingerprint: grant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(
+        service.reviewAndGrant(secret, {
+          repository,
+          recordId: first.recordId,
+          replacementRecordId: next.recordId,
+          expectedRevision: 2,
+        }),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
+    it('enforces one predecessor for a replacement under concurrent supersede CAS', async () => {
+      const oldA = await create('predecessor-A-' + randomUUID());
+      const oldB = await create('predecessor-B-' + randomUUID());
+      const successor = await create('successor-' + randomUUID());
+      await Promise.all(
+        [oldA, oldB, successor].map(async (r) => approve(await prepare(r.recordId))),
+      );
+      const service = new MemorySupersedeService(auth, env, undefined, 'test');
+      const [grantA, grantB] = await Promise.all(
+        [oldA, oldB].map((r) =>
+          service.reviewAndGrant(secret, {
+            repository,
+            recordId: r.recordId,
+            replacementRecordId: successor.recordId,
+            expectedRevision: 2,
+          }),
+        ),
+      );
+      const responses = await Promise.allSettled([
+        service.supersede(secret, grantA.grantToken, oldA.recordId, {
+          repository,
+          expectedRevision: 2,
+          replacementRecordId: successor.recordId,
+          fingerprint: grantA.fingerprint,
+        }),
+        service.supersede(secret, grantB.grantToken, oldB.recordId, {
+          repository,
+          expectedRevision: 2,
+          replacementRecordId: successor.recordId,
+          fingerprint: grantB.fingerprint,
+        }),
+      ]);
+      expect(responses.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+      const failures = responses.filter((x) => x.status === 'rejected');
+      expect(failures).toHaveLength(1);
+      if (failures[0]?.status === 'rejected')
+        expect(failures[0].reason).toMatchObject({ status: 409 });
+      const links = await pool.query(
+        'SELECT id FROM memory_records WHERE repository=$1 AND superseded_by_id=$2',
+        [repository, successor.recordId],
+      );
+      expect(links.rows).toHaveLength(1);
+      const audit = await pool.query(
+        "SELECT count(*)::int AS n FROM memory_mutation_audit WHERE action='SUPERSEDE_MEMORY_RECORD' AND memory_id=ANY($1::uuid[])",
+        [[oldA.recordId, oldB.recordId]],
+      );
+      expect(audit.rows[0]?.n).toBe(1);
+    });
+
+    it('denies foreign kind, self target, wrong action replay and direct unaudited supersede', async () => {
+      const first = await create('original-' + randomUUID());
+      const next = await create('target-' + randomUUID());
+      await approve(await prepare(first.recordId));
+      await approve(await prepare(next.recordId));
+      const service = new MemorySupersedeService(auth, env, undefined, 'test');
+      await expect(
+        service.reviewAndGrant(secret, {
+          repository,
+          recordId: first.recordId,
+          replacementRecordId: first.recordId,
+          expectedRevision: 2,
+        }),
+      ).rejects.toMatchObject({ status: 409 });
+      await expect(
+        pool.query(
+          "UPDATE memory_records SET status='SUPERSEDED',superseded_by_id=$2::uuid,revision=revision+1,updated_at=NOW() WHERE id=$1",
+          [first.recordId, next.recordId],
+        ),
+      ).rejects.toMatchObject({ code: 'P0001' });
+      const wrongGrant = await approvals.reviewVerifiedRevocationAndGrant(secret, {
+        repository,
+        recordId: first.recordId,
+        expectedRevision: 2,
+      });
+      await expect(
+        service.supersede(secret, wrongGrant.grantToken, first.recordId, {
+          repository,
+          expectedRevision: 2,
+          replacementRecordId: next.recordId,
+          fingerprint: wrongGrant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(
+        approvals.revokeVerified(secret, wrongGrant.grantToken, first.recordId, {
+          repository,
+          expectedRevision: 2,
+          fingerprint: wrongGrant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+      const different = await proposer.propose(request(bearer), randomUUID(), {
+        kind: 'fact',
+        text: 'Different kind ' + randomUUID(),
+        sourceRef: 'agent-session:' + sessionId,
+      });
+      await approve(await prepare(different.recordId));
+      await expect(
+        service.reviewAndGrant(secret, {
+          repository,
+          recordId: first.recordId,
+          replacementRecordId: different.recordId,
+          expectedRevision: 2,
+        }),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
+    it('rolls back link, third revision and audit if supersede audit INSERT fails; burns one-use grant', async () => {
+      const prior = await create('rollback-old-' + randomUUID());
+      const successor = await create('rollback-next-' + randomUUID());
+      await approve(await prepare(prior.recordId));
+      await approve(await prepare(successor.recordId));
+      const service = new MemorySupersedeService(auth, env, undefined, 'test');
+      const grant = await service.reviewAndGrant(secret, {
+        repository,
+        recordId: prior.recordId,
+        replacementRecordId: successor.recordId,
+        expectedRevision: 2,
+      });
+      const failing = new MemorySupersedeService(
+        auth,
+        env,
+        (url) => {
+          const inner = new pg.Pool({ connectionString: url, ssl: false, max: 1 });
+          return {
+            connect: async () => {
+              const client = await inner.connect();
+              return {
+                query: async (sql: string, params?: unknown[]) => {
+                  if (sql.includes('INSERT INTO memory_mutation_audit'))
+                    throw Error('private simulated audit failure');
+                  return client.query(sql, params);
+                },
+                release: () => client.release(),
+              };
+            },
+            end: async () => inner.end(),
+          } as unknown as pg.Pool;
+        },
+        'test',
+      );
+      await expect(
+        failing.supersede(secret, grant.grantToken, prior.recordId, {
+          repository,
+          expectedRevision: 2,
+          replacementRecordId: successor.recordId,
+          fingerprint: grant.fingerprint,
+        }),
+      ).rejects.toMatchObject({ status: 503 });
+      const state = await pool.query(
+        'SELECT status,revision,superseded_by_id FROM memory_records WHERE id=$1',
+        [prior.recordId],
+      );
+      expect(state.rows[0]).toMatchObject({
+        status: 'VERIFIED',
+        revision: 2,
+        superseded_by_id: null,
+      });
+      const history = await pool.query(
+        'SELECT count(*)::int AS n FROM memory_revisions WHERE memory_id=$1',
+        [prior.recordId],
+      );
+      expect(history.rows[0]?.n).toBe(2);
+      const audit = await pool.query(
+        "SELECT count(*)::int AS n FROM memory_mutation_audit WHERE action='SUPERSEDE_MEMORY_RECORD' AND memory_id=$1",
+        [prior.recordId],
+      );
+      expect(audit.rows[0]?.n).toBe(0);
+      await expect(
+        service.supersede(secret, grant.grantToken, prior.recordId, {
+          repository,
+          expectedRevision: 2,
+          replacementRecordId: successor.recordId,
           fingerprint: grant.fingerprint,
         }),
       ).rejects.toMatchObject({ status: 403 });

@@ -17,7 +17,12 @@ const credentialInputSchema = z.strictObject({
 });
 const grantInputSchema = z.strictObject({
   repository: MemoryRepositorySchema,
-  action: z.enum(['APPROVE_MEMORY_PROPOSAL', 'REJECT_MEMORY_PROPOSAL', 'REVOKE_MEMORY_RECORD']),
+  action: z.enum([
+    'APPROVE_MEMORY_PROPOSAL',
+    'REJECT_MEMORY_PROPOSAL',
+    'REVOKE_MEMORY_RECORD',
+    'SUPERSEDE_MEMORY_RECORD',
+  ]),
   recordId: uuid,
   expectedRevision: z.number().int().positive(),
   fingerprint: z.string().regex(/^sha256:[0-9a-f]{64}$/),
@@ -106,6 +111,7 @@ export class MemoryAuthorizationService {
         config.approvalWriteEnabled,
         config.rejectionWriteEnabled,
         config.verifiedRevocationEnabled,
+        config.supersedeEnabled,
       ]),
     );
     if (this.previousConfigDigest !== null && this.previousConfigDigest !== fingerprint) {

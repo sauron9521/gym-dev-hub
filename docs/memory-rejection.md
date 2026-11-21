@@ -1,6 +1,6 @@
 # Operator-reviewed rejection of unverified memory (Issue #40)
 
-**Default off; local-only, one decision per record.** This independently gated path allows a trusted local operator to reject a previously created `PROPOSED` agent record, moving it to terminal `REVOKED` with revision 2. This proposal-rejection route does **not** revoke `VERIFIED` knowledge; that separate operator workflow is documented in [verified revocation](memory-verified-revocation.md). Neither route edits content, supersedes, deletes audit, injects Codex instructions nor exposes external MCP/HTTP. A rejected record is never visible to the default verified-only memory read API.
+**Default off; local-only, one decision per record.** This independently gated path allows a trusted local operator to reject a previously created `PROPOSED` agent record, moving it to terminal `REVOKED` with revision 2. This proposal-rejection route does **not** revoke `VERIFIED` knowledge; that separate operator workflow is documented in [verified revocation](memory-verified-revocation.md). Neither rejection nor verified revocation edits content or changes the supersession link; a [distinct operator-only supersede workflow](memory-supersede.md) manages that link. None deletes audit, injects Codex instructions or exposes external MCP/HTTP. A rejected record is never visible to the default verified-only memory read API.
 
 ## Explicit separate opt-in
 
