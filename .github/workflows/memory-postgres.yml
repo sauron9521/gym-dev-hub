@@ -81,6 +81,8 @@ jobs:
         run: pnpm --filter @gym-dev-hub/api db:migrate:test
       - name: Verify migration ledger / test target / connection
         run: pnpm --filter @gym-dev-hub/api db:health:test
+      - name: Build shared contracts for standalone integration tests
+        run: pnpm --filter @gym-dev-hub/contracts build
       - name: Run actual PostgreSQL integration and negative tests
         run: pnpm --filter @gym-dev-hub/api exec vitest run test/memory-database-policy.spec.ts test/memory-database-integration.spec.ts test/memory-records.integration.spec.ts test/memory-read.integration.spec.ts test/memory-controller.spec.ts test/memory-status.controller.spec.ts
       - name: Complete frozen repository checks
