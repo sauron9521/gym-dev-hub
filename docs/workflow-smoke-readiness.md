@@ -576,3 +576,58 @@ an outdated lockfile key, and audit directories were not explicitly
 configured. The gate reports those discrepancies rather than silently
 correcting them. After the owner separately reconciles source and
 private configuration, rerun preflight before planning a live grant.
+
+## Launch #107 — owner-confirmed private backup **before** Git fast-forward
+
+After `launch-source-reconcile.mjs` has verified an externally pinned
+main commit is a genuine fast-forward with **no dirty-file path
+collisions**, you can preserve the two known local tracked edits
+(`turbo.json` and `apps/web/next-env.d.ts`) without changing the
+original checkout. Use this bounded, optional copy-only command in a
+clean Hub worktree that contains the new script:
+
+```sh
+node scripts/launch-source-owner-backup.mjs \
+  --confirm-copy-only \
+  --expected-main=REPLACE_WITH_VERIFIED_40_CHAR_MAIN_SHA \
+  --operator-checkout=/absolute/path/to/actual/primary/gym-dev-hub \
+  --backup-parent=/absolute/path/to/already-existing/private-owner-directory
+```
+
+The **backup parent must already exist**, be a real canonical directory
+outside the primary repository, owned by the invoking non-root Linux
+user and private to that user (no group/other access). The script
+reuses `inspectSource` and **refuses** staged/renamed/conflicted Git,
+an unknown origin, untrusted or absent main commit, diverged branches,
+dirty/upstream path collisions, symlinks, unsafe private state, and
+any tracked dirty path other than the two explicitly reviewed files.
+
+The script only reads the two source files via no-follow handles and
+compares inode, size and timestamps before/after reading. It writes
+**new, exclusive 0600 copies**, plus a 0600 hash/size manifest, into
+its own freshly created 0700 `source-owner-backup-*` directory;
+fsyncs the files and directory; rereads both copies, checks their
+SHA-256, and revalidates original Git HEAD and source byte content.
+The output contains only the backup location, verified count and Git
+commit identifiers (never raw file contents or operator credentials).
+Existing backups are never overwritten, and failures leave any
+partial snapshot for explicit owner inspection rather than deleting
+potential recovery data.
+
+**Important scope:** `apps/api/.env`, `apps/api/.local`, the many
+registered linked worktrees and `.worktrees/` are **left completely
+untouched**, and **are not backed up** by this narrow source-file
+backup. Back them up separately with an owner-chosen secure method
+before changing their state, if needed. Nothing calls `git pull`,
+`checkout`, `stash`, `reset`, `merge`, `worktree prune`,
+`chmod` on source files, or any Docker command; no production audit
+is read or changed and no API/Web process is restarted.
+
+**A verified backup is not permission to fast-forward or restart the
+operator.** Review the manifest and original local edits; decide with
+the owner how to handle the dirty files and linked worktrees. Only
+after explicit separate approval and a new reconciliation preflight
+should a controlled, non-destructive Git fast-forward be attempted.
+Then verify the running compiled API build and repair the pinned
+dependency store/explicit private audit directories under a separate
+manual cutover before actual production HTTP→Docker acceptance.
