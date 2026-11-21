@@ -381,3 +381,32 @@ do not automatically delete unrelated `/tmp` paths. A temporary test-only
 receipt is distinct from the production authorized audit. #107 remains
 open until a real owner-authorized HTTP run and interrupted restart
 have been independently verified.
+
+## Launch #107 — real Nest HTTP one-time grant and persisted audit regression
+
+`apps/api/test/worktree-patch-checks-http.e2e.spec.ts` boots the real
+`WorktreePlanController` on ephemeral `127.0.0.1` with the **real**
+`WorktreePatchChecksService` and file-backed, fsynced audit in a new private
+test-only directory. The test exercises the real HTTP POST routes
+`patch-check-authorize`, `patch-check-execute`, `patch-check-cancel` and
+`patch-check-history`, with fixture plan/review/preflight data.
+
+It verifies wrong operator secret rejection, explicit one-time grant and
+token-replay denial, actual Nest response statuses, authorized success history,
+redaction of secrets/token/file path, terminal Docker failure mapping to HTTP
+503 and durable `failed`, cancel-requested → canceled audit ordering, and
+`interrupted` projection after restarting the **test HTTP application**
+with the same audit directory but a new in-memory grant map. No Docker
+commands are reissued by history or during restart.
+
+**Verification boundaries:** Docker execution, production Git review, and
+source/store stages are mocked _only in this HTTP regression test_, never
+replaced in the running operator. The separate, opt-in
+[real Docker smoke](launch-fixed-docker-smoke.md) exercises the pinned
+non-networked, non-root FORMAT/TYPECHECK/TEST runner and public-only
+verified store mirror using a **test-only** journal. Passing both tests is
+stronger layered evidence, but **not** an actual owner-authorized production
+HTTP → Docker → audit run. Simulated interruption followed by a fresh Nest
+instance is **not** proof of a real SIGKILL and operator restart. Keep #107
+open until those specific live checks pass, with no production audit/secret
+mutation by these tests.
