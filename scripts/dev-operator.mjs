@@ -1,11 +1,39 @@
 /** Local operator mode: Web HMR with a prebuilt, watch-free API. */
 import { spawn, spawnSync } from 'node:child_process';
+import { lstatSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const POLICY = Object.freeze({ pnpm: '12.18.0', apiPort: 3101, webPort: 3100 });
+const LOCAL_DOCKER_ENDPOINT = 'unix:///var/run/docker.sock';
+
+/** Reject remote Docker contexts before invoking any Docker subcommand. */
+export function validateDockerEnvironment(env) {
+  if (
+    (env.DOCKER_HOST && env.DOCKER_HOST !== LOCAL_DOCKER_ENDPOINT) ||
+    (env.DOCKER_CONTEXT && env.DOCKER_CONTEXT !== 'default') ||
+    env.DOCKER_TLS_VERIFY ||
+    env.DOCKER_CERT_PATH
+  ) {
+    throw new Error(
+      'Operator requires the local Docker Unix socket; remote Docker overrides denied',
+    );
+  }
+}
+
+/** Require an actual socket, not a symlink, without access for other users. */
+export function validateDockerSocket(endpoint, socketStat) {
+  if (
+    endpoint !== LOCAL_DOCKER_ENDPOINT ||
+    !socketStat?.isSocket() ||
+    (socketStat.mode & 0o007) !== 0
+  ) {
+    throw new Error('Operator Docker socket is not the trusted private local Unix socket');
+  }
+}
+
 function port(value, fallback, name) {
   if (value === undefined || value === '') return fallback;
   if (!/^[1-9]\d{3,4}$/.test(value) || Number(value) < 1024 || Number(value) > 65535) {
@@ -55,10 +83,26 @@ function requireHost() {
   if (typeof process.getuid === 'function' && process.getuid() === 0) {
     throw new Error('Do not run operator mode as root');
   }
+  validateDockerEnvironment(process.env);
   const version = spawnSync('pnpm', ['--version'], { encoding: 'utf8', timeout: 15_000 });
   if (version.status !== 0 || version.stdout.trim() !== POLICY.pnpm) {
     throw new Error(`Expected pinned pnpm ${POLICY.pnpm}`);
   }
+  const context = spawnSync(
+    'docker',
+    ['context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'],
+    { encoding: 'utf8', timeout: 15_000 },
+  );
+  if (context.status !== 0 || context.error) {
+    throw new Error('Local Docker context inspection failed');
+  }
+  let socket;
+  try {
+    socket = lstatSync('/var/run/docker.sock');
+  } catch {
+    throw new Error('Trusted local Docker socket unavailable');
+  }
+  validateDockerSocket(context.stdout.trim(), socket);
   const docker = spawnSync('docker', ['info', '--format', '{{.ServerVersion}}'], {
     encoding: 'utf8',
     timeout: 15_000,
