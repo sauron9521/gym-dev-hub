@@ -17,8 +17,8 @@ import type {
 } from '@gym-dev-hub/contracts';
 
 /**
- * Unwired repository-scoped query engine for future authenticated handlers.
- * No Nest provider or public HTTP route may call this before Issue #39.
+ * Repository-scoped read-only query engine, invoked only AFTER the opt-in
+ * HTTP gateway has authenticated and DB-verified the bearer principal.
  * The context must be built from an authenticated principal, NOT query params.
  */
 export class MemoryQueryService {
