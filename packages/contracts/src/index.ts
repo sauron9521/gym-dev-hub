@@ -73,6 +73,7 @@ export type {
   WorktreePatchApplyGrant,
   WorktreePatchApplyResult,
   WorktreePostApplyReview,
+  WorktreePatchRecovery,
   WorktreePatchCheckRecipe,
   WorktreePatchCheckGrant,
   WorktreePatchCheckResult,

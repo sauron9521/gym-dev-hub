@@ -9,6 +9,7 @@ import type {
 import { WorktreeInspectionPanel } from './worktree-inspection-panel';
 import { WorktreeHydrationPanel } from './worktree-hydration-panel';
 import { WorktreePatchCheckHistoryPanel } from './worktree-patch-check-history-panel';
+import { WorktreePatchRecoveryPanel } from './worktree-patch-recovery-panel';
 
 const labels: Record<WorktreePlanState, string> = {
   pending: 'Очікує погодження',
@@ -231,6 +232,18 @@ export function WorktreePlanPanel({
             key={sessionId + ':' + latest.id}
             sessionId={sessionId}
             planId={latest.id}
+          />
+        )}
+      {latest?.state === 'created' &&
+        latest.hydrationState === 'completed' &&
+        latest.repository === 'sauron9521/gym-dev-hub' &&
+        latest.baseHeadSha && (
+          <WorktreePatchRecoveryPanel
+            key={sessionId + ':' + latest.id + ':patch-recovery'}
+            sessionId={sessionId}
+            planId={latest.id}
+            fingerprint={latest.fingerprint}
+            sourceCommit={latest.baseHeadSha}
           />
         )}
       {latest?.state === 'pending' && !completed && (

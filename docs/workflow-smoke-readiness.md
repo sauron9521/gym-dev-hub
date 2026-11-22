@@ -1192,3 +1192,25 @@ After owner review/merge, only a **separately owner-authorized** guarded
 backup/stop/fast-forward/build/start can load the fix into the live
 supervisor. The current-main browser/HTTP→Docker and test Draft PR/CI
 receipts are still required before closing #108.
+
+## #108 — read-only recovery of an already-applied one-file patch
+
+An owner-authorized live HTTP patch may be applied successfully before a page
+reload loses the ephemeral UI state. **Never apply that patch again** or replay
+its consumed grant. On the same hydrated Hub worktree, the Workspace panel
+now offers a read-only patch recovery action. Enter the existing patch-review
+operator secret only into the localhost password field; it is not stored.
+
+The fixed patch-recover route accepts only the operator secret, not a path,
+revision, grant ID, arbitrary command or replacement patch. It requires one
+matching terminal applied event and the exact issued -> attempted -> applied
+private audit chain, a single changed Git path matching the audit digest,
+the pinned worktree SHA and fingerprint, and existing post-apply full Git
+review. It returns an audited applied receipt and verified current diff with
+readOnly=true, grantIssued=false, writesPerformed=false.
+
+Bad secrets, unexpected files, missing/duplicate/tampered audits or source
+drift fail closed. This endpoint does not run Docker, issue a grant, modify
+Git, commit, publish or create a Draft PR. Fixed Docker recipes still require
+fresh independent one-time approval and real production receipts; #108 E2E
+is not considered passed until those plus exact GitHub CI are confirmed.
