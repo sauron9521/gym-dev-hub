@@ -878,3 +878,71 @@ cannot be used by that live process until an **explicit separately
 authorized** config pin and operator restart. Keep #107 OPEN: two
 private audit directories, live runtime provenance and real owner
 HTTP→Docker→durable audit checks remain to be completed.
+
+## Existing production audit history — explicit path pin (manual, no migration)
+
+**Do not create empty audit directories or replace the existing journals.**
+The owner installation already uses the legacy defaults, because the Nest API
+is started with `cwd=apps/api`:
+
+- `apps/api/.local/patch-checks/audit.jsonl` — the fixed Docker check history
+- `apps/api/.local/patch-apply/audit.jsonl` — the patch-apply / review history
+
+Both journals and their parent directories must remain available and unchanged
+across cutover. Moving to empty directories would silently hide previously
+issued/attempted/completed entries and break reliable interruption history.
+
+`scripts/launch-owner-pin-audit-paths.mjs` **only makes those existing
+directories explicit** by adding the two
+`DEV_HUB_PATCH_CHECK_STATE_DIR` and `DEV_HUB_PATCH_APPLY_STATE_DIR`
+settings. Its default is read-only. It verifies the canonical, 0700,
+same-owner private paths and existing 0600 owner-only `audit.jsonl` files,
+bounded length, complete UTF-8/newline-delimited JSON records and stable
+content hashes. It refuses symlinks, missing/truncated/malformed journals,
+duplicates or pre-existing custom paths (never silently migrates history),
+foreign Git origins, linked worktrees and source revision mismatches.
+
+The script must be executed from a separate current Hub worktree **but**
+point at the owner primary checkout, with an externally verified exact
+primary Git SHA. It does not fetch a newer branch or update Git.
+
+```sh
+# READ ONLY, including when live operator is running
+node scripts/launch-owner-pin-audit-paths.mjs \
+  --check-only \
+  --expected-main=REPLACE_WITH_VERIFIED_PRIMARY_MAIN_40_HEX_SHA \
+  --operator-checkout=/absolute/primary/gym-dev-hub
+
+# ONLY with separately approved maintenance downtime, after
+# the real supervisor/API/Web have stopped and while new starts
+# and .env editors are excluded. Use the exact private envSha256
+# reported by the most recent --check-only on that same checkout.
+node scripts/launch-owner-pin-audit-paths.mjs \
+  --confirm-private-audit-pin \
+  --expected-main=REPLACE_WITH_VERIFIED_PRIMARY_MAIN_40_HEX_SHA \
+  --operator-checkout=/absolute/primary/gym-dev-hub \
+  --expected-env-sha256=REPLACE_WITH_CHECK_ONLY_ENV_SHA256 \
+  --backup-parent=/absolute/existing/owner-private-0700-backup-parent
+```
+
+The write mode never sends a signal or restarts a service; it refuses an
+active process or port, pins the exact previously verified `.env` SHA,
+and creates an exclusive private 0700 snapshot of the entire original
+0600 `.env` outside the repository. It then _adds only missing audit
+path assignments_, keeping every existing configuration byte and
+the current store pin unchanged. It verifies both existing audit
+journal hashes and process/port quiescence again before fsyncing and
+atomically replacing only the `.env`. The backup is retained if anything
+fails; no automatic rollback/retry or deletion of historical audit
+data. The process check is a momentary preflight, not a kernel-level
+lock against concurrent starts.
+
+**Current operator evidence:** existing real journals were inspected
+read-only, with 38 Docker-check records and 21 patch-apply records;
+both passed the history/ownership checks. The actual live API/Web remain
+HTTP 200/200. Neither journal nor real `.env` was changed by this PR.
+The current private store pin is a separate owner maintenance operation
+(#132) — plan both edits and the single controlled restart together,
+then independently prove the running API revision, offline Docker recipes
+and durable passed/interrupted receipts before claiming production
+acceptance. A closed issue by itself is not evidence that these tests ran.
