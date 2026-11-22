@@ -1036,3 +1036,17 @@ runtime PID, corresponding Docker recipe and isolated runner policy,
 then separately verify the Draft PR's exact SHA and actual GitHub CI
 conclusions before ever declaring the full #108 flow accepted.
 Keep #108 OPEN until _all_ those independent facts are proven.
+
+## #108 — pinned running systemd metadata is not live-code proof (PR #137)
+
+Before an owner-managed service cutover, inspect the installed fixed user unit **read-only** from a trusted Linux owner shell. The main SHA must be verified **out of band** (e.g. the exact GitHub main ref), never inferred from a potentially stale local checkout.
+
+```sh
+node scripts/launch-systemd-runtime-preflight.mjs --check-only \
+  --expected-main=EXACT_40_HEX_GITHUB_MAIN_SHA \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub
+```
+
+The fixed `gym-dev-hub-operator.service` is queried with `systemctl --user show` for **only seven non-secret properties**. The gate validates the real physical Git `main` checkout, trusted origin, installed service state, its exact working directory, and twice checks the same supervisor PID and process birthtime against Linux `/proc`; it also rereads systemd and Git source to reject detectable races. No full environment, bearer token, service journal, audit record or command line is emitted. `blocked` returns code 2.
+
+Even a successful `source-and-process-metadata-consistent` result explicitly reports `liveRuntimeVersionVerified:false`, `approvedForOperatorGrants:false`, `endToEndVerified:false`. **This is not permission** to authorize a Docker recipe or proof that a process started before the source update actually loaded new code. Owner must separately supervise graceful systemd stop, verified backup, owner-gated fast-forward, fresh build/restart, HTTP health and authenticated exact-SHA smoke. Never force service stop/restart, alter the primary checkout or touch Gym Platform as part of this read-only gate.
