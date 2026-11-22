@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -199,6 +199,40 @@ test('ambiguous systemd start response never retries, clears, disables or resets
     /lost systemd response/,
   );
   assert.equal(count, 1);
+});
+
+test('only .worktrees/ may remain untracked before an owner systemd start', async () => {
+  if (process.platform !== 'linux') return;
+  const f = await fixture();
+  try {
+    // Prior gate accepted ANY one untracked entry based on its count alone.
+    await writeFile(join(f.checkout, 'unexpected-owner-file.txt'), 'do not touch\n');
+    await assert.rejects(
+      () => validatePinnedSource(f.checkout, f.sha),
+      /Owner source not at externally pinned main or has unsafe edits/,
+    );
+    await rm(join(f.checkout, 'unexpected-owner-file.txt'));
+
+    await mkdir(join(f.checkout, '.worktrees'));
+    await writeFile(join(f.checkout, '.worktrees', 'owner-plan.txt'), 'preserve\n');
+    await assert.doesNotReject(() => validatePinnedSource(f.checkout, f.sha));
+
+    await writeFile(join(f.checkout, 'unrelated-note.txt'), 'should block\n');
+    await assert.rejects(
+      () => validatePinnedSource(f.checkout, f.sha),
+      /Owner source not at externally pinned main or has unsafe edits/,
+    );
+    await rm(join(f.checkout, 'unrelated-note.txt'));
+    await rm(join(f.checkout, '.worktrees'), { recursive: true });
+
+    await symlink('README.md', join(f.checkout, '.worktrees'));
+    await assert.rejects(
+      () => validatePinnedSource(f.checkout, f.sha),
+      /Owner source not at externally pinned main or has unsafe edits/,
+    );
+  } finally {
+    await rm(f.checkout, { recursive: true, force: true });
+  }
 });
 
 test('real physical owner Git fixture accepts exact built main and rejects stale SHA/foreign origin', async () => {

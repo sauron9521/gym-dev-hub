@@ -101,6 +101,10 @@ export function assessSource({
     trackedChanges: tracked.length,
     trackedPaths: tracked,
     untrackedEntries: untracked.length,
+    // Explicitly distinguish the owner's preserved .worktrees/ from any
+    // unrelated untracked path. Keep its contents and names out of reports.
+    onlyKnownOwnerUntracked:
+      untracked.length === 0 || (untracked.length === 1 && untracked[0] === '.worktrees/'),
     overlappingPaths: collisions,
     privateStatePresent: Object.fromEntries(
       PRESERVED_PATHS.map((key) => [key, Boolean(privateState[key])]),

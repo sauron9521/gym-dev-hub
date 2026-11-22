@@ -130,7 +130,7 @@ export async function validatePinnedSource(checkout, expectedMain) {
     (status.trackedChanges !== 0 &&
       (status.trackedChanges !== 2 ||
         status.trackedPaths.slice().sort().join('\0') !== EXPECTED_DIRTY.join('\0'))) ||
-    status.untrackedEntries > 1
+    status.onlyKnownOwnerUntracked !== true
   )
     throw new Error('Owner source not at externally pinned main or has unsafe edits');
   const api = await lstat(join(checkout, 'apps/api/dist/main.js'));
