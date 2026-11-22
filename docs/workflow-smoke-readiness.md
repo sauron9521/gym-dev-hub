@@ -1108,3 +1108,29 @@ Success is **not proof** of immutable runtime bytes, authorization for write ope
 The owner start gate must **not** treat an arbitrary single untracked file as safe. Its source check now accepts either a clean untracked set or exactly one Git-porcelain untracked directory entry, `.worktrees/`, while preserving the already allowed two tracked owner edits (`apps/web/next-env.d.ts`, `turbo.json`). Any other untracked file/directory or combined extra entry blocks start **before** the fixed `systemctl --user start` request. The `.worktrees` symlink protection remains enforced by the existing source inspector; untracked file names or contents are not exposed in reports.
 
 This affects only `--check-only` and the source preflight of an explicitly owner-approved start. It does not stop/restart the live Hub, perform fast-forward, create a backup or authorize a Docker recipe. The separate owner backup and startup acceptance steps in this runbook remain mandatory. Actual #108 current-main HTTP→Docker plus Draft PR+CI evidence is still outstanding.
+
+## #108 — owner-pinned GitHub main object import (PR #141)
+
+A GitHub main SHA can be verified over the network while the owner primary checkout still **lacks that commit object**. This must be resolved before the separate owner-only fast-forward tool, without directly changing the running Hub or the working tree.
+
+First verify the exact GitHub `main` SHA independently and run the read-only gate against the physical primary checkout:
+
+```sh
+node scripts/launch-owner-main-object-import.mjs --check-only \
+  --expected-main=EXACT_40_HEX_GITHUB_MAIN_SHA \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub
+```
+
+The CLI independently checks only `https://github.com/sauron9521/gym-dev-hub.git` `refs/heads/main`, validates trusted physical owner `main`, its immutable current HEAD, the known two modified tracked owner files, and **only** `.worktrees/` as an allowed untracked Git entry. It fails closed on untrusted origin, changed upstream SHA, staged/merge state or other unknown files. This does not read `.env`, audit journals, or untracked file contents, and writes no Git metadata in check mode.
+
+**After explicit separate owner approval**, a one-time transfer of **Git objects only** is available:
+
+```sh
+node scripts/launch-owner-main-object-import.mjs --confirm-owner-main-object-import \
+  --expected-main=EXACT_40_HEX_GITHUB_MAIN_SHA \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub
+```
+
+This is **not a source update**: it rechecks the exact advertised SHA before transferring just the pinned object from the fixed HTTPS URL, without a destination refspec or FETCH_HEAD update. It verifies the owner `HEAD`, all local edits, untracked inventory and complete ref snapshot were not moved; the imported commit must be an ancestor-safe fast-forward target, and the advertised SHA must still match. A failed or lost fetch response is ambiguous; **do not retry automatically**. Unlike read-only inspection, this confirmed operation writes the primary `.git` object store, so treat it as a separate owner-authorized action. It never stops systemd, changes Git refs/working files or authorizes a Docker grant.
+
+After an independently verified object import, continue only with the separately approved verified backup and owner systemd stop, `launch-owner-fast-forward.mjs`, build, systemd start and real golden workflow. A successful import does **not** mean `endToEndVerified`. Keep #108 OPEN until live HTTP→Docker and disposable Draft PR receipts have been verified.
