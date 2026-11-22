@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   parseRuntimeArgs,
+  parseCurrentMainArgs,
+  inspectCurrentMainRuntime,
   parseUserUnitShow,
   inspectInstalledRuntime,
 } from './launch-systemd-runtime-preflight.mjs';
@@ -185,6 +187,156 @@ test('untrusted Git remote is never treated as current operator source', async (
           { readUnit: async () => unitFor(f.checkout), inspectProcess: async () => identity },
         ),
       /trusted physical owner/,
+    );
+  } finally {
+    await rm(f.checkout, { recursive: true, force: true });
+  }
+});
+
+test('current GitHub main CLI is read-only, two-argument exact and never accepts a stale caller SHA', () => {
+  assert.deepEqual(
+    parseCurrentMainArgs(['--check-current-github-main', '--operator-checkout=' + CHECKOUT]),
+    { checkout: CHECKOUT },
+  );
+  for (const args of [
+    [],
+    ['--check-current-github-main', '--operator-checkout=/tmp/../tmp'],
+    ['--check-current-github-main', '--operator-checkout=' + CHECKOUT, '--approve'],
+    ['--check-current-github-main', '--expected-main=' + PIN, '--operator-checkout=' + CHECKOUT],
+    ['--confirm-owner-golden-smoke', '--operator-checkout=' + CHECKOUT],
+  ])
+    assert.throws(() => parseCurrentMainArgs(args));
+});
+
+test('live current-main read-only gate blocks stale HEAD despite valid running systemd supervisor', async () => {
+  const f = await fixture();
+  try {
+    let remoteReads = 0;
+    const report = await inspectCurrentMainRuntime(
+      { checkout: f.checkout },
+      {
+        currentMain: async () => {
+          remoteReads++;
+          return PIN;
+        },
+        inspect: (request) =>
+          inspectInstalledRuntime(request, {
+            readUnit: async () => unitFor(f.checkout),
+            inspectProcess: async () => identity,
+          }),
+      },
+    );
+    assert.equal(remoteReads, 2);
+    assert.equal(report.status, 'blocked');
+    assert.ok(report.reasons.includes('owner-primary-behind-advertised-github-main'));
+    assert.ok(report.reasons.includes('owner-primary-behind-pinned-main'));
+    assert.equal(report.liveSupervisorIdentityVerified, true);
+    assert.equal(report.mayConsiderSeparateOwnerGoldenAuthorization, false);
+    assert.equal(report.productionGrantIssued, false);
+    assert.equal(report.dockerExecuted, false);
+    assert.equal(report.draftPrCreated, false);
+    assert.equal(report.endToEndVerified, false);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.sha);
+  } finally {
+    await rm(f.checkout, { recursive: true, force: true });
+  }
+});
+
+test('exact matching GitHub main and stable systemd produce metadata-only review, never E2E authorization', async () => {
+  const f = await fixture();
+  try {
+    let probes = 0;
+    const r = await inspectCurrentMainRuntime(
+      { checkout: f.checkout },
+      {
+        currentMain: async () => {
+          probes++;
+          return f.sha;
+        },
+        inspect: (request) =>
+          inspectInstalledRuntime(request, {
+            readUnit: async () => unitFor(f.checkout),
+            inspectProcess: async () => identity,
+          }),
+      },
+    );
+    assert.equal(probes, 2);
+    assert.equal(r.status, 'current-main-runtime-metadata-consistent-only');
+    assert.equal(r.checkedLiveGitHubMainTwice, true);
+    assert.equal(r.mayConsiderSeparateOwnerGoldenAuthorization, true);
+    assert.equal(r.liveRuntimeVersionVerified, false);
+    assert.equal(r.approvedForOperatorGrants, false);
+    assert.equal(r.endToEndVerified, false);
+    assert.equal(r.sourceMutated, false);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.sha);
+  } finally {
+    await rm(f.checkout, { recursive: true, force: true });
+  }
+});
+
+test('moving GitHub main during current-main preflight aborts without falsely marking ready', async () => {
+  const f = await fixture();
+  try {
+    let calls = 0;
+    await assert.rejects(
+      () =>
+        inspectCurrentMainRuntime(
+          { checkout: f.checkout },
+          {
+            currentMain: async () => (++calls === 1 ? f.sha : PIN),
+            inspect: (request) =>
+              inspectInstalledRuntime(request, {
+                readUnit: async () => unitFor(f.checkout),
+                inspectProcess: async () => identity,
+              }),
+          },
+        ),
+      /GitHub main moved/,
+    );
+    assert.equal(calls, 2);
+  } finally {
+    await rm(f.checkout, { recursive: true, force: true });
+  }
+});
+
+test('network unavailable, malformed advertisement and forged runtime receipt fail closed', async () => {
+  const f = await fixture();
+  try {
+    await assert.rejects(
+      () =>
+        inspectCurrentMainRuntime(
+          { checkout: f.checkout },
+          {
+            currentMain: async () => {
+              throw new Error('offline');
+            },
+          },
+        ),
+      /offline/,
+    );
+    await assert.rejects(
+      () =>
+        inspectCurrentMainRuntime(
+          { checkout: f.checkout },
+          {
+            currentMain: async () => 'main',
+          },
+        ),
+      /Invalid advertised/,
+    );
+    await assert.rejects(
+      () =>
+        inspectCurrentMainRuntime(
+          { checkout: f.checkout },
+          {
+            currentMain: async () => f.sha,
+            inspect: async () => ({
+              status: 'source-and-process-metadata-consistent',
+              reasons: [],
+            }),
+          },
+        ),
+      /Untrusted runtime metadata/,
     );
   } finally {
     await rm(f.checkout, { recursive: true, force: true });
