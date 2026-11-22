@@ -1142,3 +1142,28 @@ The single owner-authorized \`systemctl --user start gym-dev-hub-operator.servic
 The owner start gate now keeps the **same exact service, one-and-only-one systemctl start, pinned source checks, supervisor PID/birth-time checks and both exact 200 endpoints**. It allows at most **24 checks** within a **30-second monotonic post-start window**, with fixed **600 ms retry delays** and **4-second bounded HTTP request timeouts**. A healthy response received **after** the deadline cannot be accepted. Read-only preflight remains read-only; any missing health/identity checks return \`START_OUTCOME_UNVERIFIED\` and require owner inspection, **never an automatic second start, stop, restart, or rollback**.
 
 The isolated regression tests simulate slow HTTP responses, late Next readiness after 17 unsuccessful checks, final deadline expiry, a late response after the deadline, and invalid timing settings rejected before any start. This fix does **not** attest the running Hub's deployed source cryptographically and does **not** mark \`endToEndVerified\`; the current-main authenticated HTTP→Docker golden smoke and disposable Draft PR+exact CI evidence are still separate acceptance gates.
+
+## #108 — live advertised GitHub main preflight (PR #143)
+
+Before owner-authorized current-main golden smoke, validate the **main currently
+advertised by the fixed public GitHub repository**, not an older SHA passed by
+the operator. This new strictly read-only mode uses two public `git ls-remote`
+queries (no fetch, refs or Git write), trusted physical owner `main` and the
+existing stable systemd supervisor PID/birth-time metadata checks:
+
+```sh
+node scripts/launch-systemd-runtime-preflight.mjs \
+  --check-current-github-main \
+  --operator-checkout=/home/sauron/Projects/gym-dev-hub
+```
+
+A healthy systemd process and HTTP 200 alone **do not** prove current source;
+when the owner source is stale this returns `blocked` with
+`owner-primary-behind-advertised-github-main`. An unavailable/moving advertised
+main fails closed. When matching, the most it can report is
+`current-main-runtime-metadata-consistent-only`, **not** a cryptographic
+attestation of code already loaded, production Docker authorization, journal
+writes, Draft PR creation or `endToEndVerified`. A verified owner-controlled
+backup/stop/fast-forward/build/start is a separate explicitly authorized step.
+The original current-main authenticated HTTP→Docker and disposable Draft PR
+exact-CI acceptance still requires real receipts.

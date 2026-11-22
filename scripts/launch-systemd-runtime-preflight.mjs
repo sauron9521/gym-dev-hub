@@ -12,6 +12,8 @@ import { inspectSupervisor } from './launch-owner-operator-shutdown.mjs';
 const SHA = /^[a-f0-9]{40}$/;
 const PID = /^[1-9][0-9]{0,9}$/;
 const UNIT = 'gym-dev-hub-operator.service';
+const GITHUB_MAIN_URL = 'https://github.com/sauron9521/gym-dev-hub.git';
+const GITHUB_MAIN_REF = 'refs/heads/main';
 const FIELDS = [
   'Id',
   'LoadState',
@@ -53,6 +55,99 @@ export function parseRuntimeArgs(argv) {
   if (!SHA.test(expectedMain) || !canonical(checkout))
     throw new Error('Invalid source pin or checkout path');
   return { expectedMain, checkout };
+}
+
+/**
+ * Read-only operator current-main gate: unlike --check-only, this mode pins
+ * GitHub's live advertised main instead of trusting an old caller-supplied SHA.
+ * Neither mode may issue grants, write Git refs, stop services or attest E2E.
+ */
+export function parseCurrentMainArgs(argv) {
+  if (
+    argv.length !== 2 ||
+    argv[0] !== '--check-current-github-main' ||
+    !argv[1].startsWith('--operator-checkout=')
+  )
+    throw new Error('Require exact read-only GitHub main mode and physical checkout');
+  const checkout = argv[1].slice('--operator-checkout='.length);
+  if (!canonical(checkout)) throw new Error('Invalid canonical operator checkout');
+  return { checkout };
+}
+
+function advertisedGithubMain() {
+  const proc = spawnSync(
+    'git',
+    ['-c', 'credential.helper=', 'ls-remote', '--exit-code', GITHUB_MAIN_URL, GITHUB_MAIN_REF],
+    {
+      encoding: 'utf8',
+      timeout: 15000,
+      maxBuffer: 2048,
+      env: {
+        PATH: process.env.PATH ?? '/usr/bin:/bin',
+        HOME: process.env.HOME ?? '',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_OPTIONAL_LOCKS: '0',
+        GIT_TERMINAL_PROMPT: '0',
+        GIT_ASKPASS: '/bin/false',
+      },
+    },
+  );
+  if (proc.error || proc.status !== 0)
+    throw new Error('Fixed public GitHub main advertisement unavailable');
+  const match = /^([a-f0-9]{40})\trefs\/heads\/main\n?$/.exec(proc.stdout);
+  if (!match) throw new Error('Unexpected public GitHub main advertisement');
+  return match[1];
+}
+
+/** Test-only injected dependencies; CLI always uses the fixed public repo. */
+export async function inspectCurrentMainRuntime(
+  { checkout },
+  { currentMain = advertisedGithubMain, inspect = inspectInstalledRuntime } = {},
+) {
+  if (process.platform !== 'linux' || process.getuid?.() === 0 || !canonical(checkout))
+    throw new Error('Nonroot Linux and canonical owner primary required');
+  const expectedMain = await currentMain();
+  if (!SHA.test(expectedMain)) throw new Error('Invalid advertised GitHub main SHA');
+  const report = await inspect({ expectedMain, checkout });
+  const secondMain = await currentMain();
+  if (secondMain !== expectedMain) throw new Error('GitHub main moved while inspecting runtime');
+  if (
+    !report ||
+    !['blocked', 'source-and-process-metadata-consistent'].includes(report.status) ||
+    !Array.isArray(report.reasons) ||
+    report.expectedMainSha !== expectedMain ||
+    !SHA.test(report.ownerHeadSha ?? '') ||
+    report.readOnly !== true ||
+    report.endToEndVerified !== false
+  )
+    throw new Error('Untrusted runtime metadata; no golden authorization');
+
+  const reasons = [...new Set(report.reasons)];
+  if (report.ownerHeadSha !== expectedMain)
+    reasons.push('owner-primary-behind-advertised-github-main');
+  if (report.status !== 'source-and-process-metadata-consistent')
+    reasons.push('installed-owner-runtime-metadata-unverified');
+  const blocked = reasons.length > 0;
+  return {
+    status: blocked ? 'blocked' : 'current-main-runtime-metadata-consistent-only',
+    reasons: [...new Set(reasons)].sort(),
+    advertisedGitHubMainSha: expectedMain,
+    ownerHeadSha: report.ownerHeadSha,
+    liveSupervisorIdentityVerified: report.liveSupervisorIdentityVerified === true,
+    checkedLiveGitHubMainTwice: true,
+    mayConsiderSeparateOwnerGoldenAuthorization: !blocked,
+    liveRuntimeVersionVerified: false,
+    approvedForOperatorGrants: false,
+    productionGrantIssued: false,
+    dockerExecuted: false,
+    productionAuditWritten: false,
+    draftPrCreated: false,
+    endToEndVerified: false,
+    readOnly: true,
+    systemdMutated: false,
+    sourceMutated: false,
+  };
 }
 
 export function parseUserUnitShow(output) {
@@ -249,8 +344,10 @@ export async function inspectInstalledRuntime(
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  const request = parseRuntimeArgs(argv);
-  const report = await inspectInstalledRuntime(request);
+  const report =
+    argv[0] === '--check-current-github-main'
+      ? await inspectCurrentMainRuntime(parseCurrentMainArgs(argv))
+      : await inspectInstalledRuntime(parseRuntimeArgs(argv));
   process.stdout.write(JSON.stringify(report) + '\n');
   if (report.status === 'blocked') process.exitCode = 2;
 }
