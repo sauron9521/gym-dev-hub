@@ -1167,3 +1167,28 @@ writes, Draft PR creation or `endToEndVerified`. A verified owner-controlled
 backup/stop/fast-forward/build/start is a separate explicitly authorized step.
 The original current-main authenticated HTTP→Docker and disposable Draft PR
 exact-CI acceptance still requires real receipts.
+
+## #108 — clean SIGTERM for owner systemd stop (PR #144)
+
+During the first owner-authorized live cutover, `systemctl --user stop`
+terminated the API/Web children but left the user unit `failed` because the
+Node supervisor explicitly set exit status **143** on `SIGTERM`. The next
+fast-forward/start needed a separately authorized `reset-failed`. This
+was a shutdown status problem, not proof of a failed Docker or HTTP check.
+
+The supervisor now treats `SIGTERM` as a **normal stop request** and exits
+with code **0** after terminating its two detached API/Web children. A child
+that exits unexpectedly **before** a stop still yields a **nonzero**
+supervisor exit, preserving systemd `Restart=on-failure` and the existing
+owner failure safety policy. `SIGINT` remains 130. No installed systemd
+unit is edited, reloaded, stopped or restarted by this PR.
+
+Isolated process-level fixtures run two disposable Node child processes:
+the positive case issues one real SIGTERM to the disposable supervisor
+and expects exit 0 plus two child-exit receipts; the negative case
+forces a child crash and verifies nonzero exit. They do not exercise the
+actual owner unit and cannot count as real current-main E2E acceptance.
+After owner review/merge, only a **separately owner-authorized** guarded
+backup/stop/fast-forward/build/start can load the fix into the live
+supervisor. The current-main browser/HTTP→Docker and test Draft PR/CI
+receipts are still required before closing #108.

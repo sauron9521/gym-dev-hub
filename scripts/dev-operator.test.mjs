@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   operatorPorts,
@@ -105,4 +107,85 @@ test('Linux CLI rejects remote Docker before starting API/Web or exposing an ove
   assert.match(result.stderr, /remote Docker overrides denied/);
   assert.ok(!result.stderr.includes(remote));
   assert.ok(!result.stdout.includes('OPERATOR_SERVICES_STARTED'));
+});
+
+// Execute only a temporary supervisor fixture. No host API/Web, systemctl,
+// Docker, repository working tree or production credentials are contacted.
+async function withProcessFixture(crash, verify) {
+  const dir = await mkdtemp(join(tmpdir(), 'hub-sigterm-supervisor-'));
+  const entry = join(dir, 'fixture-supervisor.mjs');
+  const source = new URL('./dev-operator.mjs', import.meta.url).href;
+  const healthy =
+    "process.on('SIGTERM', () => process.exit(0)); setTimeout(() => process.exit(0), 4500)";
+  const failed = 'setTimeout(() => process.exit(7), 300)';
+  const program =
+    [
+      'import { runServices } from ' + JSON.stringify(source) + ';',
+      'const child = (body) => ({',
+      '  executable: process.execPath,',
+      '  args: ["-e", body],',
+      '  cwd: ' + JSON.stringify(dir) + ',',
+      '  env: { PATH: process.env.PATH ?? "" },',
+      '});',
+      'runServices({ api: child(' + JSON.stringify(crash ? failed : healthy) + '),',
+      '  web: child(' + JSON.stringify(healthy) + ') }, { apiPort: 31221, webPort: 31220 });',
+    ].join('\n') + '\n';
+  await writeFile(entry, program, { mode: 0o600 });
+  const proc = spawn(process.execPath, [entry], {
+    cwd: dir,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' },
+  });
+  let output = '';
+  const finished = new Promise((resolve, reject) => {
+    proc.once('error', reject);
+    proc.once('exit', (code, signal) => resolve({ code, signal, output }));
+  });
+  proc.stdout.on('data', (x) => {
+    output += x.toString();
+  });
+  proc.stderr.on('data', (x) => {
+    output += x.toString();
+  });
+  const deadline = setTimeout(() => proc.kill('SIGKILL'), 8000);
+  try {
+    await verify({ proc, finished, getOutput: () => output });
+  } finally {
+    clearTimeout(deadline);
+    if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGTERM');
+    await finished;
+    await rm(dir, { force: true, recursive: true });
+  }
+}
+
+async function waitForOperatorStarted(finished, getOutput) {
+  for (let i = 0; i < 160; i++) {
+    if (getOutput().includes('OPERATOR_SERVICES_STARTED')) return;
+    await Promise.race([new Promise((resolve) => setTimeout(resolve, 25)), finished]);
+  }
+  throw new Error('Disposable supervisor did not report a started fixture');
+}
+
+test('systemd SIGTERM exits supervisor 0 after shutting down both detached fixture children', async (t) => {
+  if (process.platform !== 'linux') return t.skip('Linux signal contract');
+  await withProcessFixture(false, async ({ proc, finished, getOutput }) => {
+    await waitForOperatorStarted(finished, getOutput);
+    assert.equal(proc.kill('SIGTERM'), true);
+    const result = await finished;
+    assert.equal(result.code, 0, 'SIGTERM is a clean systemd stop');
+    assert.equal(result.signal, null);
+    assert.match(result.output, /OPERATOR_SERVICES_STARTED/);
+    assert.equal((result.output.match(/OPERATOR_CHILD_EXIT/g) ?? []).length, 2);
+  });
+});
+
+test('a child failing before any stop request keeps supervisor exit nonzero', async (t) => {
+  if (process.platform !== 'linux') return t.skip('Linux signal contract');
+  await withProcessFixture(true, async ({ finished, getOutput }) => {
+    await waitForOperatorStarted(finished, getOutput);
+    const result = await finished;
+    assert.equal(result.code, 7);
+    assert.equal(result.signal, null);
+    assert.match(result.output, /OPERATOR_CHILD_EXIT/);
+  });
 });

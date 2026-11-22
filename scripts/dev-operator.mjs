@@ -134,7 +134,7 @@ function build(builds) {
     }
   }
 }
-function runServices(config, ports) {
+export function runServices(config, ports) {
   const children = [];
   let shuttingDown = false;
   let exitCode = 0;
@@ -161,7 +161,9 @@ function runServices(config, ports) {
       process.exitCode = exitCode;
   }
   process.on('SIGINT', () => shutdown(130));
-  process.on('SIGTERM', () => shutdown(143));
+  // SIGTERM is the expected systemd stop request, not a supervisor crash.
+  // Preserve nonzero errors from a child that already failed before shutdown.
+  process.on('SIGTERM', () => shutdown(0));
   process.on('exit', () => terminate());
   for (const [name, cmd] of Object.entries({ api: config.api, web: config.web })) {
     const child = spawn(cmd.executable, cmd.args, {
