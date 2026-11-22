@@ -987,3 +987,52 @@ owner can configure an appropriately scoped read-only GitHub API token
 where the existing GitHub service expects it, then verify specific
 workflow runs and check conclusions at the exact target SHA. Do not
 copy credentials into logs, front-end state, documentation or a PR.
+
+## #108 — verify one _actual_ persisted Docker receipt without issuing another grant (PR #136)
+
+After an **explicit owner-authorized real Hub HTTP** `patch-check-authorize`
+followed by `patch-check-execute`, keep the returned **non-secret**
+`sessionId`, `planId`, `grantId`, `runId`, `recipeId` and exact
+`sourceCommit` from that invocation. Never put any `grantToken`,
+`operatorSecret`, HTTP Authorization header, raw logs, code or `.env`
+values in a script argument, terminal transcript or GitHub comment.
+
+The read-only verifier consumes the **actual owner-private production**
+`apps/api/.local/patch-checks/audit.jsonl`, not an isolated smoke
+journal. It must be run on Linux from a trusted primary Git `main`
+checkout at the exact externally verified SHA, with existing 0700
+audit directories / 0600 journal. It does **not** run Docker, issue
+authorizations, consume grants, create commits or create Draft PRs.
+
+```sh
+node scripts/launch-verify-docker-receipt.mjs --check-only \
+  --expected-main=EXACT_40_HEX_GITHUB_MAIN_SHA \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub \
+  --session-id=ACTUAL_SESSION_UUID \
+  --plan-id=ACTUAL_PLAN_UUID \
+  --grant-id=ACTUAL_GRANT_UUID \
+  --run-id=ACTUAL_RUN_UUID \
+  --recipe-id=WEB_FORMAT
+```
+
+A success requires exactly one matching chain
+`issued → attempted → passed` for the pinned source, plan, session,
+grant, recipe and run, a stable full-file owner-only journal read, no
+replay or conflicting events, positive terminal metadata, and
+`containerRemoved:true`. The output is limited to those safe IDs,
+journal SHA-256 and booleans: `dockerReexecuted:false`,
+`githubPrCreated:false`, `endToEndVerified:false`.
+
+If the source checkout is stale, there is no matching receipt, a grant
+was rejected, the process was interrupted, or any journal record is
+truncated/unsafe, the tool fails closed and **does not claim a pass**.
+Do not automatically retry authorizations or re-execute a recipe.
+
+The private local JSONL is **not a cryptographically tamper-proof
+external ledger**: this verifies its current structure and durability
+view only, not real network isolation or a fresh Docker invocation by
+itself. Correlate each output with the owner-observed HTTP request,
+runtime PID, corresponding Docker recipe and isolated runner policy,
+then separately verify the Draft PR's exact SHA and actual GitHub CI
+conclusions before ever declaring the full #108 flow accepted.
+Keep #108 OPEN until _all_ those independent facts are proven.
