@@ -946,3 +946,13 @@ The current private store pin is a separate owner maintenance operation
 then independently prove the running API revision, offline Docker recipes
 and durable passed/interrupted receipts before claiming production
 acceptance. A closed issue by itself is not evidence that these tests ran.
+
+## Optional systemd --user restart/persistence preparation (PR #134)
+
+See [the owner-controlled systemd user-service runbook](launch-systemd-user-service.md)
+for safe, bounded restart-on-failure and login-time startup. The generator
+is **read-only** and does not install, enable, start, stop, or restart the
+Hub. Current live operator and private logs are unchanged. On Linux Mint
+with `Linger=no`, user units cannot start before owner login without a
+separately approved privileged linger change. This is not a Docker recipe
+or the end-to-end issue #108 acceptance receipt.
