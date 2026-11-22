@@ -6,6 +6,7 @@
 import { spawnSync } from 'node:child_process';
 import { lstat, realpath } from 'node:fs/promises';
 import { request } from 'node:http';
+import { performance } from 'node:perf_hooks';
 import { join, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspectSource } from './launch-source-reconcile.mjs';
@@ -29,6 +30,11 @@ const FIELDS = [
 ];
 const EXPECTED_DIRTY = ['apps/web/next-env.d.ts', 'turbo.json'];
 const PORTS = [3100, 3101];
+// Next.js development mode may compile its first HTTP request after systemd is already running.
+// Bound the whole post-start probe window; no extra systemctl start/restart is permitted.
+const START_HEALTH_WINDOW_MS = 30_000;
+const HTTP_REQUEST_TIMEOUT_MS = 4_000;
+const HEALTH_RETRY_DELAY_MS = 600;
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
 function absolute(path) {
@@ -139,7 +145,7 @@ export async function validatePinnedSource(checkout, expectedMain) {
   return true;
 }
 
-async function httpHealth(port, path) {
+export async function httpHealth(port, path) {
   return new Promise((done) => {
     const req = request(
       {
@@ -147,7 +153,7 @@ async function httpHealth(port, path) {
         port,
         path,
         method: 'GET',
-        timeout: 1500,
+        timeout: HTTP_REQUEST_TIMEOUT_MS,
         agent: false,
         headers: { Connection: 'close' },
       },
@@ -189,7 +195,9 @@ export async function runOwnerSystemdStart(
     inspect = inspectSupervisor,
     health = fixedHealth,
     sleep = wait,
-    maxChecks = 12,
+    now = () => performance.now(),
+    healthWindowMs = START_HEALTH_WINDOW_MS,
+    maxChecks = 24,
   } = {},
 ) {
   if (
@@ -200,6 +208,18 @@ export async function runOwnerSystemdStart(
     !['--check-only', '--confirm-owner-systemd-start'].includes(mode)
   )
     throw new Error('Non-root Linux, fixed mode, owner source and full pinned SHA required');
+
+  // Refuse an invalid bounded verification policy before making a systemd write.
+  if (
+    !Number.isSafeInteger(maxChecks) ||
+    maxChecks < 1 ||
+    maxChecks > 24 ||
+    !Number.isSafeInteger(healthWindowMs) ||
+    healthWindowMs < 1000 ||
+    healthWindowMs > 30_000 ||
+    typeof now !== 'function'
+  )
+    throw new Error('Invalid bounded post-start policy');
 
   const checkStopped = async () => {
     await source(checkout, expectedMain);
@@ -236,10 +256,11 @@ export async function runOwnerSystemdStart(
   // Explicit opt-in. Recheck immediately before the sole start request.
   await checkStopped();
   await start(); // A lost response is ambiguous; no auto-retry and no auto-stop.
-  if (!Number.isSafeInteger(maxChecks) || maxChecks < 1 || maxChecks > 20)
-    throw new Error('Invalid bounded post-start policy');
+  const startedAt = now();
+  if (!Number.isFinite(startedAt)) throw new Error('Invalid monotonic clock');
+  const deadline = startedAt + healthWindowMs;
 
-  for (let attempt = 0; attempt < maxChecks; attempt++) {
+  for (let attempt = 0; attempt < maxChecks && now() < deadline; attempt++) {
     try {
       const a = parseActive(await unit(), checkout);
       const p = await inspect(checkout, a.pid);
@@ -248,7 +269,13 @@ export async function runOwnerSystemdStart(
       const b = parseActive(await unit(), checkout);
       const q = await inspect(checkout, b.pid);
       await source(checkout, expectedMain);
-      if (ok && a.pid === b.pid && exactProcess(q) && q.startTicks === p.startTicks)
+      if (
+        ok &&
+        now() < deadline &&
+        a.pid === b.pid &&
+        exactProcess(q) &&
+        q.startTicks === p.startTicks
+      )
         return {
           status: 'owner-systemd-start-health-verified',
           ...base,
@@ -260,7 +287,9 @@ export async function runOwnerSystemdStart(
     } catch {
       // Health can become ready shortly after systemctl start; no second start.
     }
-    if (attempt + 1 < maxChecks) await sleep(350);
+    // One fixed retry delay and a monotonic deadline. No start or stop retries.
+    if (attempt + 1 < maxChecks && now() < deadline)
+      await sleep(Math.min(HEALTH_RETRY_DELAY_MS, Math.max(0, deadline - now())));
   }
   throw new Error('START_OUTCOME_UNVERIFIED: no auto stop/restart/retry; inspect owner service');
 }
