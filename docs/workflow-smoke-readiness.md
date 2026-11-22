@@ -956,3 +956,34 @@ Hub. Current live operator and private logs are unchanged. On Linux Mint
 with `Linger=no`, user units cannot start before owner login without a
 separately approved privileged linger change. This is not a Docker recipe
 or the end-to-end issue #108 acceptance receipt.
+
+## Issue #108 — GitHub REST rate limit vs read-only source freshness (PR #135)
+
+The Hub's `/workspace/sessions/workflow-readiness` checks the **current
+main SHA** from GitHub REST and compares it with the local primary checkout.
+An anonymous GitHub REST request can return HTTP 403 (for example when
+rate-limited, even for a public repository). This is not evidence that
+local Git is stale, and it must not be reported as a valid CI check.
+
+When REST does not supply a valid 40-character SHA, the Hub now uses
+**only** a fixed, credential-free, noninteractive `git ls-remote` for
+`https://github.com/sauron9521/gym-dev-hub.git` and
+`refs/heads/main`. It does not use an arbitrary user input, Git
+credential helper, owner environment token, `git fetch` or write to the
+checkout. The output must contain exactly one fully formed SHA/ref line;
+timeouts, network errors or unexpected data remain unknown. An exact
+match allows the **source gate only** to be configured. A mismatch
+blocks source, even if the REST API is unavailable.
+
+Critically, the **CI gate stays `unknown`** whenever GitHub REST main
+could not be verified. A public ref cannot prove GitHub API rights,
+Actions readiness, successful CI, authorization grants, Docker checks
+or `endToEndVerified`. Never allow a `10/11` source-only readiness
+status to be displayed or interpreted as acceptance of the complete
+Issue #108 workflow.
+
+To establish actual GitHub Actions readiness, a separately approved
+owner can configure an appropriately scoped read-only GitHub API token
+where the existing GitHub service expects it, then verify specific
+workflow runs and check conclusions at the exact target SHA. Do not
+copy credentials into logs, front-end state, documentation or a PR.

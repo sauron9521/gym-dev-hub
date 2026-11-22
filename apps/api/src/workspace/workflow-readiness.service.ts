@@ -12,6 +12,7 @@ import { resolve } from 'node:path';
 import { GitHubService } from '../github/github.service.js';
 import { WorktreeGitService } from '../worktree/worktree-git.service.js';
 import { configuredCommitIdentity } from '../worktree/worktree-fixed-commit.js';
+import { readPublicGitHubMainSha } from './workflow-public-main-ref.js';
 
 type SafeEnvironment = Readonly<Record<string, string | undefined>>;
 const SHA = /^[a-f0-9]{40}$/;
@@ -155,6 +156,11 @@ export class WorkflowReadinessService {
     private readonly git: WorktreeGitService,
   ) {}
 
+  /** Public ref fallback only; available for hermetic regression stubs. */
+  async readPublicMainHead(): Promise<string | null> {
+    return readPublicGitHubMainSha();
+  }
+
   async report(): Promise<WorkflowReadinessReport> {
     let authorValid = false;
     try {
@@ -178,7 +184,11 @@ export class WorkflowReadinessService {
     ]);
     const localHeadSha = local.status === 'fulfilled' && SHA.test(local.value) ? local.value : null;
     const received = github.status === 'fulfilled' ? github.value.object?.sha : undefined;
-    const githubMainSha = received && SHA.test(received) ? received : null;
+    const apiMainSha = received && SHA.test(received) ? received : null;
+    // A public Git ref can establish source freshness when anonymous REST is
+    // rate-limited, but cannot establish API reachability or actual CI status.
+    const gitMain = apiMainSha ? null : await this.readPublicMainHead();
+    const githubMainSha = apiMainSha ?? (gitMain && SHA.test(gitMain) ? gitMain : null);
     const sourceState = !localHeadSha
       ? 'blocked'
       : !githubMainSha
@@ -191,7 +201,9 @@ export class WorkflowReadinessService {
       : !githubMainSha
         ? 'GitHub main недоступний — актуальність локального коду невідома'
         : sourceState === 'configured'
-          ? 'Локальний HEAD збігається з поточним GitHub main'
+          ? apiMainSha
+            ? 'Локальний HEAD збігається з поточним GitHub main'
+            : 'Локальний HEAD збігається з публічним Git main (read-only); GitHub REST/CI недоступний'
           : 'Локальний HEAD відстає або відрізняється від GitHub main; не змінюй локальні файли автоматично';
     const all: WorkflowReadinessGate[] = [
       {
@@ -205,9 +217,11 @@ export class WorkflowReadinessService {
       {
         id: 'ci',
         title: 'GitHub CI readiness',
-        state: githubMainSha ? 'configured' : 'unknown',
+        state: apiMainSha ? 'configured' : 'unknown',
         missingKeys: [],
-        note: 'Read-only CI доступний після Draft PR; успіх checks тут не підтверджено',
+        note: apiMainSha
+          ? 'Read-only CI доступний після Draft PR; успіх checks тут не підтверджено'
+          : 'GitHub REST API недоступний; public git main не підтверджує CI. Перевір API-доступ окремо',
       },
     ];
     return {
