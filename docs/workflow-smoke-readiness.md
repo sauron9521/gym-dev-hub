@@ -1076,3 +1076,29 @@ node scripts/launch-owner-systemd-stop.mjs --confirm-owner-systemd-stop \
 The tool rechecks the exact unit identity, user-owned supervisor and birthtime before one fixed `systemctl --user stop gym-dev-hub-operator.service` call. The result must show an inactive/dead unit, no remaining known Hub processes and unused default ports 3100/3101, then **inactive/dead again**. No force, SIGKILL, restart, auto-retry or Git update is available. Systemd offers no atomic PID-compare-and-stop primitive: changes in the narrow final check-to-stop window cannot be completely eliminated; an ambiguous response must be investigated, **never blindly retried**. Nondefault service ports require independent owner verification.
 
 Even a successful stop does **not** authorize a fast-forward: next separately confirm an exact GitHub main SHA, the two-file private source backup and existing `launch-owner-fast-forward.mjs` checks, then separately build and start the service; the full authenticated HTTP-to-Docker receipt and Draft PR/CI golden workflow remain unverified. Keep #108 OPEN until verified. No live owner stop is performed as part of PR #138.
+
+## #108 — guarded post-cutover systemd user start (PR #139)
+
+Use only **after a separately approved and completed** service stop, owner-backup and current-main fast-forward, frozen offline dependency install and fresh API/Web build. The installed `gym-dev-hub-operator.service` must be inactive/dead with `MainPID=0`, and its working directory must be the canonical physical owner primary checkout.
+
+First verify the expected SHA independently against GitHub main, then run a non-mutating preflight:
+
+```sh
+node scripts/launch-owner-systemd-start.mjs --check-only \
+  --expected-main=EXACT_40_HEX_CURRENT_GITHUB_MAIN \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub
+```
+
+The preflight only reads trusted Git metadata, checks for an existing owner-owned built API artifact, verifies the fixed systemd user-unit is inactive/enabled with the expected working directory, checks the owner process inventory, and confirms default ports 3100/3101 are free. It refuses a linked worktree, stale/mismatched primary SHA or unexpected tracked changes; the two known owner edits and `.worktrees/` remain preserved. It does **not** access `.env` or production audit journals, mutate Git, start services, or authorize Docker.
+
+After **separate explicit owner approval**, the only opt-in command is:
+
+```sh
+node scripts/launch-owner-systemd-start.mjs --confirm-owner-systemd-start \
+  --expected-main=EXACT_40_HEX_CURRENT_GITHUB_MAIN \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub
+```
+
+Immediately before the single fixed `systemctl --user start gym-dev-hub-operator.service`, it repeats the complete preflight. After start it checks a stable exact operator supervisor PID/birthtime and HTTP 200 at both `127.0.0.1:3101/health/live` and `127.0.0.1:3100/`, then confirms the source SHA again. Time-bounded health polling is **not** a repeated start. If `systemctl` returns an ambiguous error, or post-start health cannot be established, it reports failure without automatically restarting, stopping or retrying; inspect the real service manually.
+
+Success is **not proof** of immutable runtime bytes, authorization for write operations or a full golden workflow. It does not run Docker, create GitHub branches/PRs or change Gym Platform. Current-main production HTTP→Docker receipts, negative interruption/replay, and the owner-authorized disposable Draft PR + exact-head CI remain outstanding; #108 remains OPEN. A normal implementation PR does not authorize a production start.
