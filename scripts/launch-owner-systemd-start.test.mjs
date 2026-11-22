@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
 import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +10,7 @@ import {
   parseOwnerStartArgs,
   runOwnerSystemdStart,
   validatePinnedSource,
+  httpHealth,
 } from './launch-owner-systemd-start.mjs';
 
 const ROOT = '/home/owner/Projects/gym-dev-hub';
@@ -248,5 +251,109 @@ test('real physical owner Git fixture accepts exact built main and rejects stale
     );
   } finally {
     await rm(f.checkout, { recursive: true, force: true });
+  }
+});
+
+test('cold Next.js first request may take over 1500 ms, but an actual delayed HTTP 200 is accepted', async () => {
+  const server = createServer((req, res) => {
+    if (req.url === '/unhealthy') {
+      res.writeHead(503).end();
+      return;
+    }
+    setTimeout(() => res.writeHead(200).end('healthy'), 1900);
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address !== 'string');
+    assert.equal(await httpHealth(address.port, '/unhealthy'), false);
+    assert.equal(await httpHealth(address.port, '/slow-cold-start'), true);
+  } finally {
+    await new Promise((done) => server.close(done));
+  }
+});
+
+test('cold Web readiness after 17 initially failed probes passes with one single owner start', async () => {
+  let clock = 0;
+  let checks = 0;
+  const t = controls({
+    health: async () => ++checks >= 18,
+    maxChecks: 24,
+    now: () => clock,
+    sleep: async (ms) => {
+      clock += ms;
+    },
+    healthWindowMs: 20_000,
+  });
+  const result = await runOwnerSystemdStart(request('--confirm-owner-systemd-start'), t.testDeps);
+  assert.equal(result.status, 'owner-systemd-start-health-verified');
+  assert.equal(result.httpHealthVerified, true);
+  assert.equal(result.endToEndVerified, false);
+  assert.equal(t.getStarts(), 1);
+  assert.equal(checks, 18);
+  assert.ok(clock > 9000 && clock < 20_000);
+});
+
+test('monotonic startup verification deadline fails closed, never restarts or stops service', async () => {
+  let clock = 0;
+  let checks = 0;
+  const t = controls({
+    health: async () => {
+      checks++;
+      return false;
+    },
+    now: () => clock,
+    sleep: async (ms) => {
+      clock += ms;
+    },
+    maxChecks: 24,
+    healthWindowMs: 2000,
+  });
+  await assert.rejects(
+    () => runOwnerSystemdStart(request('--confirm-owner-systemd-start'), t.testDeps),
+    /START_OUTCOME_UNVERIFIED/,
+  );
+  assert.equal(clock, 2000);
+  assert.equal(checks, 4);
+  assert.equal(t.getStarts(), 1);
+  assert.equal(t.running(), true);
+});
+
+test('health response after deadline cannot claim a successful startup', async () => {
+  let clock = 0;
+  let checks = 0;
+  const t = controls({
+    health: async () => {
+      checks++;
+      clock += 2100;
+      return true;
+    },
+    now: () => clock,
+    healthWindowMs: 2000,
+  });
+  await assert.rejects(
+    () => runOwnerSystemdStart(request('--confirm-owner-systemd-start'), t.testDeps),
+    /START_OUTCOME_UNVERIFIED/,
+  );
+  assert.equal(checks, 1);
+  assert.equal(t.getStarts(), 1);
+  assert.equal(t.running(), true);
+});
+
+test('invalid post-start timing policy is rejected BEFORE a systemd start', async () => {
+  for (const bad of [
+    { maxChecks: 25 },
+    { maxChecks: 0 },
+    { healthWindowMs: 31_000 },
+    { healthWindowMs: 0 },
+    { now: null },
+  ]) {
+    const t = controls(bad);
+    await assert.rejects(
+      () => runOwnerSystemdStart(request('--confirm-owner-systemd-start'), t.testDeps),
+      /Invalid bounded post-start policy/,
+    );
+    assert.equal(t.getStarts(), 0);
   }
 });
