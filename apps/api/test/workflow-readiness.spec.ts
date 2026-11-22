@@ -3,6 +3,7 @@ import {
   evaluateWorkflowEnvironment,
   WorkflowReadinessService,
 } from '../src/workspace/workflow-readiness.service.js';
+import { parsePublicMainRef } from '../src/workspace/workflow-public-main-ref.js';
 
 const SHA = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
@@ -145,11 +146,76 @@ describe('read-only full-workflow smoke readiness', () => {
     for (const [key, value] of Object.entries(allConfigured)) vi.stubEnv(key, value);
     github.request.mockRejectedValueOnce(new Error('403 with credential details'));
     const service = new WorkflowReadinessService(github as never, git as never);
+    const publicHead = vi.spyOn(service, 'readPublicMainHead').mockResolvedValue(null);
     const result = await service.report();
+    expect(publicHead).toHaveBeenCalledExactlyOnceWith();
     expect(result.source).toMatchObject({ state: 'unknown', githubMainSha: null });
     expect(result.preconditionsSatisfied).toBe(false);
     expect(result.gates.find((x) => x.id === 'ci')?.state).toBe('unknown');
     expect(JSON.stringify(result)).not.toContain('credential details');
+  });
+
+  it('recovers public main source SHA from credential-free git when GitHub REST is 403, not CI', async () => {
+    for (const [key, value] of Object.entries(allConfigured)) vi.stubEnv(key, value);
+    github.request.mockRejectedValueOnce(new Error('403 and private details must not leak'));
+    const service = new WorkflowReadinessService(github as never, git as never);
+    const publicHead = vi.spyOn(service, 'readPublicMainHead').mockResolvedValue(SHA);
+    const result = await service.report();
+    expect(publicHead).toHaveBeenCalledOnce();
+    expect(result.source).toEqual({
+      localHeadSha: SHA,
+      githubMainSha: SHA,
+      state: 'configured',
+    });
+    expect(result.gates.find((x) => x.id === 'source')?.note).toContain('read-only');
+    expect(result.gates.find((x) => x.id === 'ci')?.state).toBe('unknown');
+    expect(result.configuredCount).toBe(10);
+    expect(result.totalCount).toBe(11);
+    expect(result.preconditionsSatisfied).toBe(false);
+    expect(result.githubPermissionsVerified).toBe(false);
+    expect(result.dockerExecutionVerified).toBe(false);
+    expect(result.endToEndVerified).toBe(false);
+    expect(JSON.stringify(result)).not.toContain('private details');
+    expect(JSON.stringify(result)).not.toContain(TOKEN);
+    expect(JSON.stringify(result)).not.toContain(SECRET);
+  });
+
+  it('blocks a stale main even when recovered from public Git ref; CI remains unknown', async () => {
+    github.request.mockRejectedValueOnce(new Error('HTTP 403'));
+    const service = new WorkflowReadinessService(github as never, git as never);
+    vi.spyOn(service, 'readPublicMainHead').mockResolvedValue(OTHER);
+    const result = await service.report();
+    expect(result.source).toEqual({ localHeadSha: SHA, githubMainSha: OTHER, state: 'blocked' });
+    expect(result.gates.find((x) => x.id === 'ci')?.state).toBe('unknown');
+    expect(result.preconditionsSatisfied).toBe(false);
+  });
+
+  it('treats malformed public fallback or missing local HEAD as blocked/unknown', async () => {
+    github.request.mockRejectedValue(new Error('GitHub API not available'));
+    const service = new WorkflowReadinessService(github as never, git as never);
+    const publicHead = vi.spyOn(service, 'readPublicMainHead').mockResolvedValue('bad-sha');
+    const first = await service.report();
+    expect(first.source).toMatchObject({ state: 'unknown', githubMainSha: null });
+    publicHead.mockResolvedValue(SHA);
+    git.headSha.mockRejectedValueOnce(new Error('private local worktree path'));
+    const second = await service.report();
+    expect(second.source).toMatchObject({
+      state: 'blocked',
+      githubMainSha: SHA,
+      localHeadSha: null,
+    });
+    expect(JSON.stringify(second)).not.toContain('private local worktree path');
+  });
+
+  it('does not run fallback on a well-formed authoritative GitHub REST main SHA', async () => {
+    const service = new WorkflowReadinessService(github as never, git as never);
+    const publicHead = vi
+      .spyOn(service, 'readPublicMainHead')
+      .mockRejectedValue(new Error('should not run'));
+    const result = await service.report();
+    expect(publicHead).not.toHaveBeenCalled();
+    expect(result.source.state).toBe('configured');
+    expect(result.gates.find((x) => x.id === 'ci')?.state).toBe('configured');
   });
 
   it('blocks missing/invalid local repo and never exposes filesystem paths', async () => {
@@ -159,5 +225,26 @@ describe('read-only full-workflow smoke readiness', () => {
     expect(result.source.localHeadSha).toBeNull();
     expect(result.source.state).toBe('blocked');
     expect(JSON.stringify(result)).not.toContain('/home/private');
+  });
+});
+
+describe('fixed public main Git ref parser', () => {
+  it('trusts only one exact lowercase GitHub main SHA + ref', () => {
+    expect(parsePublicMainRef(SHA + '\trefs/heads/main\n')).toBe(SHA);
+    expect(parsePublicMainRef(SHA + '\trefs/heads/main')).toBe(SHA);
+    for (const output of [
+      null,
+      undefined,
+      123,
+      '',
+      'malformed',
+      SHA.toUpperCase() + '\trefs/heads/main\n',
+      SHA + '\trefs/heads/feature\n',
+      SHA + '\trefs/heads/main\n' + OTHER + '\trefs/heads/main\n',
+      SHA + ' refs/heads/main\n',
+      SHA + '\trefs/heads/main\nextra',
+      'TOKEN=' + TOKEN,
+    ])
+      expect(parsePublicMainRef(output)).toBeNull();
   });
 });
