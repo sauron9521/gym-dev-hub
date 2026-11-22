@@ -78,6 +78,7 @@ test('read-only report treats dirty nonoverlap and preserved private paths as sa
   assert.equal(report.backupVerified, false);
   assert.equal(report.runtimeRestarted, false);
   assert.equal(report.worktreeCount, 42);
+  assert.equal(report.onlyKnownOwnerUntracked, true);
   assert.deepEqual(report.privateStatePresent, paths);
 });
 
