@@ -1050,3 +1050,29 @@ node scripts/launch-systemd-runtime-preflight.mjs --check-only \
 The fixed `gym-dev-hub-operator.service` is queried with `systemctl --user show` for **only seven non-secret properties**. The gate validates the real physical Git `main` checkout, trusted origin, installed service state, its exact working directory, and twice checks the same supervisor PID and process birthtime against Linux `/proc`; it also rereads systemd and Git source to reject detectable races. No full environment, bearer token, service journal, audit record or command line is emitted. `blocked` returns code 2.
 
 Even a successful `source-and-process-metadata-consistent` result explicitly reports `liveRuntimeVersionVerified:false`, `approvedForOperatorGrants:false`, `endToEndVerified:false`. **This is not permission** to authorize a Docker recipe or proof that a process started before the source update actually loaded new code. Owner must separately supervise graceful systemd stop, verified backup, owner-gated fast-forward, fresh build/restart, HTTP health and authenticated exact-SHA smoke. Never force service stop/restart, alter the primary checkout or touch Gym Platform as part of this read-only gate.
+
+## #108 — owner-gated systemd user stop without automatic source update (PR #138)
+
+When the installed Hub runs under `gym-dev-hub-operator.service`, use **systemd owner control**, not the older direct-PID SIGTERM utility for manually launched standalone operators. Read-only inspection uses the existing physical owner checkout's SHA, **not the newer remote main** (it may legitimately be stale before maintenance):
+
+```sh
+node scripts/launch-owner-systemd-stop.mjs --inspect-only \
+  --expected-owner-head=EXACT_40_HEX_CURRENT_PRIMARY_HEAD \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub
+```
+
+The JSON supplies the observed non-secret `supervisorPid` and `supervisorStartTicks` for review. It never signals a process, accesses secrets, alters Git, touches Docker or restarts the service. The source SHA must be pinned from the verified owner checkout, and the **new target main independently verified**. This inspection is **not permission** to stop or authorize a grant.
+
+After separate explicit owner approval, the only supported stop operation requires that exact previewed PID and Linux birthtime:
+
+```sh
+node scripts/launch-owner-systemd-stop.mjs --confirm-owner-systemd-stop \
+  --expected-owner-head=EXACT_40_HEX_CURRENT_PRIMARY_HEAD \
+  --operator-checkout=/absolute/path/to/primary/gym-dev-hub \
+  --supervisor-pid=ACTUAL_VERIFIED_PID \
+  --expected-start-ticks=ACTUAL_VERIFIED_LINUX_START_TICKS
+```
+
+The tool rechecks the exact unit identity, user-owned supervisor and birthtime before one fixed `systemctl --user stop gym-dev-hub-operator.service` call. The result must show an inactive/dead unit, no remaining known Hub processes and unused default ports 3100/3101, then **inactive/dead again**. No force, SIGKILL, restart, auto-retry or Git update is available. Systemd offers no atomic PID-compare-and-stop primitive: changes in the narrow final check-to-stop window cannot be completely eliminated; an ambiguous response must be investigated, **never blindly retried**. Nondefault service ports require independent owner verification.
+
+Even a successful stop does **not** authorize a fast-forward: next separately confirm an exact GitHub main SHA, the two-file private source backup and existing `launch-owner-fast-forward.mjs` checks, then separately build and start the service; the full authenticated HTTP-to-Docker receipt and Draft PR/CI golden workflow remain unverified. Keep #108 OPEN until verified. No live owner stop is performed as part of PR #138.
