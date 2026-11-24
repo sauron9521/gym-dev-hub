@@ -40,6 +40,7 @@ import type {
   WorktreePatchApplyGrant,
   WorktreePatchApplyResult,
   WorktreePostApplyReview,
+  WorktreePatchRecovery,
   WorktreePatchCheckGrant,
   WorktreePatchCheckResult,
   WorktreePatchCheckCancel,
@@ -199,6 +200,16 @@ export class WorktreePlanController {
     @Body() body: unknown,
   ): Promise<WorktreePatchApplyResult> {
     return this.patchApply.apply(sessionId, planId, body);
+  }
+
+  /** Restore only a verified consumed one-file patch; no write grant or replay. */
+  @Post(':planId/patch-recover')
+  patchRecover(
+    @Param('sessionId') sessionId: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ): Promise<WorktreePatchRecovery> {
+    return this.patchReview.recover(sessionId, planId, body);
   }
 
   /** Read-only audit + actual working tree Git diff, no scripts or Git mutation. */

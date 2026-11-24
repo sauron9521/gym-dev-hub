@@ -78,6 +78,7 @@ function allowedPath(segments: string[], method: string): string | null {
       'patch-apply-authorize',
       'patch-apply',
       'patch-review',
+      'patch-recover',
       'patch-check-authorize',
       'patch-check-execute',
       'patch-check-cancel',

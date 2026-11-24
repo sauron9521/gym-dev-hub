@@ -228,6 +228,15 @@ export interface WorktreePostApplyReview {
   mergeEnabled: false;
 }
 
+/** Operator-secret-gated, read-only recovery of an already applied one-file patch. */
+export interface WorktreePatchRecovery {
+  applied: WorktreePatchApplyResult;
+  verified: WorktreePostApplyReview;
+  readOnly: true;
+  grantIssued: false;
+  writesPerformed: false;
+}
+
 export type WorktreePatchCheckRecipe =
   'API_FORMAT' | 'API_TYPECHECK' | 'API_TEST' | 'WEB_FORMAT' | 'WEB_TYPECHECK' | 'WEB_TEST';
 

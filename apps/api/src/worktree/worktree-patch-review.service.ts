@@ -11,7 +11,7 @@ import { constants } from 'node:fs';
 import { lstat, open, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import type { WorktreePostApplyReview } from '@gym-dev-hub/contracts';
+import type { WorktreePatchRecovery, WorktreePostApplyReview } from '@gym-dev-hub/contracts';
 import { WorktreePlanService } from './worktree-plan.service.js';
 import { WorktreeIntegrityService } from './worktree-integrity.service.js';
 import { validateScopedCodePath } from './worktree-mount-probe.js';
@@ -19,6 +19,9 @@ import { validateScopedCodePath } from './worktree-mount-probe.js';
 const SHA = /^[a-f0-9]{64}$/;
 const MAX_AUDIT_BYTES = 1024 * 1024;
 const MAX_DIFF_BYTES = 32_768;
+const recoverySchema = z.strictObject({
+  operatorSecret: z.string().min(32).max(256),
+});
 const requestSchema = z.strictObject({
   grantId: z.uuid(),
   fingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/),
@@ -243,6 +246,99 @@ export class WorktreePatchReviewService {
     private readonly plans: WorktreePlanService,
     private readonly integrity: WorktreeIntegrityService,
   ) {}
+
+  /**
+   * Recover an already consumed one-file patch from existing private audit
+   * metadata and the actual Git diff. Never reapply, authorize, commit or push.
+   * A missing, mixed, ambiguous or stale audit fails closed.
+   */
+  async recover(sessionId: string, planId: string, input: unknown): Promise<WorktreePatchRecovery> {
+    const parsed = recoverySchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException('Некоректний запит відновлення.');
+    authenticate(parsed.data.operatorSecret);
+
+    const plan = await this.plans.availableForMountProbe(sessionId, planId);
+    let entries: AuditLine[];
+    try {
+      entries = await auditEvents();
+    } catch {
+      throw new ConflictException('Приватний audit недоступний або пошкоджений.');
+    }
+    const applied = entries.filter(
+      (entry) =>
+        entry.event === 'applied' && entry.sessionId === sessionId && entry.planId === planId,
+    );
+    if (applied.length !== 1) {
+      throw new ConflictException('Немає єдиного застосованого патча для відновлення.');
+    }
+    const receipt = applied[0]!;
+    const history = entries.filter((entry) => entry.grantId === receipt.grantId);
+    if (
+      !receipt.grantId ||
+      !z.uuid().safeParse(receipt.grantId).success ||
+      !receipt.at ||
+      !Number.isFinite(Date.parse(receipt.at)) ||
+      !receipt.sourceCommit ||
+      !receipt.fingerprint ||
+      !receipt.sourceSha256 ||
+      !SHA.test(receipt.sourceSha256) ||
+      !receipt.proposedSha256 ||
+      !SHA.test(receipt.proposedSha256) ||
+      !receipt.filePathSha256 ||
+      !SHA.test(receipt.filePathSha256) ||
+      plan.baseHeadSha !== receipt.sourceCommit ||
+      plan.fingerprint !== receipt.fingerprint ||
+      history.length !== 3 ||
+      history.map((entry) => entry.event).join(',') !== 'issued,attempted,applied'
+    ) {
+      throw new ConflictException('Аудит патча неоднозначний або змінився.');
+    }
+
+    let filePath: string;
+    try {
+      const paths = await gitDiff(plan.targetPath, ['--name-only', '-z', 'HEAD', '--']);
+      const changed = paths.toString('utf8').split('\0').filter(Boolean);
+      if (changed.length !== 1) throw new Error('Unexpected files');
+      filePath = changed[0]!;
+      validateScopedCodePath(filePath);
+    } catch {
+      throw new ConflictException('Неможливо відновити єдиний Git diff.');
+    }
+    if (sha256(filePath) !== receipt.filePathSha256) {
+      throw new ConflictException('Git-файл не відповідає приватному аудиту.');
+    }
+
+    // The existing verifier independently reopens the private audit, checks
+    // one-file integrity twice and validates the real uncommitted Git diff.
+    const verified = await this.review(sessionId, planId, {
+      grantId: receipt.grantId,
+      fingerprint: receipt.fingerprint,
+      sourceCommit: receipt.sourceCommit,
+      filePath,
+      sourceSha256: receipt.sourceSha256,
+      proposedSha256: receipt.proposedSha256,
+      operatorSecret: parsed.data.operatorSecret,
+    });
+    return {
+      applied: {
+        sessionId,
+        planId,
+        grantId: receipt.grantId,
+        filePath,
+        sourceCommit: receipt.sourceCommit,
+        sourceSha256: receipt.sourceSha256,
+        proposedSha256: receipt.proposedSha256,
+        appliedAt: receipt.at,
+        status: 'applied',
+        mergeEnabled: false,
+        githubPushEnabled: false,
+      },
+      verified,
+      readOnly: true,
+      grantIssued: false,
+      writesPerformed: false,
+    };
+  }
 
   async review(
     sessionId: string,

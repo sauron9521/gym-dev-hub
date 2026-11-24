@@ -167,6 +167,60 @@ describe('read-only post-apply verification of one Git worktree file', () => {
     expect(git(target, ['status', '--porcelain'])).toContain('M src/main.ts');
   });
 
+  it('recovers a consumed one-file patch from the private audit with zero writes', async () => {
+    const auditBefore = await readFile(join(state, 'audit.jsonl'));
+    const sourceBefore = await readFile(join(source, PATH));
+    const targetBefore = await readFile(join(target, PATH));
+    const result = await review.recover(SESSION, PLAN_ID, { operatorSecret: SECRET });
+    expect(result).toMatchObject({
+      applied: {
+        sessionId: SESSION,
+        planId: PLAN_ID,
+        grantId,
+        sourceCommit: plan.baseHeadSha,
+        filePath: PATH,
+        sourceSha256: sha(BEFORE),
+        proposedSha256: sha(AFTER),
+        status: 'applied',
+        mergeEnabled: false,
+        githubPushEnabled: false,
+      },
+      verified: {
+        status: 'verified',
+        changedFiles: 1,
+        grantId,
+        readOnly: true,
+        commitCreated: false,
+        pushEnabled: false,
+        mergeEnabled: false,
+      },
+      readOnly: true,
+      grantIssued: false,
+      writesPerformed: false,
+    });
+    expect(result.verified.diff).toContain('+TWO');
+    expect(await readFile(join(state, 'audit.jsonl'))).toEqual(auditBefore);
+    expect(await readFile(join(source, PATH))).toEqual(sourceBefore);
+    expect(await readFile(join(target, PATH))).toEqual(targetBefore);
+  });
+
+  it('denies recovery with wrong secret or ambiguous audit chain', async () => {
+    await expect(
+      review.recover(SESSION, PLAN_ID, { operatorSecret: 'a'.repeat(40) }),
+    ).rejects.toThrow('Невірний секрет');
+    await audit('applied');
+    await expect(review.recover(SESSION, PLAN_ID, { operatorSecret: SECRET })).rejects.toThrow(
+      'Немає єдиного застосованого патча',
+    );
+  });
+
+  it('fails closed on an additional modified file without replaying the patch', async () => {
+    await writeFile(join(target, 'src/other.ts'), 'foreign change\\n');
+    await expect(review.recover(SESSION, PLAN_ID, { operatorSecret: SECRET })).rejects.toThrow(
+      'Неможливо відновити єдиний Git diff',
+    );
+  });
+
   it('rejects unknown, forged, mixed or post-failure audit receipts', async () => {
     await expect(
       review.review(SESSION, PLAN_ID, { ...input(), grantId: randomUUID() }),
